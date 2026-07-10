@@ -198,12 +198,19 @@ export function updateKey(input: ApiKeyUpdateInput): ApiKeyRecord {
   if (!existing) throw new Error(`api key not found: ${input.id}`)
 
   const hasEndpointUpdate = Object.prototype.hasOwnProperty.call(input, 'baseUrlOverride')
-  if (hasEndpointUpdate) {
+  const rebound = hasEndpointUpdate && originChanged(existing.provider_id, existing.base_url_override, input.baseUrlOverride)
+  const existingExtra = decryptExtra(existing.extra_credentials)
+  if (rebound) {
     const nextUrl = input.baseUrlOverride
     const endpoint = validateProviderEndpoint(existing.provider_id, nextUrl)
     if (!endpoint.ok) throw new Error(endpoint.reason)
-    if (originChanged(existing.provider_id, existing.base_url_override, nextUrl) && !input.apiKey) {
+    if (!input.apiKey) {
       throw new Error('credential re-entry required when changing provider endpoint')
+    }
+    for (const key of Object.keys(existingExtra)) {
+      if (!input.extra || typeof input.extra[key] !== 'string' || input.extra[key].length === 0) {
+        throw new Error('credential re-entry required for provider credentials')
+      }
     }
   }
 
@@ -211,7 +218,7 @@ export function updateKey(input: ApiKeyUpdateInput): ApiKeyRecord {
   const nextKey = input.apiKey?.trim()
   const encrypted = nextKey ? encryptSecret(nextKey) : existing.encrypted_key
   const tail = nextKey ? keyTail(nextKey) : existing.key_tail
-  const mergedExtra = { ...decryptExtra(existing.extra_credentials), ...(input.extra ?? {}) }
+  const mergedExtra = rebound ? { ...(input.extra ?? {}) } : { ...existingExtra, ...(input.extra ?? {}) }
   const nextExtra = Object.keys(mergedExtra).length > 0 ? encryptExtra(mergedExtra) : null
 
   db.prepare(

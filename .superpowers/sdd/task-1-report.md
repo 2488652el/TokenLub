@@ -32,3 +32,11 @@ Implemented main-process provider endpoint origin binding and credential re-entr
 - `src/main/ipc/register-handlers.ts`
 - `tests/unit/endpoint-policy.test.ts`
 - `tests/unit/store/keys-extra.test.ts`
+
+## Follow-up review fixes
+
+- HTTPS endpoints are now restricted to origins documented in the provider catalog; attacker-controlled HTTPS origins are rejected.
+- `newapi-generic` allows HTTP/HTTPS only for localhost, loopback, or RFC1918 private IPv4 addresses, and rejects other schemes/public hosts.
+- Endpoint rebinding requires a replacement main key and all previously stored extra credential fields. On rebinding, the submitted extra map replaces the old map instead of merging it.
+
+Follow-up verification: focused 25 tests passed, `npm run typecheck` passed, and full suite passed with 47 files / 307 tests.
