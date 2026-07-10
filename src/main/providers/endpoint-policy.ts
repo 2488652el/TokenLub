@@ -1,9 +1,19 @@
 import { getProvider } from './registry'
+import { getCatalogEntry } from '@shared/provider-catalog'
 
 type EndpointResult = { ok: true; origin: string } | { ok: false; reason: string }
 
 function isManualProvider(providerId: string): boolean {
   return getProvider(providerId)?.manifest.category === 'manual'
+}
+
+function documentedOrigins(providerId: string): Set<string> {
+  const entry = getCatalogEntry(providerId)
+  const urls = [entry?.defaultBaseUrl ?? '', ...(entry?.baseUrlTemplates ?? []).map((t) => t.url)]
+  return new Set(urls.flatMap((url) => {
+    const origin = parseOrigin(url)
+    return origin && url.startsWith('https://') ? [origin] : []
+  }))
 }
 
 function parseOrigin(rawUrl: string | null | undefined): string | null {
@@ -27,12 +37,15 @@ export function validateProviderEndpoint(
     return { ok: false, reason: 'endpoint must be a valid URL' }
   }
 
-  if (parsed.protocol === 'https:') return { ok: true, origin: parsed.origin }
-  const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]'
-  if (providerId === 'newapi-generic' && parsed.protocol === 'http:' && loopback) {
+  if (parsed.protocol === 'https:' && documentedOrigins(providerId).has(parsed.origin)) {
     return { ok: true, origin: parsed.origin }
   }
-  return { ok: false, reason: 'endpoint must use HTTPS' }
+  const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]'
+  const privateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(parsed.hostname)
+  if (providerId === 'newapi-generic' && (loopback || privateIpv4) && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+    return { ok: true, origin: parsed.origin }
+  }
+  return { ok: false, reason: parsed.protocol === 'https:' ? 'endpoint origin is not approved for this provider' : 'endpoint must use HTTP or HTTPS' }
 }
 
 export function originChanged(
