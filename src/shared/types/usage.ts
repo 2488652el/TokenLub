@@ -23,6 +23,8 @@ export interface UsageRecord {
   cost?: number
   currency?: string
   source: UsageSource
+  /** Stable provider-side dimension used to distinguish aggregate admin results. */
+  upstreamDimension?: string
   sessionId?: string
   messageId?: string
   agentLabel?: string

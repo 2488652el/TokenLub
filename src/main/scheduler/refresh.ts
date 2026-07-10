@@ -167,6 +167,9 @@ export function usageSliceToRecord(
     periodStart: slice.periodStart,
     periodEnd: slice.periodEnd,
     source: slice.source ?? 'vendor-api',
+    ...(slice.upstreamDimension !== undefined
+      ? { upstreamDimension: slice.upstreamDimension }
+      : {}),
     capturedAt: slice.periodEnd ?? opts.capturedAt ?? new Date().toISOString()
   }
   const promptTokens = finiteOrUndefined(slice.promptTokens)

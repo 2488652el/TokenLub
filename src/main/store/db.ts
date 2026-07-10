@@ -313,4 +313,64 @@ function applyMigrations(db: Database.Database): void {
     }
     db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(5)
   }
+
+  // --- v6: lossless vendor usage identity ---
+  // v2 omitted api_key_id and a provider result dimension, allowing Admin API
+  // rows from different keys or sibling results to overwrite one another.
+  if (currentVersion < 6) {
+    db.exec('BEGIN')
+    try {
+      db.exec(`
+        CREATE TABLE usage_records_v6 (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          api_key_id TEXT,
+          provider_id TEXT NOT NULL,
+          model TEXT NOT NULL,
+          period_start TEXT,
+          period_end TEXT,
+          prompt_tokens INTEGER,
+          completion_tokens INTEGER,
+          cache_creation_tokens INTEGER,
+          cache_read_tokens INTEGER,
+          total_tokens INTEGER,
+          cost REAL,
+          currency TEXT,
+          source TEXT NOT NULL,
+          upstream_dimension TEXT NOT NULL DEFAULT '',
+          session_id TEXT,
+          message_id TEXT,
+          agent_label TEXT,
+          captured_at TEXT NOT NULL,
+          UNIQUE (source, message_id)
+        );
+        INSERT OR IGNORE INTO usage_records_v6 (
+          id, api_key_id, provider_id, model, period_start, period_end,
+          prompt_tokens, completion_tokens, cache_creation_tokens, cache_read_tokens,
+          total_tokens, cost, currency, source, upstream_dimension, session_id,
+          message_id, agent_label, captured_at
+        ) SELECT
+          id, api_key_id, provider_id, model, period_start, period_end,
+          prompt_tokens, completion_tokens, cache_creation_tokens, cache_read_tokens,
+          total_tokens, cost, currency, source, '', session_id,
+          message_id, agent_label, captured_at
+        FROM usage_records ORDER BY id;
+        DROP TABLE usage_records;
+        ALTER TABLE usage_records_v6 RENAME TO usage_records;
+        CREATE INDEX idx_usage_source_provider
+          ON usage_records(source, provider_id, captured_at);
+        CREATE INDEX idx_usage_message_id
+          ON usage_records(source, message_id) WHERE message_id IS NOT NULL;
+        CREATE UNIQUE INDEX idx_usage_vendor_identity
+          ON usage_records(
+            source, COALESCE(api_key_id, ''), provider_id, model,
+            COALESCE(period_start, ''), upstream_dimension
+          ) WHERE source = 'vendor-api';
+      `)
+      db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(6)
+      db.exec('COMMIT')
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
 }

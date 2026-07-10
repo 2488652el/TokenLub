@@ -3,6 +3,7 @@
  * (glm-5.2)
  */
 import { describe, expect, it, vi } from 'vitest'
+import { createRequire } from 'node:module'
 
 /**
  * PR-1 v5 migration contract test.
@@ -67,6 +68,23 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { applyMigrationsForTest } from '../../../src/main/store/db'
 
+interface SqliteDb {
+  exec(sql: string): void
+  prepare(sql: string): {
+    get(...params: unknown[]): unknown
+    all(...params: unknown[]): unknown[]
+    run(...params: unknown[]): unknown
+  }
+}
+
+function createSqliteDb(): SqliteDb {
+  const nodeRequire = createRequire(import.meta.url)
+  const { DatabaseSync } = nodeRequire(['node', 'sqlite'].join(':')) as {
+    DatabaseSync: new (path: string) => SqliteDb
+  }
+  return new DatabaseSync(':memory:')
+}
+
 // PR-1 v5 迁移契约测试组:覆盖源 SQL 声明、迁移执行与幂等性
 describe('PR-1: db v5 migration contract', () => {
   it('source SQL declares the v5 ADD COLUMN steps with the documented defaults', () => {
@@ -98,7 +116,7 @@ describe('PR-1: db v5 migration contract', () => {
     expect(source).toContain("const SQLITE_SIDECAR_SUFFIXES = ['-wal', '-shm']")
   })
 
-  it('applyMigrationsForTest brings a fresh DB up to version 5 with both new columns', () => {
+  it('applyMigrationsForTest brings a fresh DB up to version 6 with both new columns', () => {
     // A brand-new DB: schema_version table will be created, no rows yet.
     const fresh = makeFakeDb({ version: 0, columns: [] })
     // applyMigrations creates api_keys via CREATE TABLE IF NOT EXISTS; we
@@ -120,11 +138,11 @@ describe('PR-1: db v5 migration contract', () => {
 
     applyMigrationsForTest(fresh as unknown as Parameters<typeof applyMigrationsForTest>[0])
 
-    // After v5 migration, schema_version should have reached 5.
+    // After v6 migration, schema_version should have reached 6.
     const versionRow = fresh
       .prepare('SELECT MAX(version) AS v FROM schema_version')
       .get() as SchemaVersionRow
-    expect(versionRow.v).toBe(5)
+    expect(versionRow.v).toBe(6)
 
     // Both new columns should be visible via PRAGMA table_info(api_keys).
     const cols = fresh.prepare('PRAGMA table_info(api_keys)').all() as ColumnInfo[]
@@ -152,7 +170,7 @@ describe('PR-1: db v5 migration contract', () => {
     expect(sql).toMatch(/SELECT\s+[^;]*agent_label[^;]*\s+FROM usage_records/s)
   })
 
-  it('v5 migration is idempotent: re-running does not duplicate columns or bump the schema version', () => {
+  it('v5 migration is idempotent while the v6 migration advances the schema once', () => {
     const state = { version: 5, columns: [] as ColumnInfo[] }
     // Pre-populate columns as if the v5 migration had already run.
     state.columns.push(
@@ -187,8 +205,23 @@ describe('PR-1: db v5 migration contract', () => {
     // The PRAGMA guards must prevent the migration from re-running its body.
     expect(state.columns.filter((c) => c.name === 'usage_query_enabled').length).toBe(1)
     expect(state.columns.filter((c) => c.name === 'query_mode').length).toBe(1)
-    // schema_version should NOT be bumped past 5 (the version 5 stamp
-    // already happened; re-running skips the v5 block entirely).
-    expect(state.version).toBe(5)
+    // v5 is skipped; the next migration advances the schema exactly once.
+    expect(state.version).toBe(6)
+  })
+})
+
+describe('v6 usage migration', () => {
+  it('is idempotent on a real in-memory SQLite database', () => {
+    const db = createSqliteDb()
+
+    applyMigrationsForTest(db as unknown as Parameters<typeof applyMigrationsForTest>[0])
+    applyMigrationsForTest(db as unknown as Parameters<typeof applyMigrationsForTest>[0])
+
+    expect(db.prepare('SELECT MAX(version) AS v FROM schema_version').get()).toEqual({ v: 6 })
+    expect(
+      db
+        .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'usage_records'")
+        .get()
+    ).toMatchObject({ sql: expect.stringContaining('upstream_dimension') })
   })
 })
