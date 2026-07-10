@@ -13,7 +13,7 @@ describe('provider endpoint policy', () => {
     expect(validateProviderEndpoint('newapi-generic', 'http://127.0.0.1:3000').ok).toBe(true)
     expect(validateProviderEndpoint('newapi-generic', 'https://192.168.1.10:3000').ok).toBe(true)
     expect(validateProviderEndpoint('newapi-generic', 'http://10.0.0.8:3000').ok).toBe(true)
-    expect(validateProviderEndpoint('newapi-generic', 'https://attacker.example').ok).toBe(false)
+    expect(validateProviderEndpoint('newapi-generic', 'https://proxy.example').ok).toBe(true)
     expect(validateProviderEndpoint('newapi-generic', 'file:///C:/x').ok).toBe(false)
   })
 

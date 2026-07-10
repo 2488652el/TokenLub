@@ -204,7 +204,7 @@ export function updateKey(input: ApiKeyUpdateInput): ApiKeyRecord {
     const nextUrl = input.baseUrlOverride
     const endpoint = validateProviderEndpoint(existing.provider_id, nextUrl)
     if (!endpoint.ok) throw new Error(endpoint.reason)
-    if (!input.apiKey) {
+    if (!input.apiKey?.trim()) {
       throw new Error('credential re-entry required when changing provider endpoint')
     }
     for (const key of Object.keys(existingExtra)) {

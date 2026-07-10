@@ -191,6 +191,23 @@ describe('api key extra credential storage', () => {
     ).toThrow(/credential/i)
   })
 
+  it('rejects origin change when apiKey is whitespace only', async () => {
+    const { addKey, updateKey } = await loadKeysRepo()
+    const saved = addKey({
+      providerId: 'newapi-generic',
+      alias: 'NewAPI',
+      apiKey: 'sk-primary-secret',
+      baseUrlOverride: 'http://127.0.0.1:3000'
+    })
+
+    expect(() => updateKey({
+      id: saved.id,
+      alias: saved.alias,
+      apiKey: '   ',
+      baseUrlOverride: 'https://proxy.example'
+    })).toThrow(/credential/i)
+  })
+
   it('rejects origin change when an existing extra credential is omitted', async () => {
     const { addKey, updateKey } = await loadKeysRepo()
     const saved = addKey({

@@ -40,3 +40,10 @@ Implemented main-process provider endpoint origin binding and credential re-entr
 - Endpoint rebinding requires a replacement main key and all previously stored extra credential fields. On rebinding, the submitted extra map replaces the old map instead of merging it.
 
 Follow-up verification: focused 25 tests passed, `npm run typecheck` passed, and full suite passed with 47 files / 307 tests.
+
+## Re-review fixes
+
+- Credential re-entry checks now trim `apiKey`, so whitespace-only replacements are rejected and cannot preserve the old encrypted key during an origin change.
+- `newapi-generic` accepts any valid HTTP or HTTPS self-hosted endpoint, including public HTTPS proxy domains; non-HTTP(S) schemes remain rejected.
+
+Re-review verification: focused 26 tests passed, `npm run typecheck` passed, and full suite passed with 47 files / 308 tests.
