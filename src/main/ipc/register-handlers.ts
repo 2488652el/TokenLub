@@ -91,8 +91,10 @@ export function registerIpcHandlers(): void {
     ) as unknown as ApiKeyUpdateInput
     const existing = getKey(parsed.id)
     if (!existing) throw new Error('api key not found')
-    const endpoint = validateProviderEndpoint(existing.providerId, parsed.baseUrlOverride)
-    if (!endpoint.ok) throw new Error(endpoint.reason)
+    if (Object.prototype.hasOwnProperty.call(parsed, 'baseUrlOverride')) {
+      const endpoint = validateProviderEndpoint(existing.providerId, parsed.baseUrlOverride)
+      if (!endpoint.ok) throw new Error(endpoint.reason)
+    }
     return updateKey(parsed)
   })
   ipcMain.handle(IPC.keysDelete, (_e, id: string) => {
