@@ -63,4 +63,28 @@ describe('anthropicAdminProvider', () => {
     expect(slices[0]?.promptTokens).toBe(100)
     expect(slices[0]?.cacheCreationTokens).toBe(5)
   })
+
+  it('maps separate Admin result dimensions to distinct usage slices', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonResp(200, {
+        data: [
+          {
+            starting_at: '2026-07-01T00:00:00Z',
+            ending_at: '2026-07-02T00:00:00Z',
+            results: [
+              { input_tokens: 1, workspace_id: 'w1' },
+              { input_tokens: 2, workspace_id: 'w2' }
+            ]
+          }
+        ]
+      })
+    ) as typeof fetch
+
+    const slices = await anthropicAdminProvider.build({
+      baseUrl: 'https://x.test',
+      apiKey: 'synthetic-key'
+    }).usage!('2026-07-01T00:00:00Z', '2026-07-02T00:00:00Z')
+
+    expect(slices.map((slice) => slice.upstreamDimension)).toEqual(['workspace:w1', 'workspace:w2'])
+  })
 })

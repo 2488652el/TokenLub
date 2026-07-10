@@ -123,13 +123,14 @@ export const openaiAdminProvider: ProviderImpl = {
           `/organization/usage/completions?start_time=${fromUnix}&end_time=${toUnix}&bucket_width=1d`
         )
         return (body.data ?? []).flatMap((bucket) =>
-          (bucket.results ?? []).map((r) => {
+          (bucket.results ?? []).map((r, index) => {
             const slice: UsageSlice = {
               providerId: MANIFEST.id,
               periodStart: unixToISO(bucket.start_time),
               periodEnd: unixToISO(bucket.end_time),
               model: r.model,
               source: 'vendor-api',
+              upstreamDimension: openaiResultDimension(r, index),
               promptTokens: r.input_tokens,
               completionTokens: r.output_tokens,
               raw: r
@@ -154,4 +155,15 @@ export const openaiAdminProvider: ProviderImpl = {
       }
     }
   }
+}
+
+function openaiResultDimension(
+  result: Pick<UsageBucket['results'][number], 'project_id' | 'user_id'>,
+  index: number
+): string {
+  const dimensions = [
+    result.project_id ? `project:${result.project_id}` : null,
+    result.user_id ? `user:${result.user_id}` : null
+  ].filter((value): value is string => value !== null)
+  return dimensions.length > 0 ? dimensions.join('|') : `result:${index}`
 }
