@@ -1,0 +1,522 @@
+/**
+ * 单个 API Key 的卡片组件:展示余额、用量进度条、消费估算、创建时间,
+ * 以及编辑/测试/删除/刷新/用量查询开关等操作。
+ * 根据 providerId 自动选择不同的余额展示形态(coding-plan / token-pack / cash-balance / admin-usage / gateway)。
+ * (glm-5.2)
+ */
+import { useEffect, useState } from 'react'
+import { Card } from './Card'
+import { ProviderIcon } from './ProviderIcon'
+import { fmtMoney, fmtCount } from '../../shared/utils/money'
+import { extractCodingPlanQuotas, type CodingPlanQuota } from '../../shared/utils/minimax-quota'
+import type { ApiKeyRecord } from '../../shared/types/api-key'
+import type { KeySpendSummary } from '../../shared/types/usage'
+import type { BalanceSnapshot, ProviderManifest } from '../../shared/types/provider'
+
+/** ApiKeyCard 组件的 props 类型定义 */
+type ApiKeyCardProps = {
+  keyRecord: ApiKeyRecord
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+  providerDisplayName: string
+  onEdit: (k: ApiKeyRecord) => void
+  onTest: (id: string, alias: string) => void
+  onDelete: (k: ApiKeyRecord) => void
+  onRefreshOne: (k: ApiKeyRecord) => void
+  onToggleUsage: (id: string, enabled: boolean) => Promise<void>
+}
+
+// ponytail: single-key card. Mirrors BalanceQuery's grid card layout but adds
+// the source pill in the Card `action` slot, the usage bar, and a per-row
+// pill toggle for `usageQueryEnabled`. queryMode drives which manual controls
+// are visible: `auto` hides test + manual-refresh, `manual` shows both.
+//
+// 单个 Key 卡片:复用余额查询的卡片布局,额外加入来源徽标、用量进度条与
+// 每行的用量查询开关。queryMode 决定手动控制项的显隐(auto 隐藏测试与刷新,manual 显示)。 (glm-5.2)
+export function ApiKeyCard({
+  keyRecord,
+  balance,
+  providerDisplayName,
+  onEdit,
+  onTest,
+  onDelete,
+  onRefreshOne,
+  onToggleUsage
+}: ApiKeyCardProps) {
+  const [toggling, setToggling] = useState(false)
+  const usageEnabled = keyRecord.usageQueryEnabled !== false
+  const isManual = keyRecord.queryMode === 'manual'
+  const profile = getCardProfile(keyRecord, balance)
+
+  const subtitle = `${providerDisplayName} / ${keyRecord.providerId}`
+
+  return (
+    <Card
+      title={keyRecord.alias}
+      subtitle={subtitle}
+      iconNode={
+        <ProviderIcon
+          providerId={keyRecord.providerId}
+          title={providerDisplayName}
+          size={18}
+          className="shrink-0"
+        />
+      }
+      action={
+        <div className="flex items-center gap-2">
+          {!usageEnabled && (
+            <span className="inline-block px-2 py-[2px] rounded text-[11.5px] font-medium bg-neutral-100 text-neutral-600">
+              用量查询已关闭
+            </span>
+          )}
+          <SourceBadge source={keyRecord.source} />
+          <button className="btn btn-ghost btn-xs" onClick={() => onEdit(keyRecord)} title="编辑">
+            <i className="fa-solid fa-pen-to-square" />
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-2 text-[13px]">
+        {profile === 'coding-plan' && <CodingPlanQuotaBlock balance={balance} />}
+        {profile === 'token-pack' && <TokenPackBalanceBlock balance={balance} />}
+        {profile === 'cash-balance' && <CashBalanceBlock balance={balance} />}
+        {profile === 'admin-usage' && <AdminUsageBlock balance={balance} keyRecord={keyRecord} />}
+        {profile === 'gateway' && <GatewayBalanceBlock balance={balance} keyRecord={keyRecord} />}
+
+        <KeySpendLine keyRecord={keyRecord} compact={profile === 'cash-balance'} />
+
+        <CreatedAtLine createdAt={keyRecord.createdAt} />
+
+        <div className="pt-2 border-t border-border-light flex items-center justify-between gap-2 flex-wrap">
+          <UsageToggle
+            enabled={usageEnabled}
+            disabled={toggling}
+            onToggle={async (next) => {
+              setToggling(true)
+              try {
+                await onToggleUsage(keyRecord.id, next)
+              } finally {
+                setToggling(false)
+              }
+            }}
+          />
+          <div className="flex items-center gap-1">
+            {isManual && (
+              <>
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => onRefreshOne(keyRecord)}
+                  title="手动刷新余额"
+                >
+                  <i className="fa-solid fa-arrows-rotate" />
+                </button>
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => onTest(keyRecord.id, keyRecord.alias)}
+                  title="测试连接"
+                >
+                  <i className="fa-solid fa-plug" />
+                </button>
+              </>
+            )}
+            <button
+              className="btn btn-ghost btn-xs"
+              onClick={() => onDelete(keyRecord)}
+              title="删除"
+            >
+              <i className="fa-solid fa-trash-can text-red" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+/** 卡片展示形态:决定渲染哪一种余额块 */
+type CardProfile = 'cash-balance' | 'token-pack' | 'coding-plan' | 'admin-usage' | 'gateway'
+
+/**
+ * 根据 providerId 与余额信息推断卡片应使用的展示形态。
+ * @param keyRecord 当前 Key 记录
+ * @param balance 余额快照
+ * @returns 卡片形态类型
+ */
+function getCardProfile(
+  keyRecord: ApiKeyRecord,
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+): CardProfile {
+  if (keyRecord.providerId === 'minimax') return 'coding-plan'
+  if (keyRecord.providerId === 'longcat' && balance?.currency === 'TOKENS') return 'token-pack'
+  if (keyRecord.providerId === 'openai-admin' || keyRecord.providerId === 'anthropic-admin') {
+    return 'admin-usage'
+  }
+  if (keyRecord.providerId === 'newapi-generic' || keyRecord.providerId === 'openrouter') {
+    return 'gateway'
+  }
+  return 'cash-balance'
+}
+
+/** 现金余额展示块:仅展示剩余余额 */
+function CashBalanceBlock({
+  balance
+}: {
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+}) {
+  return (
+    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+      <InfoRow
+        label="余额"
+        value={
+          balance?.remaining !== undefined
+            ? fmtMoney(balance.remaining, balance.currency ?? 'CNY')
+            : '—'
+        }
+        strong
+      />
+    </div>
+  )
+}
+
+/** Admin Usage 展示块:展示 OpenAI/Anthropic Admin API 的本期已用与 Key 末位 */
+function AdminUsageBlock({
+  balance,
+  keyRecord
+}: {
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+  keyRecord: ApiKeyRecord
+}) {
+  return (
+    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+      <InfoRow label="获取方式" value="Admin Usage API" />
+      <InfoRow
+        label="本期已用"
+        value={
+          balance?.used !== undefined ? fmtMoney(balance.used, balance.currency ?? 'USD') : '—'
+        }
+        strong
+      />
+      <InfoRow label="Key 末位" value={`…${keyRecord.keyTail}`} mono />
+      {keyRecord.baseUrlOverride && (
+        <InfoRow label="Base URL" value={keyRecord.baseUrlOverride} mono />
+      )}
+    </div>
+  )
+}
+
+/** 网关余额展示块:展示 NewAPI/OpenRouter 等网关的余额、已用与使用率进度条 */
+function GatewayBalanceBlock({
+  balance,
+  keyRecord
+}: {
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+  keyRecord: ApiKeyRecord
+}) {
+  return (
+    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+      <InfoRow
+        label={keyRecord.providerId === 'newapi-generic' ? '网关余额' : '额度余额'}
+        value={
+          balance?.remaining !== undefined
+            ? fmtMoney(balance.remaining, balance.currency ?? 'USD')
+            : '—'
+        }
+        strong
+      />
+      <InfoRow
+        label="已用"
+        value={
+          balance?.used !== undefined ? fmtMoney(balance.used, balance.currency ?? 'USD') : '—'
+        }
+      />
+      {keyRecord.baseUrlOverride && (
+        <InfoRow label="Base URL" value={keyRecord.baseUrlOverride} mono />
+      )}
+      <UsageBar remaining={balance?.remaining} total={balance?.total} />
+    </div>
+  )
+}
+
+/** Token 资源包展示块:展示 LongCat Cookie 模式的 Token 剩余/已用/总量及进度条 */
+function TokenPackBalanceBlock({
+  balance
+}: {
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+}) {
+  return (
+    <>
+      <div className="flex justify-between">
+        <span className="text-text-muted">Token 剩余</span>
+        <span className="font-mono font-medium">
+          {balance?.remaining !== undefined ? fmtCount(balance.remaining) : '—'}
+        </span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-text-muted">Token 已用</span>
+        <span className="font-mono">
+          {balance?.used !== undefined ? fmtCount(balance.used) : '—'}
+        </span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-text-muted">Token 总量</span>
+        <span className="font-mono">
+          {balance?.total !== undefined ? fmtCount(balance.total) : '—'}
+        </span>
+      </div>
+      <UsageBar remaining={balance?.remaining} total={balance?.total} />
+      <p className="text-[11px] text-text-muted leading-snug">
+        来自 LongCat 平台 Cookie 模式的 Token 资源包快照
+      </p>
+    </>
+  )
+}
+
+/** MiniMax Coding Plan 配额展示块:展示 5h 与周限额的已用百分比与剩余/重置信息 */
+function CodingPlanQuotaBlock({
+  balance
+}: {
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+}) {
+  const quotas = extractCodingPlanQuotas(balance?.raw)
+
+  return (
+    <div className="space-y-2">
+      <CodingPlanQuotaRow label="5h 限额" quota={quotas.shortWindow} />
+      <CodingPlanQuotaRow label="周限额" quota={quotas.weeklyWindow} />
+    </div>
+  )
+}
+
+/** 创建时间行 */
+function CreatedAtLine({ createdAt }: { createdAt: string }) {
+  return (
+    <div className="flex justify-between text-[12px]">
+      <span className="text-text-muted">创建时间</span>
+      <span className="text-text-secondary">{createdAt.slice(0, 16).replace('T', ' ')}</span>
+    </div>
+  )
+}
+
+/** 信息行:左右排列的标签-值组件,支持加粗与等宽字体 */
+function InfoRow({
+  label,
+  value,
+  strong,
+  mono
+}: {
+  label: string
+  value: string
+  strong?: boolean
+  mono?: boolean
+}) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-text-muted">{label}</span>
+      <span
+        className={`${mono ? 'font-mono' : ''} ${strong ? 'font-medium text-text-primary' : 'text-text-secondary'} text-right truncate`}
+        title={value}
+      >
+        {value}
+      </span>
+    </div>
+  )
+}
+
+/** Coding Plan 单行限额展示:含数值、进度条与重置说明 */
+function CodingPlanQuotaRow({ label, quota }: { label: string; quota: CodingPlanQuota | null }) {
+  const pct = quota?.usedPercent
+  const hasPct = typeof pct === 'number' && Number.isFinite(pct)
+  const width = hasPct ? Math.max(0, Math.min(100, pct)) : 100
+  const barColor = !hasPct ? 'bg-neutral-200' : pct >= 90 ? 'bg-red-500' : 'bg-amber-400'
+  const value = quota?.remainingText ?? quota?.usedText ?? '暂未自动读取'
+  const detail = quota?.resetText ?? 'MiniMax Coding Plan 控制台限额'
+
+  return (
+    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-text-muted text-[12px]">{label}</span>
+        <span className="font-mono text-[12px] text-text-primary text-right">{value}</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-bg-hover overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+      <div className="flex justify-between gap-3 text-[11px] text-text-muted leading-snug">
+        <span>{detail}</span>
+        {hasPct && <span className="font-mono">已用 {pct.toFixed(0)}%</span>}
+      </div>
+    </div>
+  )
+}
+
+// ponytail: SourceBadge shape matches the legacy table pill so existing users
+// don't see a new visual identity for `manual` / `api-key` / `session-log`.
+//
+// 来源徽标:沿用旧版表格徽标样式,按来源(manual/api-key/session-log)显示不同颜色。 (glm-5.2)
+function SourceBadge({ source }: { source: ApiKeyRecord['source'] }) {
+  const cls =
+    source === 'manual'
+      ? 'bg-blue-100 text-blue-700'
+      : source === 'session-log'
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-neutral-100 text-neutral-600'
+  const label = source === 'api-key' ? 'manual' : source
+  return (
+    <span className={`inline-block px-2 py-[2px] rounded text-[11.5px] font-medium ${cls}`}>
+      {label}
+    </span>
+  )
+}
+
+// ponytail: 4-state bar driven by remaining/total ratio per PRD:
+//   >= 90% remaining -> green (healthy)
+//   70% <= ratio < 90% -> amber (running low)
+//   ratio < 70% -> red (critical)
+//   no total or invalid numbers -> neutral 100% placeholder
+// We divide remaining by total, so a "high bar" means "lots left".
+//
+// 用量进度条:依据 remaining/total 比值显示四种状态(绿/琥珀/红/中性占位)。 (glm-5.2)
+function UsageBar({
+  remaining,
+  total
+}: {
+  remaining: number | undefined
+  total: number | undefined
+}) {
+  let pct: number | null = null
+  if (
+    typeof remaining === 'number' &&
+    typeof total === 'number' &&
+    total > 0 &&
+    Number.isFinite(remaining) &&
+    Number.isFinite(total)
+  ) {
+    pct = Math.max(0, Math.min(100, (remaining / total) * 100))
+  }
+  const showPlaceholder = pct === null
+  const width = showPlaceholder ? 100 : pct!
+  const colorCls = showPlaceholder
+    ? 'bg-neutral-200'
+    : pct! >= 90
+      ? 'bg-emerald-500'
+      : pct! >= 70
+        ? 'bg-amber-500'
+        : 'bg-red-500'
+  return (
+    <div className="pt-1" title={showPlaceholder ? '暂无总额数据' : `剩余 ${pct!.toFixed(1)}%`}>
+      <div className="h-1.5 w-full rounded-full bg-bg-hover overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${colorCls}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ponytail: pill-shaped inline switch. No new component lib — Tailwind
+// classes only. Active = green, inactive = neutral; disabled shows busy state.
+//
+// 用量查询开关:胶囊式开关,启用为绿色、关闭为中性色,禁用时表示切换中。 (glm-5.2)
+function UsageToggle({
+  enabled,
+  disabled,
+  onToggle
+}: {
+  enabled: boolean
+  disabled: boolean
+  onToggle: (next: boolean) => void | Promise<void>
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => void onToggle(!enabled)}
+      disabled={disabled}
+      title={enabled ? '点击关闭用量查询' : '点击开启用量查询'}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors ${
+        enabled
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+          : 'bg-neutral-100 text-neutral-600 border-neutral-200 hover:bg-neutral-200'
+      }`}
+    >
+      <span
+        className={`inline-block w-1.5 h-1.5 rounded-full ${
+          enabled ? 'bg-emerald-500' : 'bg-neutral-400'
+        }`}
+      />
+      用量查询:{enabled ? ' 开' : ' 关'}
+    </button>
+  )
+}
+
+// ponytail: tiny helper to look up displayName with a safe fallback.
+//
+// 辅助函数:在 manifest 列表中查找 provider 的展示名,未找到时回退为 providerId。 (glm-5.2)
+export function providerLabel(providerId: string, manifests: ProviderManifest[]): string {
+  const m = manifests.find((p) => p.id === providerId)
+  return m?.displayName ?? providerId
+}
+
+/**
+ * "消费估算" line that sits between the balance rows and the "创建时间" row
+ * on each key card. Fetches `usage.getKeySpend` once on mount and whenever
+ * `keyRecord` changes; renders the rolled-up cost in the primary currency
+ * plus a small diagnostic line ("12 条已计费 · 2 条未定价") so the user can
+ * tell at a glance whether their pricing config is missing rows.
+ *
+ * Three states: loading (-), priced (¥xx.xx), no usage (¥0.00).
+ *
+ * 消费估算行:挂载或 keyRecord 变化时拉取近 30 天消费汇总并展示金额与诊断信息。
+ * 包含加载中、已计价、无用量三种状态。 (glm-5.2)
+ */
+function KeySpendLine({
+  keyRecord,
+  compact = false
+}: {
+  keyRecord: ApiKeyRecord
+  compact?: boolean
+}) {
+  const [spend, setSpend] = useState<KeySpendSummary | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setSpend(null)
+    window.api.usage
+      .getKeySpend(keyRecord.id, 30)
+      .then((r) => {
+        if (alive) setSpend(r)
+      })
+      .catch(() => {
+        // Silent — the rest of the card still works. Diagnostics show in dev.
+      })
+    return () => {
+      alive = false
+    }
+  }, [keyRecord.id])
+
+  if (!spend) {
+    return (
+      <div className="flex justify-between">
+        <span className="text-text-muted">{compact ? '消费' : '消费估算 (30 天)'}</span>
+        <span className="font-mono text-text-muted">—</span>
+      </div>
+    )
+  }
+
+  const amount = fmtMoney(spend.total, spend.currency)
+  const sub =
+    spend.totalRequests === 0
+      ? '近 30 天无用量记录'
+      : `${fmtCount(spend.pricedRequests)} 条已计费 · ${fmtCount(spend.unpricedRequests)} 条未定价`
+
+  return (
+    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-0.5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-text-muted text-[12px]">{compact ? '消费' : '消费估算 (30 天)'}</span>
+        <span className="font-mono font-medium text-text-primary">{amount}</span>
+      </div>
+      <p className="text-[11px] text-text-muted leading-snug">{sub}</p>
+    </div>
+  )
+}
