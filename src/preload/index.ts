@@ -1,0 +1,174 @@
+/**
+ * 预加载脚本(preload):运行在沙箱化渲染进程中,作为主进程与渲染进程之间唯一的桥梁。
+ * 通过 `contextBridge.exposeInMainWorld` 暴露一组白名单化的 IPC 方法,渲染进程只能调用这些方法,
+ * 无法直接访问 `ipcRenderer` 或 Node 能力。所属模块:preload。
+ * (glm-5.2)
+ */
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { IPC } from '../shared/ipc-channels'
+import type { ApiKeyCreateInput, ApiKeyRecord, ApiKeyUpdateInput } from '../shared/types/api-key'
+import type {
+  UsageRecord,
+  UsageLogPage,
+  DashboardSummary,
+  ProviderSummary,
+  RefreshAllResult,
+  TotalSpendSummary,
+  KeySpendSummary,
+  ModelSpendAggregate
+} from '../shared/types/usage'
+import type { PricingEntry } from '../shared/types/pricing'
+import type { AlertRule } from '../shared/types/alert'
+import type { ProviderManifest, BalanceSnapshot } from '../shared/types/provider'
+import type { ProviderTestResult } from '../shared/types/provider'
+import type { ProviderCatalogEntry } from '../shared/provider-catalog'
+
+/**
+ * Whitelisted API surface exposed to the renderer via contextBridge.
+ * Renderer code can ONLY call these methods — no raw ipcRenderer.
+ *
+ * ponytail: no zod in preload. Sandbox mode disallows asar-internal npm
+ * modules at require-time, and the main-process IPC handler already runs
+ * the same zod schema before dispatching. Validating twice is YAGNI.
+ */
+const api = {
+  version: '1.0.1',
+
+  keys: {
+    list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
+    add: (input: ApiKeyCreateInput): Promise<ApiKeyRecord> =>
+      ipcRenderer.invoke(IPC.keysAdd, input),
+    update: (input: ApiKeyUpdateInput): Promise<ApiKeyRecord> =>
+      ipcRenderer.invoke(IPC.keysUpdate, input),
+    delete: (id: string): Promise<{ ok: true }> => ipcRenderer.invoke(IPC.keysDelete, id),
+    test: (id: string): Promise<ProviderTestResult> => ipcRenderer.invoke(IPC.keysTest, id),
+    setUsageQuery: (id: string, enabled: boolean): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC.keysSetUsageQuery, { id, enabled }),
+    importFromCLI: (
+      source: 'claude' | 'codex'
+    ): Promise<{
+      imported: boolean
+      key?: ApiKeyRecord
+      reason?: string
+    }> => ipcRenderer.invoke(IPC.keysImportFromCLI, { source })
+  },
+
+  usage: {
+    getDashboard: (days?: number): Promise<DashboardSummary> =>
+      ipcRenderer.invoke(IPC.usageGetDashboard, days ?? 30),
+    getTotalSpend: (days?: number): Promise<TotalSpendSummary> =>
+      ipcRenderer.invoke(IPC.usageGetTotalSpend, days ?? 30),
+    getModelSpend: (filter?: {
+      fromISO?: string | undefined
+      toISO?: string | undefined
+    }): Promise<ModelSpendAggregate[]> => ipcRenderer.invoke(IPC.usageGetModelSpend, filter ?? {}),
+    getLogs: (filter?: {
+      providerId?: string | undefined
+      fromISO?: string | undefined
+      toISO?: string | undefined
+      source?: 'vendor-api' | 'session-log' | undefined
+      limit?: number | undefined
+      modelContains?: string | undefined
+    }): Promise<UsageRecord[]> => ipcRenderer.invoke(IPC.usageGetLogs, filter ?? {}),
+    getLogsPage: (filter?: {
+      providerId?: string | undefined
+      fromISO?: string | undefined
+      toISO?: string | undefined
+      source?: 'vendor-api' | 'session-log' | undefined
+      limit?: number | undefined
+      offset?: number | undefined
+      modelContains?: string | undefined
+    }): Promise<UsageLogPage> => ipcRenderer.invoke(IPC.usageGetLogsPage, filter ?? {}),
+    refreshAll: (): Promise<RefreshAllResult> => ipcRenderer.invoke(IPC.usageRefreshAll),
+    getProviderSummary: (): Promise<ProviderSummary[]> =>
+      ipcRenderer.invoke(IPC.usageGetProviderSummary),
+    /**
+     * Per-key spend estimate. Backed by `computeSpendByKey` in
+     * `src/main/store/usage-repo.ts`; reads `usage_records` filtered by
+     * `apiKeyId` × `days`, multiplies tokens by current pricing, and returns
+     * the total in the primary currency (the one with the largest amount).
+     */
+    getKeySpend: (apiKeyId: string, days?: number): Promise<KeySpendSummary> =>
+      ipcRenderer.invoke(IPC.usageGetKeySpend, { apiKeyId, days: days ?? 30 })
+  },
+
+  balance: {
+    latest: (): Promise<Array<BalanceSnapshot & { id: number; apiKeyId?: string }>> =>
+      ipcRenderer.invoke(IPC.balanceListLatest)
+  },
+
+  pricing: {
+    list: (): Promise<PricingEntry[]> => ipcRenderer.invoke(IPC.pricingList),
+    set: (entry: Omit<PricingEntry, 'id' | 'updatedAt'>): Promise<PricingEntry> =>
+      ipcRenderer.invoke(IPC.pricingSet, entry),
+    restore: (id: number): Promise<{ ok: true }> => ipcRenderer.invoke(IPC.pricingRestore, id),
+    syncCatalog: (): Promise<{ synced: number; skipped: number }> =>
+      ipcRenderer.invoke(IPC.pricingCatalog)
+  },
+
+  settings: {
+    get: (): Promise<Record<string, unknown>> => ipcRenderer.invoke(IPC.settingsGet),
+    set: (key: string, value: unknown): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC.settingsSet, { key, value })
+  },
+
+  alerts: {
+    list: (): Promise<AlertRule[]> => ipcRenderer.invoke(IPC.alertsList),
+    add: (input: {
+      scope: 'provider' | 'global'
+      providerId?: string | undefined
+      threshold: number
+      metric: 'remaining_amount' | 'remaining_pct'
+    }): Promise<AlertRule> => ipcRenderer.invoke(IPC.alertsAdd, input),
+    toggle: (id: string, enabled: boolean): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC.alertsToggle, { id, enabled }),
+    delete: (id: string): Promise<{ ok: true }> => ipcRenderer.invoke(IPC.alertsDelete, id)
+  },
+
+  providers: {
+    list: (): Promise<ProviderManifest[]> => ipcRenderer.invoke(IPC.providersList),
+    /**
+     * Rich catalog used by the "create new key" modal — default base URL,
+     * signup link, suggested models, region/currency hint. Returned as a
+     * frozen list so the renderer can't mutate shared state.
+     */
+    catalog: (): Promise<readonly ProviderCatalogEntry[]> =>
+      ipcRenderer.invoke(IPC.providersCatalog)
+  },
+
+  log: {
+    discover: (): Promise<{ claude: string[]; codex: string[] }> =>
+      ipcRenderer.invoke(IPC.logDiscover),
+    sync: (source: 'claude-code' | 'codex'): Promise<{ started: boolean }> =>
+      ipcRenderer.invoke(IPC.logSync, { source }),
+    detectCodexKey: (): Promise<{ found: boolean; maskedKey?: string; path?: string }> =>
+      ipcRenderer.invoke(IPC.logDetectCodexKey),
+    detectClaudeKey: (): Promise<{ found: boolean; maskedKey?: string; path?: string }> =>
+      ipcRenderer.invoke(IPC.logDetectClaudeKey),
+    openFolder: (path: string): Promise<{ ok: boolean; path: string; error?: string }> =>
+      ipcRenderer.invoke(IPC.logOpenFolder, { path }),
+    onSyncProgress: (
+      cb: (e: { source: string; file: string; lines: number; tokens: number }) => void
+    ): (() => void) => {
+      const listener = (_e: IpcRendererEvent, payload: unknown) =>
+        cb(payload as { source: string; file: string; lines: number; tokens: number })
+      ipcRenderer.on(IPC.logSyncProgress, listener)
+      return () => ipcRenderer.off(IPC.logSyncProgress, listener)
+    },
+    onSyncDone: (
+      cb: (e: {
+        source: string
+        totals: { lines: number; tokens: number; inserted: number }
+        error?: string
+      }) => void
+    ): (() => void) => {
+      const listener = (_e: IpcRendererEvent, payload: unknown) => cb(payload as never)
+      ipcRenderer.on(IPC.logSyncDone, listener)
+      return () => ipcRenderer.off(IPC.logSyncDone, listener)
+    }
+  }
+} as const
+
+export type TokenLubAPI = typeof api
+
+contextBridge.exposeInMainWorld('api', api)

@@ -1,0 +1,24 @@
+/* Tailwind 基础样式入口:引入 base/components/utilities 层并设定全局 body 样式。 (glm-5.2) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基础层:设定 html/body/#root 全高,以及 body 字体、背景、颜色等全局样式 */
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    font-family: theme('fontFamily.sans');
+    background: theme('colors.bg.base');
+    color: theme('colors.text.primary');
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  * {
+    box-sizing: border-box;
+  }
+}
