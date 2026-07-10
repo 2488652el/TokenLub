@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
 import { encryptSecret, decryptSecret, keyTail } from '../crypto/safe-storage'
 import { deriveQueryMode } from './db-usage-defaults'
+import { originChanged, validateProviderEndpoint } from '../providers/endpoint-policy'
 import type {
   ApiKeyCreateInput,
   ApiKeyRecord,
@@ -135,6 +136,8 @@ export function addKey(
   input: ApiKeyCreateInput & { source?: ApiKeyRecord['source'] }
 ): ApiKeyRecord {
   const db = getDb()
+  const endpoint = validateProviderEndpoint(input.providerId, input.baseUrlOverride)
+  if (!endpoint.ok) throw new Error(endpoint.reason)
   const id = randomUUID()
   const now = new Date().toISOString()
   const encrypted = encryptSecret(input.apiKey)
@@ -193,6 +196,16 @@ export function updateKey(input: ApiKeyUpdateInput): ApiKeyRecord {
   const existing = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(input.id) as
     DbRow | undefined
   if (!existing) throw new Error(`api key not found: ${input.id}`)
+
+  const hasEndpointUpdate = Object.prototype.hasOwnProperty.call(input, 'baseUrlOverride')
+  if (hasEndpointUpdate) {
+    const nextUrl = input.baseUrlOverride
+    const endpoint = validateProviderEndpoint(existing.provider_id, nextUrl)
+    if (!endpoint.ok) throw new Error(endpoint.reason)
+    if (originChanged(existing.provider_id, existing.base_url_override, nextUrl) && !input.apiKey) {
+      throw new Error('credential re-entry required when changing provider endpoint')
+    }
+  }
 
   const now = new Date().toISOString()
   const nextKey = input.apiKey?.trim()

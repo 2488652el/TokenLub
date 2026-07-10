@@ -172,4 +172,22 @@ describe('api key extra credential storage', () => {
     expect(getDecryptedKey(saved.id)).toBe('sk-new-primary-secret')
     expect(getDecryptedExtraCredentials(saved.id)).toEqual({ adminKey: 'sk-new-admin-secret' })
   })
+
+  it('rejects origin change when apiKey is omitted', async () => {
+    const { addKey, updateKey } = await loadKeysRepo()
+    const saved = addKey({
+      providerId: 'openai-admin',
+      alias: 'OpenAI Admin',
+      apiKey: 'sk-primary-secret',
+      baseUrlOverride: 'https://api.example.com/v1'
+    })
+
+    expect(() =>
+      updateKey({
+        id: saved.id,
+        alias: saved.alias,
+        baseUrlOverride: 'https://other.example.com/v1'
+      })
+    ).toThrow(/credential/i)
+  })
 })
