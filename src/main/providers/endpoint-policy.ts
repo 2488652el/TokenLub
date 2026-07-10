@@ -37,12 +37,10 @@ export function validateProviderEndpoint(
     return { ok: false, reason: 'endpoint must be a valid URL' }
   }
 
-  if (parsed.protocol === 'https:' && documentedOrigins(providerId).has(parsed.origin)) {
+  if (providerId === 'newapi-generic' && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
     return { ok: true, origin: parsed.origin }
   }
-  const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]'
-  const privateIpv4 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(parsed.hostname)
-  if (providerId === 'newapi-generic' && (loopback || privateIpv4) && (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+  if (parsed.protocol === 'https:' && documentedOrigins(providerId).has(parsed.origin)) {
     return { ok: true, origin: parsed.origin }
   }
   return { ok: false, reason: parsed.protocol === 'https:' ? 'endpoint origin is not approved for this provider' : 'endpoint must use HTTP or HTTPS' }
