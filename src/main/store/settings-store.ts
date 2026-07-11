@@ -4,6 +4,13 @@
  * (glm-5.2)
  */
 import { getDb } from './db'
+import { randomUUID } from 'node:crypto'
+
+const SYNCABLE_SETTING_KEYS = new Set(['refresh_interval_min'])
+
+function shouldSyncSetting(key: string): boolean {
+  return SYNCABLE_SETTING_KEYS.has(key)
+}
 
 /**
  * 读取指定键的设置值,值以 JSON 存储,无法反序列化时回退为原始字符串。
@@ -29,12 +36,64 @@ export function getSetting<T = unknown>(key: string): T | null {
  */
 export function setSetting(key: string, value: unknown): void {
   const db = getDb()
-  db.prepare(
+  const serializedValue = JSON.stringify(value)
+
+  const writeSetting = () => {
+    db.prepare(
+      `
+      INSERT INTO app_settings (key, value) VALUES (?, ?)
+      ON CONFLICT (key) DO UPDATE SET value = excluded.value
     `
-    INSERT INTO app_settings (key, value) VALUES (?, ?)
-    ON CONFLICT (key) DO UPDATE SET value = excluded.value
-  `
-  ).run(key, JSON.stringify(value))
+    ).run(key, serializedValue)
+
+    if (!shouldSyncSetting(key)) return
+
+    const now = new Date().toISOString()
+    const existing = db
+      .prepare(
+        `
+        SELECT sync_id, sync_version
+        FROM sync_entity_map
+        WHERE entity_type = ? AND local_key = ?
+      `
+      )
+      .get('setting', key) as { sync_id: string; sync_version: number } | undefined
+
+    const entityId = existing?.sync_id ?? randomUUID()
+    const baseVersion = existing?.sync_version ?? 0
+    if (!existing) {
+      db.prepare(
+        `
+        INSERT INTO sync_entity_map (
+          entity_type, local_key, sync_id, sync_version, updated_at
+        ) VALUES (?, ?, ?, ?, ?)
+      `
+      ).run('setting', key, entityId, 0, now)
+    }
+
+    db.prepare(
+      `
+      INSERT INTO sync_outbox (
+        operation_id, entity_type, entity_id, base_version, operation, payload, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run(
+      randomUUID(),
+      'setting',
+      entityId,
+      baseVersion,
+      'upsert',
+      JSON.stringify({ key, value }),
+      now
+    )
+  }
+
+  if (shouldSyncSetting(key)) {
+    db.transaction(writeSetting)()
+    return
+  }
+
+  writeSetting()
 }
 
 /**

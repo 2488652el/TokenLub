@@ -1,11 +1,11 @@
 /**
- * 数据库迁移契约测试:覆盖 PR-1 v5 迁移的 ADD COLUMN 步骤、PRAGMA 幂等守卫、v2 usage_records 重建与列默认值。
+ * 数据库迁移契约测试:覆盖 PR-1 v5、同步 v6、PRAGMA 幂等守卫与 v2 usage_records 重建。
  * (glm-5.2)
  */
 import { describe, expect, it, vi } from 'vitest'
 
 /**
- * PR-1 v5 migration contract test.
+ * PR-1 v5 and sync v6 migration contract test.
  *
  * The project's better-sqlite3 binary is built against Electron's ABI and
  * cannot be `require()`d from plain Node (vitest runs in a Node child), so we
@@ -67,8 +67,23 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { applyMigrationsForTest } from '../../../src/main/store/db'
 
-// PR-1 v5 迁移契约测试组:覆盖源 SQL 声明、迁移执行与幂等性
-describe('PR-1: db v5 migration contract', () => {
+// 数据库迁移契约测试组:覆盖源 SQL 声明、迁移执行与幂等性
+describe('database migration contract', () => {
+  it('v6 creates the local sync tables and stamps schema version 6', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sync_outbox')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sync_entity_map')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sync_state')
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sync_conflicts')
+
+    const state = { version: 5, columns: [] as ColumnInfo[] }
+    const fakeDb = makeFakeDb(state)
+    applyMigrationsForTest(fakeDb as unknown as Parameters<typeof applyMigrationsForTest>[0])
+
+    expect(state.version).toBe(6)
+  })
+
   it('source SQL declares the v5 ADD COLUMN steps with the documented defaults', () => {
     const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
     expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(5)")
@@ -98,7 +113,7 @@ describe('PR-1: db v5 migration contract', () => {
     expect(source).toContain("const SQLITE_SIDECAR_SUFFIXES = ['-wal', '-shm']")
   })
 
-  it('applyMigrationsForTest brings a fresh DB up to version 5 with both new columns', () => {
+  it('applyMigrationsForTest brings a fresh DB up to version 6 with both new columns', () => {
     // A brand-new DB: schema_version table will be created, no rows yet.
     const fresh = makeFakeDb({ version: 0, columns: [] })
     // applyMigrations creates api_keys via CREATE TABLE IF NOT EXISTS; we
@@ -120,11 +135,11 @@ describe('PR-1: db v5 migration contract', () => {
 
     applyMigrationsForTest(fresh as unknown as Parameters<typeof applyMigrationsForTest>[0])
 
-    // After v5 migration, schema_version should have reached 5.
+    // After all migrations, schema_version should have reached 6.
     const versionRow = fresh
       .prepare('SELECT MAX(version) AS v FROM schema_version')
       .get() as SchemaVersionRow
-    expect(versionRow.v).toBe(5)
+    expect(versionRow.v).toBe(6)
 
     // Both new columns should be visible via PRAGMA table_info(api_keys).
     const cols = fresh.prepare('PRAGMA table_info(api_keys)').all() as ColumnInfo[]
@@ -152,8 +167,8 @@ describe('PR-1: db v5 migration contract', () => {
     expect(sql).toMatch(/SELECT\s+[^;]*agent_label[^;]*\s+FROM usage_records/s)
   })
 
-  it('v5 migration is idempotent: re-running does not duplicate columns or bump the schema version', () => {
-    const state = { version: 5, columns: [] as ColumnInfo[] }
+  it('v6 migration is idempotent: re-running does not duplicate columns or bump the schema version', () => {
+    const state = { version: 6, columns: [] as ColumnInfo[] }
     // Pre-populate columns as if the v5 migration had already run.
     state.columns.push(
       { name: 'id' },
@@ -187,8 +202,7 @@ describe('PR-1: db v5 migration contract', () => {
     // The PRAGMA guards must prevent the migration from re-running its body.
     expect(state.columns.filter((c) => c.name === 'usage_query_enabled').length).toBe(1)
     expect(state.columns.filter((c) => c.name === 'query_mode').length).toBe(1)
-    // schema_version should NOT be bumped past 5 (the version 5 stamp
-    // already happened; re-running skips the v5 block entirely).
-    expect(state.version).toBe(5)
+    // schema_version should NOT be bumped past 6 (all migration blocks are skipped).
+    expect(state.version).toBe(6)
   })
 })

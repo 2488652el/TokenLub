@@ -156,7 +156,7 @@ function DailyCostLineChart({
               axisLine={false}
             />
             <Tooltip
-              formatter={(value: number) => fmtMoney(value)}
+              formatter={(value) => (typeof value === 'number' ? fmtMoney(value) : '—')}
               labelFormatter={(label, payload) => {
                 const point = payload?.[0]?.payload as { date?: string } | undefined
                 return point?.date ?? String(label)
