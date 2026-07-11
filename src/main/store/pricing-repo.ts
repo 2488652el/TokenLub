@@ -5,6 +5,7 @@
  */
 import { getDb } from './db'
 import type { PricingEntry } from '@shared/types/pricing'
+import { randomUUID } from 'node:crypto'
 
 /** pricing_entries 表的数据库行结构映射。 */
 interface DbRow {
@@ -110,34 +111,90 @@ export function findPricingByModel(model: string, preferredCurrency?: string): P
 export function setPricing(entry: Omit<PricingEntry, 'id' | 'updatedAt'>): PricingEntry {
   const db = getDb()
   const now = new Date().toISOString()
-  db.prepare(
+  const save = () => {
+    db.prepare(
+      `
+      INSERT INTO pricing_entries (
+        provider_id, model, prompt_price_per_mtok, completion_price_per_mtok,
+        cache_read_price_per_mtok, cache_creation_price_per_mtok, currency, source, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (provider_id, model, currency) DO UPDATE SET
+        prompt_price_per_mtok = excluded.prompt_price_per_mtok,
+        completion_price_per_mtok = excluded.completion_price_per_mtok,
+        cache_read_price_per_mtok = excluded.cache_read_price_per_mtok,
+        cache_creation_price_per_mtok = excluded.cache_creation_price_per_mtok,
+        source = excluded.source,
+        updated_at = excluded.updated_at
     `
-    INSERT INTO pricing_entries (
-      provider_id, model, prompt_price_per_mtok, completion_price_per_mtok,
-      cache_read_price_per_mtok, cache_creation_price_per_mtok, currency, source, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT (provider_id, model, currency) DO UPDATE SET
-      prompt_price_per_mtok = excluded.prompt_price_per_mtok,
-      completion_price_per_mtok = excluded.completion_price_per_mtok,
-      cache_read_price_per_mtok = excluded.cache_read_price_per_mtok,
-      cache_creation_price_per_mtok = excluded.cache_creation_price_per_mtok,
-      source = excluded.source,
-      updated_at = excluded.updated_at
-  `
-  ).run(
-    entry.providerId,
-    entry.model,
-    entry.promptPricePerMtok,
-    entry.completionPricePerMtok,
-    entry.cacheReadPricePerMtok ?? null,
-    entry.cacheCreationPricePerMtok ?? null,
-    entry.currency,
-    entry.source,
-    now
-  )
-  const row = db
-    .prepare('SELECT * FROM pricing_entries WHERE provider_id = ? AND model = ? AND currency = ?')
-    .get(entry.providerId, entry.model, entry.currency) as DbRow
+    ).run(
+      entry.providerId,
+      entry.model,
+      entry.promptPricePerMtok,
+      entry.completionPricePerMtok,
+      entry.cacheReadPricePerMtok ?? null,
+      entry.cacheCreationPricePerMtok ?? null,
+      entry.currency,
+      entry.source,
+      now
+    )
+    const row = db
+      .prepare('SELECT * FROM pricing_entries WHERE provider_id = ? AND model = ? AND currency = ?')
+      .get(entry.providerId, entry.model, entry.currency) as DbRow
+
+    if (entry.source !== 'user') return row
+
+    const localKey = String(row.id)
+    const existing = db
+      .prepare(
+        `
+        SELECT sync_id, sync_version
+        FROM sync_entity_map
+        WHERE entity_type = ? AND local_key = ?
+      `
+      )
+      .get('model_pricing', localKey) as { sync_id: string; sync_version: number } | undefined
+    const entityId = existing?.sync_id ?? randomUUID()
+    const baseVersion = existing?.sync_version ?? 0
+
+    if (!existing) {
+      db.prepare(
+        `
+        INSERT INTO sync_entity_map (
+          entity_type, local_key, sync_id, sync_version, updated_at
+        ) VALUES (?, ?, ?, ?, ?)
+      `
+      ).run('model_pricing', localKey, entityId, 0, now)
+    }
+
+    db.prepare(
+      `
+      INSERT INTO sync_outbox (
+        operation_id, entity_type, entity_id, base_version, operation, payload, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+    ).run(
+      randomUUID(),
+      'model_pricing',
+      entityId,
+      baseVersion,
+      'upsert',
+      JSON.stringify({
+        providerId: row.provider_id,
+        model: row.model,
+        promptPricePerMtok: row.prompt_price_per_mtok,
+        completionPricePerMtok: row.completion_price_per_mtok,
+        cacheReadPricePerMtok: row.cache_read_price_per_mtok,
+        cacheCreationPricePerMtok: row.cache_creation_price_per_mtok,
+        currency: row.currency,
+        source: row.source
+      }),
+      now
+    )
+
+    return row
+  }
+
+  const row = entry.source === 'user' ? db.transaction(save)() : save()
   return rowToEntry(row)
 }
 
