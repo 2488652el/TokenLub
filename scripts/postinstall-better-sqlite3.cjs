@@ -6,7 +6,9 @@
 /**
  * Postinstall helper for native-binary modules on Windows.
  *
- * 1. `better-sqlite3` — prebuilt binary via prebuild-install, fall back to gyp.
+ * 1. `better-sqlite3` — prebuilt binary via prebuild-install. A failed fetch
+ *    defers to the following `electron-builder install-app-deps` command,
+ *    which owns the project's native rebuild configuration.
  * 2. `electron` — runs the package's own `install.js` to download the Electron
  *    binary zip (skipped when npm runs with `--ignore-scripts`).
  *
@@ -74,10 +76,5 @@ if (prebuildResult.status === 0) {
   process.exit(0)
 }
 
-console.warn('[postinstall] prebuild fetch failed — falling back to node-gyp (requires Visual Studio Build Tools).')
-const gypResult = spawnSync(process.execPath, [
-  path.join(root, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'),
-  'rebuild', '--release'
-], { cwd: bs3Dir, stdio: 'inherit' })
-
-process.exit(gypResult.status ?? 1)
+console.warn('[postinstall] prebuild fetch failed — deferring native rebuild to electron-builder.')
+process.exit(0)

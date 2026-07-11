@@ -1,5 +1,5 @@
 /**
- * 数据库初始化与 schema 迁移:管理 SQLite 数据库连接、旧库迁移与 v1-v5 版本迁移。
+ * 数据库初始化与 schema 迁移:管理 SQLite 数据库连接、旧库迁移与 v1-v6 版本迁移。
  * 该模块属于 main 进程的 store 模块,是所有 repo 模块的数据库单例来源。
  * (glm-5.2)
  */
@@ -74,16 +74,16 @@ function legacyDbCandidates(userData: string): string[] {
 /**
  * Test-only migration runner. Accepts an externally-owned better-sqlite3
  * connection (e.g. `:memory:`) so {@link db-migration.test.ts} can assert the
- * v5 schema without touching the Electron `app.getPath('userData')` path used
+ * v6 schema without touching the Electron `app.getPath('userData')` path used
  * by {@link getDb}. The migration logic itself lives in {@link applyMigrations}
  * - keep them in lockstep.
- * 测试专用迁移入口:接受外部连接(如 :memory:)以在测试中验证 v5 schema,不依赖 Electron 路径。(glm-5.2)
+ * 测试专用迁移入口:接受外部连接(如 :memory:)以在测试中验证 v6 schema,不依赖 Electron 路径。(glm-5.2)
  */
 export function applyMigrationsForTest(db: Database.Database): void {
   applyMigrations(db)
 }
 
-/** 执行 schema 迁移:创建表与索引,按版本号依次应用 v1-v5 迁移逻辑。(内部核心函数) */
+/** 执行 schema 迁移:创建表与索引,按版本号依次应用 v1-v6 迁移逻辑。(内部核心函数) */
 function applyMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
@@ -312,5 +312,58 @@ function applyMigrations(db: Database.Database): void {
       db.exec("ALTER TABLE api_keys ADD COLUMN query_mode TEXT NOT NULL DEFAULT 'manual'")
     }
     db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(5)
+  }
+
+  // --- v6: local sync metadata and durable outbox ---
+  // Sync identifiers live in a side table so existing SQLite primary keys and
+  // business-table schemas remain stable. Every local change will later write
+  // its matching outbox row in the same transaction as the business update.
+  if (currentVersion < 6) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_outbox (
+        operation_id TEXT PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        base_version INTEGER NOT NULL,
+        operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+        payload TEXT,
+        created_at TEXT NOT NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT,
+        last_error_code TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_sync_outbox_due
+        ON sync_outbox(next_attempt_at, created_at);
+
+      CREATE TABLE IF NOT EXISTS sync_entity_map (
+        entity_type TEXT NOT NULL,
+        local_key TEXT NOT NULL,
+        sync_id TEXT NOT NULL UNIQUE,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT,
+        deleted_at TEXT,
+        PRIMARY KEY (entity_type, local_key)
+      );
+
+      CREATE TABLE IF NOT EXISTS sync_state (
+        scope TEXT PRIMARY KEY,
+        cursor TEXT,
+        last_success_at TEXT,
+        last_error_code TEXT,
+        bootstrap_required INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS sync_conflicts (
+        id TEXT PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        local_change TEXT NOT NULL,
+        server_entity TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('open', 'resolved', 'discarded')),
+        created_at TEXT NOT NULL,
+        resolved_at TEXT
+      );
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(6)
   }
 }
