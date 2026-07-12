@@ -16,6 +16,7 @@ interface OutboxRow {
 
 const state = vi.hoisted(() => ({
   outbox: [] as OutboxRow[],
+  openConflicts: 0,
   syncStates: new Map<
     string,
     {
@@ -39,9 +40,15 @@ vi.mock('../../../src/main/store/db', () => ({
             .sort((a, b) => a.created_at.localeCompare(b.created_at))
             .slice(0, limit)
         },
-        get: (scope: string) => {
+        get: (scope?: string) => {
+          if (sql.includes('COUNT(*) AS count FROM sync_outbox')) {
+            return { count: state.outbox.length }
+          }
+          if (sql.includes('COUNT(*) AS count FROM sync_conflicts')) {
+            return { count: state.openConflicts }
+          }
           if (!sql.includes('FROM sync_state')) return undefined
-          return state.syncStates.get(scope)
+          return state.syncStates.get(scope ?? 'default')
         },
         run: (...args: unknown[]) => {
           if (sql.includes('DELETE FROM sync_outbox')) {
@@ -103,6 +110,7 @@ describe('sync repository', () => {
         last_error_code: 'network_error'
       }
     ]
+    state.openConflicts = 0
     state.syncStates.clear()
   })
 
@@ -139,6 +147,29 @@ describe('sync repository', () => {
       cursor: 'cursor-123',
       lastSuccessAt: '2026-07-12T00:30:00.000Z',
       lastErrorCode: null,
+      bootstrapRequired: false
+    })
+  })
+
+  it('summarizes local sync status without exposing the raw cursor', async () => {
+    const { getLocalSyncStatus, saveSyncState } = await import('../../../src/main/store/sync-repo')
+    state.openConflicts = 2
+    saveSyncState({
+      scope: 'default',
+      cursor: 'opaque-cursor',
+      lastSuccessAt: '2026-07-12T00:30:00.000Z',
+      lastErrorCode: 'network_error',
+      bootstrapRequired: false
+    })
+
+    expect(getLocalSyncStatus()).toEqual({
+      mode: 'local-only',
+      state: 'error',
+      pendingOutboxCount: 2,
+      openConflictCount: 2,
+      cursorPresent: true,
+      lastSuccessAt: '2026-07-12T00:30:00.000Z',
+      lastErrorCode: 'network_error',
       bootstrapRequired: false
     })
   })

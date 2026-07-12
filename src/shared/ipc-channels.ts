@@ -35,6 +35,7 @@ export const IPC = {
   pricingCatalog: 'pricing:catalog',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
+  syncGetStatus: 'sync:get-status',
   alertsList: 'alerts:list',
   alertsAdd: 'alerts:add',
   alertsToggle: 'alerts:toggle',
