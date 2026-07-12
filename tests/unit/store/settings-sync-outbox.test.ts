@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
   settings: new Map<string, string>(),
-  entityIds: new Map<string, string>(),
+  entityMaps: new Map<string, { syncId: string; syncVersion: number }>(),
   outbox: [] as Array<{
     operationId: string
     entityType: string
@@ -23,8 +23,8 @@ vi.mock('../../../src/main/store/db', () => ({
       return {
         get: (...args: unknown[]) => {
           if (sql.includes('SELECT sync_id, sync_version FROM sync_entity_map')) {
-            const id = state.entityIds.get(`${args[0]}:${args[1]}`)
-            return id ? { sync_id: id, sync_version: 0 } : undefined
+            const row = state.entityMaps.get(`${args[0]}:${args[1]}`)
+            return row ? { sync_id: row.syncId, sync_version: row.syncVersion } : undefined
           }
           return undefined
         },
@@ -33,7 +33,18 @@ vi.mock('../../../src/main/store/db', () => ({
             state.settings.set(String(args[0]), String(args[1]))
           }
           if (sql.includes('INSERT INTO sync_entity_map')) {
-            state.entityIds.set(`${args[0]}:${args[1]}`, String(args[2]))
+            state.entityMaps.set(`${args[0]}:${args[1]}`, {
+              syncId: String(args[2]),
+              syncVersion: Number(args[3])
+            })
+          }
+          if (sql.includes('UPDATE sync_entity_map')) {
+            const key = `${args[3]}:${args[4]}`
+            const existing = state.entityMaps.get(key)
+            state.entityMaps.set(key, {
+              syncId: existing?.syncId ?? '',
+              syncVersion: Number(args[0])
+            })
           }
           if (sql.includes('INSERT INTO sync_outbox')) {
             state.outbox.push({
@@ -63,7 +74,7 @@ describe('settings sync outbox', () => {
   beforeEach(() => {
     vi.resetModules()
     state.settings.clear()
-    state.entityIds.clear()
+    state.entityMaps.clear()
     state.outbox.length = 0
     state.transactionCalls = 0
   })
@@ -90,6 +101,31 @@ describe('settings sync outbox', () => {
     setSetting('last_refresh_at', '2026-07-11T00:00:00.000Z')
 
     expect(state.settings.get('last_refresh_at')).toBe('"2026-07-11T00:00:00.000Z"')
+    expect(state.outbox).toHaveLength(0)
+  })
+
+  it('applies remote settings without echoing them back into outbox', async () => {
+    const { applyRemoteSettingChange } = await import('../../../src/main/store/settings-store')
+
+    applyRemoteSettingChange({
+      entityId: 'setting-sync-id',
+      key: 'refresh_interval_min',
+      value: 20,
+      version: 4
+    })
+    applyRemoteSettingChange({
+      entityId: 'setting-sync-id',
+      key: 'refresh_interval_min',
+      value: 20,
+      version: 4
+    })
+
+    expect(state.transactionCalls).toBe(2)
+    expect(state.settings.get('refresh_interval_min')).toBe('20')
+    expect(state.entityMaps.get('setting:refresh_interval_min')).toEqual({
+      syncId: 'setting-sync-id',
+      syncVersion: 4
+    })
     expect(state.outbox).toHaveLength(0)
   })
 })

@@ -12,6 +12,13 @@ function shouldSyncSetting(key: string): boolean {
   return SYNCABLE_SETTING_KEYS.has(key)
 }
 
+export interface RemoteSettingChange {
+  entityId: string
+  key: string
+  value: unknown
+  version: number
+}
+
 /**
  * 读取指定键的设置值,值以 JSON 存储,无法反序列化时回退为原始字符串。
  * @param key 设置键名
@@ -94,6 +101,33 @@ export function setSetting(key: string, value: unknown): void {
   }
 
   writeSetting()
+}
+
+export function applyRemoteSettingChange(change: RemoteSettingChange): void {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const serializedValue = JSON.stringify(change.value)
+
+  db.transaction(() => {
+    db.prepare(
+      `
+      INSERT INTO app_settings (key, value) VALUES (?, ?)
+      ON CONFLICT (key) DO UPDATE SET value = excluded.value
+    `
+    ).run(change.key, serializedValue)
+
+    db.prepare(
+      `
+      INSERT INTO sync_entity_map (
+        entity_type, local_key, sync_id, sync_version, updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT (entity_type, local_key) DO UPDATE SET
+        sync_id = excluded.sync_id,
+        sync_version = excluded.sync_version,
+        updated_at = excluded.updated_at
+    `
+    ).run('setting', change.key, change.entityId, change.version, now)
+  })()
 }
 
 /**
