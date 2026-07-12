@@ -16,7 +16,7 @@ interface PricingRow {
 
 const state = vi.hoisted(() => ({
   pricing: new Map<string, PricingRow>(),
-  entityIds: new Map<string, string>(),
+  entityMaps: new Map<string, { syncId: string; syncVersion: number }>(),
   outbox: [] as Array<{ entityType: string; entityId: string; payload: string }>,
   nextId: 1,
   transactionCalls: 0
@@ -32,8 +32,8 @@ vi.mock('../../../src/main/store/db', () => ({
       return {
         get: (...args: unknown[]) => {
           if (sql.includes('SELECT sync_id, sync_version FROM sync_entity_map')) {
-            const id = state.entityIds.get(`${args[0]}:${args[1]}`)
-            return id ? { sync_id: id, sync_version: 0 } : undefined
+            const row = state.entityMaps.get(`${args[0]}:${args[1]}`)
+            return row ? { sync_id: row.syncId, sync_version: row.syncVersion } : undefined
           }
           if (sql.includes('SELECT * FROM pricing_entries WHERE provider_id')) {
             return state.pricing.get(pricingKey(String(args[0]), String(args[1]), String(args[2])))
@@ -59,7 +59,10 @@ vi.mock('../../../src/main/store/db', () => ({
             })
           }
           if (sql.includes('INSERT INTO sync_entity_map')) {
-            state.entityIds.set(`${args[0]}:${args[1]}`, String(args[2]))
+            state.entityMaps.set(`${args[0]}:${args[1]}`, {
+              syncId: String(args[2]),
+              syncVersion: Number(args[3])
+            })
           }
           if (sql.includes('INSERT INTO sync_outbox')) {
             state.outbox.push({
@@ -86,7 +89,7 @@ describe('pricing sync outbox', () => {
   beforeEach(() => {
     vi.resetModules()
     state.pricing.clear()
-    state.entityIds.clear()
+    state.entityMaps.clear()
     state.outbox.length = 0
     state.nextId = 1
     state.transactionCalls = 0
@@ -129,6 +132,36 @@ describe('pricing sync outbox', () => {
       source: 'catalog'
     })
 
+    expect(state.outbox).toHaveLength(0)
+  })
+
+  it('applies remote user pricing without echoing it back into outbox', async () => {
+    const { applyRemotePricingChange } = await import('../../../src/main/store/pricing-repo')
+
+    const saved = applyRemotePricingChange({
+      entityId: 'pricing-sync-id',
+      version: 5,
+      payload: {
+        providerId: 'openrouter',
+        model: 'remote-model',
+        promptPricePerMtok: 1.5,
+        completionPricePerMtok: 5,
+        currency: 'USD',
+        source: 'user'
+      }
+    })
+
+    expect(state.transactionCalls).toBe(1)
+    expect(saved.id).toBe(1)
+    expect(state.pricing.get('openrouter:remote-model:USD')).toMatchObject({
+      prompt_price_per_mtok: 1.5,
+      completion_price_per_mtok: 5,
+      source: 'user'
+    })
+    expect(state.entityMaps.get('model_pricing:1')).toEqual({
+      syncId: 'pricing-sync-id',
+      syncVersion: 5
+    })
     expect(state.outbox).toHaveLength(0)
   })
 })

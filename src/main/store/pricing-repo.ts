@@ -21,6 +21,12 @@ interface DbRow {
   updated_at: string
 }
 
+export interface RemotePricingChange {
+  entityId: string
+  version: number
+  payload: Omit<PricingEntry, 'id' | 'updatedAt'>
+}
+
 /** 将数据库行映射为 PricingEntry 对象,处理可选缓存价格字段的条件展开。 */
 function rowToEntry(r: DbRow): PricingEntry {
   return {
@@ -196,6 +202,60 @@ export function setPricing(entry: Omit<PricingEntry, 'id' | 'updatedAt'>): Prici
 
   const row = entry.source === 'user' ? db.transaction(save)() : save()
   return rowToEntry(row)
+}
+
+export function applyRemotePricingChange(change: RemotePricingChange): PricingEntry {
+  const db = getDb()
+  const now = new Date().toISOString()
+  const entry = change.payload
+
+  const save = () => {
+    db.prepare(
+      `
+      INSERT INTO pricing_entries (
+        provider_id, model, prompt_price_per_mtok, completion_price_per_mtok,
+        cache_read_price_per_mtok, cache_creation_price_per_mtok, currency, source, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (provider_id, model, currency) DO UPDATE SET
+        prompt_price_per_mtok = excluded.prompt_price_per_mtok,
+        completion_price_per_mtok = excluded.completion_price_per_mtok,
+        cache_read_price_per_mtok = excluded.cache_read_price_per_mtok,
+        cache_creation_price_per_mtok = excluded.cache_creation_price_per_mtok,
+        source = excluded.source,
+        updated_at = excluded.updated_at
+    `
+    ).run(
+      entry.providerId,
+      entry.model,
+      entry.promptPricePerMtok,
+      entry.completionPricePerMtok,
+      entry.cacheReadPricePerMtok ?? null,
+      entry.cacheCreationPricePerMtok ?? null,
+      entry.currency,
+      entry.source,
+      now
+    )
+
+    const row = db
+      .prepare('SELECT * FROM pricing_entries WHERE provider_id = ? AND model = ? AND currency = ?')
+      .get(entry.providerId, entry.model, entry.currency) as DbRow
+
+    db.prepare(
+      `
+      INSERT INTO sync_entity_map (
+        entity_type, local_key, sync_id, sync_version, updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT (entity_type, local_key) DO UPDATE SET
+        sync_id = excluded.sync_id,
+        sync_version = excluded.sync_version,
+        updated_at = excluded.updated_at
+    `
+    ).run('model_pricing', String(row.id), change.entityId, change.version, now)
+
+    return row
+  }
+
+  return rowToEntry(db.transaction(save)())
 }
 
 /** 删除指定定价条目。 */
