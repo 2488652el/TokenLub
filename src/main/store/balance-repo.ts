@@ -5,6 +5,7 @@
  */
 import { getDb } from './db'
 import type { BalanceSnapshot } from '@shared/types/provider'
+import { randomUUID } from 'node:crypto'
 
 /** balance_snapshots 表的数据库行结构映射。 */
 interface DbRow {
@@ -41,21 +42,47 @@ function rowToSnapshot(r: DbRow): BalanceSnapshot & { id: number; apiKeyId?: str
  */
 export function insertBalance(snap: BalanceSnapshot & { apiKeyId: string }): void {
   const db = getDb()
-  db.prepare(
-    `
-    INSERT INTO balance_snapshots (api_key_id, provider_id, total, used, remaining, currency, captured_at, raw_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `
-  ).run(
-    snap.apiKeyId,
-    snap.providerId,
-    snap.total ?? null,
-    snap.used ?? null,
-    snap.remaining ?? null,
-    snap.currency ?? null,
-    snap.capturedAt,
-    snap.raw !== undefined ? JSON.stringify(snap.raw) : null
-  )
+  db.transaction(() => {
+    const result = db
+      .prepare(
+        `
+        INSERT INTO balance_snapshots (api_key_id, provider_id, total, used, remaining, currency, captured_at, raw_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      )
+      .run(
+        snap.apiKeyId,
+        snap.providerId,
+        snap.total ?? null,
+        snap.used ?? null,
+        snap.remaining ?? null,
+        snap.currency ?? null,
+        snap.capturedAt,
+        snap.raw !== undefined ? JSON.stringify(snap.raw) : null
+      )
+
+    const localKey = String(result.lastInsertRowid)
+    const now = new Date().toISOString()
+    const existing = db
+      .prepare(
+        `
+        SELECT sync_id, sync_version
+        FROM sync_entity_map
+        WHERE entity_type = ? AND local_key = ?
+      `
+      )
+      .get('balance_snapshot', localKey) as { sync_id: string; sync_version: number } | undefined
+
+    if (!existing) {
+      db.prepare(
+        `
+        INSERT INTO sync_entity_map (
+          entity_type, local_key, sync_id, sync_version, updated_at
+        ) VALUES (?, ?, ?, ?, ?)
+      `
+      ).run('balance_snapshot', localKey, randomUUID(), 0, now)
+    }
+  })()
 }
 
 /**

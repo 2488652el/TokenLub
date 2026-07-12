@@ -26,14 +26,36 @@ interface SchemaVersionRow {
   v: number | null
 }
 
-function makeFakeDb(schemaState: { version: number; columns: ColumnInfo[] }) {
+interface SyncMapInsert {
+  entityType: string
+  localKey: string
+}
+
+function makeFakeDb(schemaState: {
+  version: number
+  columns: ColumnInfo[]
+  settings?: Array<{ key: string }>
+  pricing?: Array<{ id: number }>
+  balances?: Array<{ id: number }>
+  syncMaps?: SyncMapInsert[]
+  outboxWrites?: number
+}) {
   return {
     prepare(sql: string) {
       return {
-        run: (..._args: unknown[]) => {
+        run: (...args: unknown[]) => {
           // Stamp schema_version increments requested inside applyMigrations.
           if (/INSERT INTO schema_version \(version\) VALUES \(\?\)/.test(sql)) {
-            schemaState.version = Math.max(schemaState.version, Number(_args[0]))
+            schemaState.version = Math.max(schemaState.version, Number(args[0]))
+          }
+          if (sql.includes('INSERT OR IGNORE INTO sync_entity_map')) {
+            schemaState.syncMaps?.push({
+              entityType: String(args[0]),
+              localKey: String(args[1])
+            })
+          }
+          if (sql.includes('INSERT INTO sync_outbox')) {
+            schemaState.outboxWrites = (schemaState.outboxWrites ?? 0) + 1
           }
           return { changes: 1 }
         },
@@ -43,7 +65,17 @@ function makeFakeDb(schemaState: { version: number; columns: ColumnInfo[] }) {
           }
           return undefined
         },
-        all: () => schemaState.columns as ColumnInfo[]
+        all: () => {
+          if (sql.includes('FROM app_settings')) {
+            const settings = schemaState.settings ?? []
+            return sql.includes("key = 'refresh_interval_min'")
+              ? settings.filter((row) => row.key === 'refresh_interval_min')
+              : settings
+          }
+          if (sql.includes('FROM pricing_entries')) return schemaState.pricing ?? []
+          if (sql.includes('FROM balance_snapshots')) return schemaState.balances ?? []
+          return schemaState.columns as ColumnInfo[]
+        }
       }
     },
     exec: (sql: string) => {
@@ -81,6 +113,53 @@ describe('database migration contract', () => {
     const fakeDb = makeFakeDb(state)
     applyMigrationsForTest(fakeDb as unknown as Parameters<typeof applyMigrationsForTest>[0])
 
+    expect(state.version).toBe(6)
+  })
+
+  it('v6 backfills sync identities for existing syncable rows without queuing uploads', () => {
+    const state = {
+      version: 5,
+      columns: [] as ColumnInfo[],
+      settings: [{ key: 'refresh_interval_min' }, { key: 'last_refresh_at' }],
+      pricing: [{ id: 1 }, { id: 2 }],
+      balances: [{ id: 7 }],
+      syncMaps: [] as SyncMapInsert[],
+      outboxWrites: 0
+    }
+    const fakeDb = makeFakeDb(state)
+
+    applyMigrationsForTest(fakeDb as unknown as Parameters<typeof applyMigrationsForTest>[0])
+
+    expect(state.syncMaps).toEqual([
+      { entityType: 'setting', localKey: 'refresh_interval_min' },
+      { entityType: 'model_pricing', localKey: '1' },
+      { entityType: 'model_pricing', localKey: '2' },
+      { entityType: 'balance_snapshot', localKey: '7' }
+    ])
+    expect(state.outboxWrites).toBe(0)
+    expect(state.version).toBe(6)
+  })
+
+  it('v6 backfill also repairs databases already stamped at schema version 6', () => {
+    const state = {
+      version: 6,
+      columns: [] as ColumnInfo[],
+      settings: [{ key: 'refresh_interval_min' }],
+      pricing: [{ id: 3 }],
+      balances: [{ id: 9 }],
+      syncMaps: [] as SyncMapInsert[],
+      outboxWrites: 0
+    }
+    const fakeDb = makeFakeDb(state)
+
+    applyMigrationsForTest(fakeDb as unknown as Parameters<typeof applyMigrationsForTest>[0])
+
+    expect(state.syncMaps).toEqual([
+      { entityType: 'setting', localKey: 'refresh_interval_min' },
+      { entityType: 'model_pricing', localKey: '3' },
+      { entityType: 'balance_snapshot', localKey: '9' }
+    ])
+    expect(state.outboxWrites).toBe(0)
     expect(state.version).toBe(6)
   })
 

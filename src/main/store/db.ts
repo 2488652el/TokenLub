@@ -7,6 +7,7 @@ import { app } from 'electron'
 import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 
 /** 数据库文件名与历史遗留文件名/目录名常量。 */
 let dbInstance: Database.Database | null = null
@@ -319,51 +320,91 @@ function applyMigrations(db: Database.Database): void {
   // business-table schemas remain stable. Every local change will later write
   // its matching outbox row in the same transaction as the business update.
   if (currentVersion < 6) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS sync_outbox (
-        operation_id TEXT PRIMARY KEY,
-        entity_type TEXT NOT NULL,
-        entity_id TEXT NOT NULL,
-        base_version INTEGER NOT NULL,
-        operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
-        payload TEXT,
-        created_at TEXT NOT NULL,
-        attempt_count INTEGER NOT NULL DEFAULT 0,
-        next_attempt_at TEXT,
-        last_error_code TEXT
-      );
-      CREATE INDEX IF NOT EXISTS idx_sync_outbox_due
-        ON sync_outbox(next_attempt_at, created_at);
+    db.exec('BEGIN')
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sync_outbox (
+          operation_id TEXT PRIMARY KEY,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          base_version INTEGER NOT NULL,
+          operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+          payload TEXT,
+          created_at TEXT NOT NULL,
+          attempt_count INTEGER NOT NULL DEFAULT 0,
+          next_attempt_at TEXT,
+          last_error_code TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_sync_outbox_due
+          ON sync_outbox(next_attempt_at, created_at);
 
-      CREATE TABLE IF NOT EXISTS sync_entity_map (
-        entity_type TEXT NOT NULL,
-        local_key TEXT NOT NULL,
-        sync_id TEXT NOT NULL UNIQUE,
-        sync_version INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT,
-        deleted_at TEXT,
-        PRIMARY KEY (entity_type, local_key)
-      );
+        CREATE TABLE IF NOT EXISTS sync_entity_map (
+          entity_type TEXT NOT NULL,
+          local_key TEXT NOT NULL,
+          sync_id TEXT NOT NULL UNIQUE,
+          sync_version INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT,
+          deleted_at TEXT,
+          PRIMARY KEY (entity_type, local_key)
+        );
 
-      CREATE TABLE IF NOT EXISTS sync_state (
-        scope TEXT PRIMARY KEY,
-        cursor TEXT,
-        last_success_at TEXT,
-        last_error_code TEXT,
-        bootstrap_required INTEGER NOT NULL DEFAULT 0
-      );
+        CREATE TABLE IF NOT EXISTS sync_state (
+          scope TEXT PRIMARY KEY,
+          cursor TEXT,
+          last_success_at TEXT,
+          last_error_code TEXT,
+          bootstrap_required INTEGER NOT NULL DEFAULT 0
+        );
 
-      CREATE TABLE IF NOT EXISTS sync_conflicts (
-        id TEXT PRIMARY KEY,
-        entity_type TEXT NOT NULL,
-        entity_id TEXT NOT NULL,
-        local_change TEXT NOT NULL,
-        server_entity TEXT NOT NULL,
-        status TEXT NOT NULL CHECK (status IN ('open', 'resolved', 'discarded')),
-        created_at TEXT NOT NULL,
-        resolved_at TEXT
-      );
-    `)
-    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(6)
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+          id TEXT PRIMARY KEY,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          local_change TEXT NOT NULL,
+          server_entity TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('open', 'resolved', 'discarded')),
+          created_at TEXT NOT NULL,
+          resolved_at TEXT
+        );
+      `)
+      db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(6)
+      db.exec('COMMIT')
+      currentVersion = 6
+    } catch (e) {
+      db.exec('ROLLBACK')
+      throw e
+    }
+  }
+
+  if (currentVersion >= 6) {
+    backfillSyncEntityMaps(db)
+  }
+}
+
+function backfillSyncEntityMaps(db: Database.Database): void {
+  const now = new Date().toISOString()
+  const insertMap = db.prepare(`
+    INSERT OR IGNORE INTO sync_entity_map (
+      entity_type, local_key, sync_id, sync_version, updated_at
+    ) VALUES (?, ?, ?, ?, ?)
+  `)
+
+  const settings = db
+    .prepare("SELECT key FROM app_settings WHERE key = 'refresh_interval_min'")
+    .all() as Array<{ key: string }>
+  for (const row of settings) {
+    insertMap.run('setting', row.key, randomUUID(), 0, now)
+  }
+
+  const pricing = db.prepare("SELECT id FROM pricing_entries WHERE source = 'user'").all() as Array<{
+    id: number
+  }>
+  for (const row of pricing) {
+    insertMap.run('model_pricing', String(row.id), randomUUID(), 0, now)
+  }
+
+  const balances = db.prepare('SELECT id FROM balance_snapshots').all() as Array<{ id: number }>
+  for (const row of balances) {
+    insertMap.run('balance_snapshot', String(row.id), randomUUID(), 0, now)
   }
 }
