@@ -22,6 +22,7 @@ import type { AlertRule } from '../shared/types/alert'
 import type { ProviderManifest, BalanceSnapshot } from '../shared/types/provider'
 import type { ProviderTestResult } from '../shared/types/provider'
 import type { ProviderCatalogEntry } from '../shared/provider-catalog'
+import type { LocalSyncStatus } from '../shared/types/sync'
 
 /**
  * Whitelisted API surface exposed to the renderer via contextBridge.
@@ -110,6 +111,10 @@ const api = {
     get: (): Promise<Record<string, unknown>> => ipcRenderer.invoke(IPC.settingsGet),
     set: (key: string, value: unknown): Promise<{ ok: true }> =>
       ipcRenderer.invoke(IPC.settingsSet, { key, value })
+  },
+
+  sync: {
+    getStatus: (): Promise<LocalSyncStatus> => ipcRenderer.invoke(IPC.syncGetStatus)
   },
 
   alerts: {

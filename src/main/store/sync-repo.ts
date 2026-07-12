@@ -1,4 +1,5 @@
 import { getDb } from './db'
+import type { LocalSyncStatus, LocalSyncStatusState } from '@shared/types/sync'
 
 export interface SyncOutboxOperation {
   operationId: string
@@ -48,6 +49,10 @@ interface SyncStateRow {
   last_success_at: string | null
   last_error_code: string | null
   bootstrap_required: number
+}
+
+interface CountRow {
+  count: number
 }
 
 function parsePayload(payload: string | null): unknown {
@@ -146,4 +151,34 @@ export function saveSyncState(state: SyncStateInput): void {
     state.lastErrorCode ?? null,
     Number(state.bootstrapRequired)
   )
+}
+
+export function getLocalSyncStatus(scope = 'default'): LocalSyncStatus {
+  const db = getDb()
+  const syncState = getSyncState(scope)
+  const pendingOutboxCount =
+    (db.prepare('SELECT COUNT(*) AS count FROM sync_outbox').get() as CountRow | undefined)
+      ?.count ?? 0
+  const openConflictCount =
+    (
+      db
+        .prepare("SELECT COUNT(*) AS count FROM sync_conflicts WHERE status = 'open'")
+        .get() as CountRow | undefined
+    )?.count ?? 0
+
+  let state: LocalSyncStatusState = 'idle'
+  if (syncState?.bootstrapRequired) state = 'needs_bootstrap'
+  else if (syncState?.lastErrorCode) state = 'error'
+  else if (pendingOutboxCount > 0) state = 'pending'
+
+  return {
+    mode: 'local-only',
+    state,
+    pendingOutboxCount,
+    openConflictCount,
+    cursorPresent: syncState?.cursor !== null && syncState?.cursor !== undefined,
+    lastSuccessAt: syncState?.lastSuccessAt ?? null,
+    lastErrorCode: syncState?.lastErrorCode ?? null,
+    bootstrapRequired: syncState?.bootstrapRequired ?? false
+  }
 }

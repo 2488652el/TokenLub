@@ -43,6 +43,7 @@ import {
 import { listPricing, setPricing, deletePricing, upsertCatalogBatch } from '../store/pricing-repo'
 import { listAlerts, addAlert, toggleAlert, deleteAlert } from '../store/alerts-repo'
 import { setSetting, getAllSettings } from '../store/settings-store'
+import { getLocalSyncStatus } from '../store/sync-repo'
 import { listProviders, getProvider } from '../providers/registry'
 import { PROVIDER_CATALOG } from '@shared/provider-catalog'
 import { syncCatalog } from '../pricing/catalog'
@@ -212,6 +213,9 @@ export function registerIpcHandlers(): void {
     }
     return { ok: true }
   })
+
+  // sync
+  ipcMain.handle(IPC.syncGetStatus, () => getLocalSyncStatus())
 
   // alerts
   ipcMain.handle(IPC.alertsList, () => listAlerts())
