@@ -16,6 +16,7 @@
 const { spawnSync } = require('node:child_process')
 const { existsSync } = require('node:fs')
 const path = require('node:path')
+const { getPrebuildTarget } = require('./postinstall-target.cjs')
 
 const root = path.join(__dirname, '..')
 
@@ -30,12 +31,17 @@ function readElectronVersion() {
 // 1. Ensure Electron binary is downloaded (its postinstall normally does this
 //    but `--ignore-scripts` skips it).
 const electronDir = path.join(root, 'node_modules', 'electron', 'dist')
-const electronExe = path.join(electronDir, 'electron.exe')
+const electronExe =
+  process.platform === 'darwin'
+    ? path.join(electronDir, 'Electron.app', 'Contents', 'MacOS', 'Electron')
+    : path.join(electronDir, 'electron.exe')
 if (!existsSync(electronExe)) {
   console.log('[postinstall] Electron binary missing, running electron/install.js...')
-  const result = spawnSync(process.execPath, [
-    path.join(root, 'node_modules', 'electron', 'install.js')
-  ], { stdio: 'inherit' })
+  const result = spawnSync(
+    process.execPath,
+    [path.join(root, 'node_modules', 'electron', 'install.js')],
+    { stdio: 'inherit' }
+  )
   if (result.status !== 0) {
     console.error('[postinstall] electron install failed (status ' + result.status + ')')
     process.exit(result.status ?? 1)
@@ -57,15 +63,13 @@ if (existsSync(bs3Built)) {
 }
 
 const electronVersion = readElectronVersion()
-console.log(`[postinstall] fetching better-sqlite3 prebuilt for Electron v${electronVersion}...`)
+console.log(
+  `[postinstall] fetching better-sqlite3 prebuilt for Electron v${electronVersion} ` +
+    `(${process.platform}/${process.arch})...`
+)
 const prebuildResult = spawnSync(
   path.join(root, 'node_modules', '.bin', 'prebuild-install'),
-  [
-    '--runtime=electron',
-    `--target=${electronVersion}`,
-    '--arch=x64',
-    '--platform=win32'
-  ],
+  getPrebuildTarget({ platform: process.platform, arch: process.arch, electronVersion }),
   { cwd: bs3Dir, stdio: 'inherit' }
 )
 
@@ -74,10 +78,14 @@ if (prebuildResult.status === 0) {
   process.exit(0)
 }
 
-console.warn('[postinstall] prebuild fetch failed — falling back to node-gyp (requires Visual Studio Build Tools).')
-const gypResult = spawnSync(process.execPath, [
-  path.join(root, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'),
-  'rebuild', '--release'
-], { cwd: bs3Dir, stdio: 'inherit' })
+console.warn(
+  `[postinstall] prebuild fetch failed for ${process.platform}/${process.arch} — ` +
+    'falling back to node-gyp (requires platform build tools).'
+)
+const gypResult = spawnSync(
+  process.execPath,
+  [path.join(root, 'node_modules', 'node-gyp', 'bin', 'node-gyp.js'), 'rebuild', '--release'],
+  { cwd: bs3Dir, stdio: 'inherit' }
+)
 
 process.exit(gypResult.status ?? 1)

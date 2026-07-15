@@ -83,7 +83,7 @@ export class ProviderHttpClient {
 
     if (res.status === 429 && attempt < 2) {
       const ra = Number(res.headers.get('retry-after') ?? 0)
-      const retryAfter = (Number.isFinite(ra) ? ra : 0) * 1000
+      const retryAfter = Math.min(Math.max(Number.isFinite(ra) ? ra : 0, 0), 60) * 1000
       await this.sleep(Math.max(retryAfter, 1000 * Math.pow(3, attempt)))
       return this.getJSON<T>(path, attempt + 1)
     }

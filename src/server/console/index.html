@@ -1,0 +1,852 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="/console/tokenlub-mark.png" type="image/png" />
+    <title>TokenLub 控制台</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font:
+          14px/1.55 Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        color: #17211d;
+        background: #fafaf8;
+        --surface: #ffffff;
+        --surface-soft: #f5f7f4;
+        --ink: #17211d;
+        --muted: #66736d;
+        --line: #dde4df;
+        --line-strong: #c9d4cd;
+        --brand: #10b981;
+        --brand-strong: #059669;
+        --brand-soft: #ecfdf5;
+        --danger: #b42318;
+        --danger-soft: #fff5f4;
+        --warning: #9a5b13;
+        --warning-soft: #fff8eb;
+        --radius: 10px;
+        --shadow: 0 18px 48px rgba(23, 33, 29, 0.07);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        min-width: 280px;
+        min-height: 100vh;
+        margin: 0;
+        background:
+          radial-gradient(circle at 50% 0, rgba(16, 185, 129, 0.06), transparent 34rem), #fafaf8;
+      }
+      button,
+      input {
+        font: inherit;
+      }
+      button,
+      summary {
+        -webkit-tap-highlight-color: transparent;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid rgba(16, 185, 129, 0.25);
+        outline-offset: 2px;
+      }
+      main {
+        width: min(1120px, calc(100% - 32px));
+        margin: 32px auto 56px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        flex: 0 0 auto;
+        object-fit: contain;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 20px;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        margin-bottom: 14px;
+        font-size: 16px;
+        line-height: 1.35;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .eyebrow {
+        margin-bottom: 5px;
+        color: var(--brand-strong);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .panel {
+        min-width: 0;
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--surface);
+        box-shadow: 0 1px 2px rgba(23, 33, 29, 0.025);
+      }
+      .wide {
+        grid-column: 1 / -1;
+      }
+      #auth {
+        width: min(100%, 480px);
+        margin: 64px auto 0;
+        padding: clamp(22px, 5vw, 32px);
+        box-shadow: var(--shadow);
+      }
+      .auth-heading {
+        margin-bottom: 22px;
+        text-align: center;
+      }
+      .auth-heading h2 {
+        margin-bottom: 6px;
+        font-size: 22px;
+        letter-spacing: -0.025em;
+      }
+      .mode-switch {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+        margin-bottom: 20px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface-soft);
+      }
+      .mode-switch button {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        box-shadow: none;
+      }
+      .mode-switch button[aria-selected='true'] {
+        background: var(--surface);
+        color: var(--ink);
+        box-shadow: 0 1px 3px rgba(23, 33, 29, 0.1);
+        font-weight: 650;
+      }
+      form {
+        display: grid;
+        gap: 14px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        color: #35423c;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        min-height: 42px;
+        padding: 9px 11px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--ink);
+        transition:
+          border-color 120ms ease,
+          box-shadow 120ms ease;
+      }
+      input:hover {
+        border-color: #acbbb2;
+      }
+      input:focus {
+        border-color: var(--brand-strong);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+        outline: 0;
+      }
+      input::placeholder {
+        color: #98a39d;
+      }
+      button {
+        min-height: 38px;
+        padding: 8px 13px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--surface);
+        color: #35423c;
+        cursor: pointer;
+        font-weight: 600;
+        transition:
+          background 120ms ease,
+          border-color 120ms ease,
+          transform 120ms ease;
+      }
+      button:hover:not(:disabled) {
+        border-color: #a9b7ae;
+        background: var(--surface-soft);
+      }
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+      button.primary {
+        border-color: var(--brand-strong);
+        background: var(--brand-strong);
+        color: #fff;
+      }
+      button.primary:hover:not(:disabled) {
+        border-color: #047857;
+        background: #047857;
+      }
+      button.danger {
+        border-color: #f0c9c5;
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      button.danger:hover:not(:disabled) {
+        border-color: #e6aaa4;
+        background: #ffebe9;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+      .auth-submit {
+        width: 100%;
+        min-height: 44px;
+        margin-top: 2px;
+      }
+      details {
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      summary {
+        width: max-content;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      details label {
+        margin-top: 12px;
+      }
+      .field-help {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 400;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      #password-form {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+        align-items: end;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .stat {
+        min-width: 0;
+        padding: 12px;
+        border: 1px solid #d8eee2;
+        border-radius: 8px;
+        background: var(--brand-soft);
+        color: #3d5147;
+      }
+      .stat strong {
+        display: block;
+        overflow-wrap: anywhere;
+        color: #075e47;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 13px 0;
+        border-top: 1px solid #edf0ed;
+      }
+      .row:first-child {
+        border-top: 0;
+      }
+      .row-copy {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .row-title {
+        color: var(--ink);
+        font-weight: 650;
+      }
+      .row-meta {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.55;
+        white-space: pre-line;
+      }
+      #app,
+      #message {
+        display: none;
+      }
+      #message {
+        margin-bottom: 16px;
+        padding: 11px 13px;
+        border: 1px solid #f0d8ad;
+        border-radius: 7px;
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+      #message[data-tone='error'] {
+        border-color: #f0c9c5;
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      #message[data-tone='success'] {
+        border-color: #b9e4cd;
+        background: var(--brand-soft);
+        color: #067451;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 840px) {
+        .stats {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        #password-form {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 720px) {
+        main {
+          width: min(100% - 24px, 1120px);
+          margin-top: 20px;
+        }
+        header {
+          align-items: flex-start;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .wide {
+          grid-column: auto;
+        }
+        #auth {
+          margin-top: 36px;
+        }
+      }
+      @media (max-width: 480px) {
+        main {
+          width: min(100% - 20px, 1120px);
+          margin-top: 16px;
+        }
+        header {
+          align-items: stretch;
+          flex-direction: column;
+        }
+        header > button {
+          align-self: flex-start;
+        }
+        .brand-mark {
+          width: 38px;
+          height: 38px;
+        }
+        #auth {
+          margin-top: 28px;
+          padding: 20px 16px;
+        }
+        .panel {
+          padding: 16px;
+        }
+        .stats {
+          grid-template-columns: 1fr 1fr;
+        }
+        .row {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .row .actions {
+          width: 100%;
+        }
+        .row .actions button {
+          flex: 1 1 auto;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand">
+          <img class="brand-mark" src="/console/tokenlub-mark.png" alt="TokenLub" />
+          <div>
+            <h1>TokenLub 控制台</h1>
+            <p class="muted">本地优先 · 白名单同步</p>
+          </div>
+        </div>
+        <button id="logout" class="danger" type="button" hidden>退出登录</button>
+      </header>
+      <div id="message" role="status" aria-live="polite" aria-atomic="true"></div>
+      <section id="auth" class="panel" aria-labelledby="auth-title">
+        <div class="auth-heading">
+          <p class="eyebrow">Secure sync</p>
+          <h2 id="auth-title">欢迎使用 TokenLub</h2>
+          <p class="muted">登录后管理同步数据、设备与账户安全</p>
+        </div>
+        <div class="mode-switch" role="tablist" aria-label="账户操作">
+          <button id="login-tab" type="button" role="tab" aria-selected="true">登录</button>
+          <button id="register-tab" type="button" role="tab" aria-selected="false">注册</button>
+        </div>
+        <form id="auth-form" aria-busy="false">
+          <label for="email"
+            >邮箱
+            <input id="email" name="email" type="email" autocomplete="email" required />
+          </label>
+          <label for="password"
+            >密码
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <label id="device-id-field" for="device-id"
+            >设备 ID
+            <input
+              id="device-id"
+              name="deviceId"
+              autocomplete="off"
+              placeholder="注册后返回的设备 ID"
+              required
+            />
+            <span class="field-help">用于确认这是已登记的可信设备</span>
+          </label>
+          <label id="device-name-field" for="device-name" hidden
+            >设备名称
+            <input id="device-name" name="deviceName" value="Browser" autocomplete="off" />
+            <span class="field-help">用于在设备列表中识别当前浏览器</span>
+          </label>
+          <details>
+            <summary>连接设置</summary>
+            <label for="base-url"
+              >同步服务地址
+              <input id="base-url" name="baseUrl" type="url" placeholder="默认使用当前站点" />
+              <span class="field-help">通常无需修改；仅在连接其他 TokenLub 服务时填写</span>
+            </label>
+          </details>
+          <button id="auth-submit" class="primary auth-submit" type="submit">登录</button>
+        </form>
+      </section>
+      <section id="app" class="grid" aria-label="账户控制台">
+        <div class="panel wide">
+          <h2>同步概览</h2>
+          <div id="stats" class="stats"></div>
+        </div>
+        <div class="panel">
+          <h2>设备</h2>
+          <div class="actions" style="margin-bottom: 12px">
+            <button id="bind-app" class="primary" type="button">绑定 TokenLub 应用</button>
+          </div>
+          <div id="devices"></div>
+        </div>
+        <div class="panel">
+          <h2>数据操作</h2>
+          <div class="actions">
+            <button id="export" type="button">创建导出任务</button>
+            <button id="delete" class="danger" type="button">删除云端数据</button>
+          </div>
+          <p id="task" class="muted" style="margin-top: 12px" aria-live="polite"></p>
+        </div>
+        <div class="panel">
+          <h2>账户安全</h2>
+          <form id="password-form">
+            <label for="current-password"
+              >当前密码
+              <input
+                id="current-password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <label for="new-password"
+              >新密码
+              <input id="new-password" type="password" autocomplete="new-password" required />
+            </label>
+            <button class="primary" type="submit">修改密码</button>
+          </form>
+        </div>
+        <div class="panel wide">
+          <h2>活跃会话</h2>
+          <div id="sessions"><p class="muted">正在读取…</p></div>
+        </div>
+      </section>
+    </main>
+    <script>
+      let session = null
+      let authMode = 'login'
+      let authBusy = false
+      const $ = (id) => document.getElementById(id)
+      const message = (text, tone = 'notice') => {
+        const target = $('message')
+        target.textContent = text
+        target.dataset.tone = tone
+        target.style.display = text ? 'block' : 'none'
+      }
+      const base = () => ($('base-url').value.trim() || location.origin).replace(/\/$/, '')
+      const request = async (path, init = {}) => {
+        const headers = {
+          ...(init.body ? { 'content-type': 'application/json' } : {}),
+          ...(session ? { authorization: `Bearer ${session.accessToken}` } : {}),
+          ...(init.headers || {})
+        }
+        const response = await fetch(`${session?.baseUrl || base()}${path}`, { ...init, headers })
+        const body = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(body.message || '请求失败')
+        return body
+      }
+      const json = (value) => ({ method: 'POST', body: JSON.stringify(value) })
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+      const makeText = (tag, text, className) => {
+        const node = document.createElement(tag)
+        node.textContent = String(text ?? '')
+        if (className) node.className = className
+        return node
+      }
+      const emptyState = (text) => makeText('p', text, 'muted')
+      const setAuthMode = (mode) => {
+        authMode = mode
+        const registering = mode === 'register'
+        $('login-tab').setAttribute('aria-selected', String(!registering))
+        $('register-tab').setAttribute('aria-selected', String(registering))
+        $('device-id-field').hidden = registering
+        $('device-name-field').hidden = !registering
+        $('device-id').required = !registering
+        $('device-name').required = registering
+        $('password').autocomplete = registering ? 'new-password' : 'current-password'
+        $('auth-submit').textContent = registering ? '创建账户' : '登录'
+        message('')
+      }
+      const setAuthBusy = (busy) => {
+        authBusy = busy
+        $('auth-form').setAttribute('aria-busy', String(busy))
+        for (const control of $('auth-form').querySelectorAll('button, input'))
+          control.disabled = busy
+        $('login-tab').disabled = busy
+        $('register-tab').disabled = busy
+        $('auth-submit').textContent = busy
+          ? authMode === 'register'
+            ? '正在创建…'
+            : '正在登录…'
+          : authMode === 'register'
+            ? '创建账户'
+            : '登录'
+      }
+      const withBusyButton = async (button, busyText, action) => {
+        if (button.disabled) return
+        const idleText = button.textContent
+        button.disabled = true
+        button.textContent = busyText
+        try {
+          return await action()
+        } finally {
+          button.disabled = false
+          button.textContent = idleText
+        }
+      }
+      const addStat = (container, value, label) => {
+        const stat = document.createElement('div')
+        stat.className = 'stat'
+        stat.append(makeText('strong', value), document.createTextNode(label))
+        container.append(stat)
+      }
+      const renderStats = (summary) => {
+        const container = $('stats')
+        container.replaceChildren()
+        addStat(container, summary.total ?? 0, '同步项目')
+        addStat(container, summary.byType?.setting ?? 0, '设置')
+        addStat(container, summary.byType?.model_pricing ?? 0, '价格')
+        addStat(container, Number(summary.estimatedBytes || 0).toLocaleString(), '估算字节')
+        addStat(container, summary.revision ?? 0, '快照版本')
+      }
+      const renderDevices = (devices) => {
+        const container = $('devices')
+        container.replaceChildren()
+        if (!devices.length) {
+          container.append(emptyState('暂无设备'))
+          return
+        }
+        for (const device of devices) {
+          const row = document.createElement('div')
+          row.className = 'row'
+          const copy = document.createElement('div')
+          copy.className = 'row-copy'
+          const metadata = [
+            `${device.platform ?? '未知平台'} · v${device.appVersion ?? '未知'} · 注册 ${device.createdAt ?? '未知'}`,
+            `最近在线 ${device.lastSeenAt || '从未'}`,
+            device.id ?? ''
+          ].join('\n')
+          copy.append(
+            makeText('span', device.name || '未命名设备', 'row-title'),
+            makeText('small', metadata, 'row-meta')
+          )
+          const actions = document.createElement('div')
+          actions.className = 'actions'
+          const rename = makeText('button', '重命名')
+          rename.type = 'button'
+          rename.dataset.rename = String(device.id ?? '')
+          rename.disabled = Boolean(device.revokedAt)
+          const revoke = makeText('button', device.revokedAt ? '已撤销' : '撤销')
+          revoke.type = 'button'
+          revoke.dataset.revoke = String(device.id ?? '')
+          revoke.disabled = Boolean(device.revokedAt)
+          actions.append(rename, revoke)
+          row.append(copy, actions)
+          container.append(row)
+        }
+      }
+      const renderSessions = (sessions) => {
+        const container = $('sessions')
+        container.replaceChildren()
+        if (!sessions.length) {
+          container.append(emptyState('暂无会话'))
+          return
+        }
+        for (const item of sessions) {
+          const row = document.createElement('div')
+          row.className = 'row'
+          const copy = document.createElement('div')
+          copy.className = 'row-copy'
+          copy.append(
+            makeText('span', item.deviceId || '未知设备', 'row-title'),
+            makeText(
+              'small',
+              `${item.active ? '活跃' : '已撤销'} · ${item.createdAt ?? '未知'}`,
+              'row-meta'
+            )
+          )
+          const revoke = makeText('button', item.id === session.sessionId ? '退出此会话' : '撤销')
+          revoke.type = 'button'
+          revoke.dataset.sessionRevoke = String(item.id ?? '')
+          revoke.disabled = !item.active
+          row.append(copy, revoke)
+          container.append(row)
+        }
+      }
+      async function watchTask(task) {
+        let current = task
+        for (let attempt = 0; attempt < 20; attempt++) {
+          $('task').textContent =
+            `${current.type === 'export' ? '导出' : '删除'}任务：${current.id}（${current.status}）`
+          if (current.status === 'completed' || current.status === 'failed') return current
+          await wait(250)
+          current = await request(`/v1/data/${current.type}/${encodeURIComponent(current.id)}`)
+        }
+        return current
+      }
+      async function load() {
+        const [summary, devices, sessions] = await Promise.all([
+          request('/v1/sync/summary'),
+          request('/v1/devices'),
+          request('/v1/account/sessions')
+        ])
+        renderStats(summary)
+        renderDevices(devices)
+        renderSessions(sessions)
+      }
+      async function signIn() {
+        const path = authMode === 'register' ? '/v1/auth/register' : '/v1/auth/login'
+        const body = {
+          email: $('email').value,
+          password: $('password').value,
+          ...(authMode === 'register'
+            ? { deviceName: $('device-name').value }
+            : { deviceId: $('device-id').value })
+        }
+        const result = await request(path, json(body))
+        $('password').value = ''
+        if (result.verificationRequired) {
+          if (result.deviceId) $('device-id').value = result.deviceId
+          message('注册成功，请查收验证邮件后再登录', 'success')
+          return
+        }
+        session = { baseUrl: base(), ...result }
+        $('auth').style.display = 'none'
+        $('app').style.display = 'grid'
+        $('logout').hidden = false
+        message(
+          session.securityNotice === 'new_device_login'
+            ? '检测到新设备登录，请确认这是你的操作'
+            : '',
+          'notice'
+        )
+        await load()
+      }
+      $('login-tab').addEventListener('click', () => setAuthMode('login'))
+      $('register-tab').addEventListener('click', () => setAuthMode('register'))
+      $('auth-form').addEventListener('submit', async (event) => {
+        event.preventDefault()
+        if (authBusy) return
+        message('')
+        setAuthBusy(true)
+        try {
+          await signIn()
+        } catch (error) {
+          message(error instanceof Error ? error.message : '请求失败', 'error')
+        } finally {
+          setAuthBusy(false)
+        }
+      })
+      $('logout').addEventListener('click', () => {
+        session = null
+        location.reload()
+      })
+      $('bind-app').addEventListener('click', async (event) => {
+        const button = event.currentTarget
+        try {
+          await withBusyButton(button, '正在绑定…', async () => {
+            const binding = await request('/v1/auth/binding-ticket', json({}))
+            const link = new URL('tokenlub://sync/bind')
+            link.searchParams.set('server', session.baseUrl)
+            link.searchParams.set('ticket', binding.ticket)
+            location.href = link.toString()
+            message('正在打开 TokenLub；若没有响应，请确认已安装最新版应用。')
+          })
+        } catch (error) {
+          message(error instanceof Error ? error.message : '请求失败', 'error')
+        }
+      })
+      $('export').addEventListener('click', async (event) => {
+        const button = event.currentTarget
+        try {
+          await withBusyButton(button, '正在导出…', async () => {
+            const task = await request('/v1/data/export', json({}))
+            await watchTask(task)
+          })
+        } catch (error) {
+          message(error instanceof Error ? error.message : '请求失败', 'error')
+        }
+      })
+      $('delete').addEventListener('click', async (event) => {
+        if (!confirm('确认删除云端同步数据？此操作会保留账户和设备，但不可恢复云端实体。')) return
+        const button = event.currentTarget
+        try {
+          await withBusyButton(button, '正在删除…', async () => {
+            const task = await request('/v1/data/cloud', {
+              method: 'DELETE',
+              body: JSON.stringify({ confirmation: 'DELETE_CLOUD_DATA' })
+            })
+            await watchTask(task)
+          })
+        } catch (error) {
+          message(error instanceof Error ? error.message : '请求失败', 'error')
+        }
+      })
+      $('password-form').addEventListener('submit', async (event) => {
+        event.preventDefault()
+        const button = event.currentTarget.querySelector('button[type="submit"]')
+        try {
+          await withBusyButton(button, '正在修改…', async () => {
+            await request(
+              '/v1/account/password',
+              json({
+                currentPassword: $('current-password').value,
+                newPassword: $('new-password').value
+              })
+            )
+            $('current-password').value = ''
+            $('new-password').value = ''
+            session = null
+            message('密码已修改，请使用新密码重新登录', 'success')
+            $('app').style.display = 'none'
+            $('auth').style.display = 'block'
+            $('logout').hidden = true
+          })
+        } catch (error) {
+          message(error instanceof Error ? error.message : '请求失败', 'error')
+        }
+      })
+      $('app').addEventListener('click', async (event) => {
+        if (!(event.target instanceof Element)) return
+        const button = event.target.closest('button')
+        if (!button || button.disabled) return
+        try {
+          await withBusyButton(button, '处理中…', async () => {
+            if (button.dataset.revoke && confirm('确认撤销此设备？'))
+              await request(`/v1/devices/${encodeURIComponent(button.dataset.revoke)}`, {
+                method: 'DELETE'
+              })
+            if (button.dataset.rename) {
+              const name = prompt('设备名称', '')?.trim()
+              if (name)
+                await request(`/v1/devices/${encodeURIComponent(button.dataset.rename)}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ name })
+                })
+            }
+            if (button.dataset.sessionRevoke && confirm('确认撤销此会话？')) {
+              await request(
+                `/v1/account/sessions/${encodeURIComponent(button.dataset.sessionRevoke)}`,
+                { method: 'DELETE' }
+              )
+              if (button.dataset.sessionRevoke === session.sessionId) {
+                session = null
+                location.reload()
+                return
+              }
+            }
+            await load()
+          })
+        } catch (error) {
+          message(error instanceof Error ? error.message : '请求失败', 'error')
+        }
+      })
+      setAuthMode('login')
+    </script>
+  </body>
+</html>

@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
       id: 1,
       api_key_id: null,
       provider_id: 'codex',
+      billing_scope: 'default',
       model: 'gpt-5.5',
       period_start: null,
       period_end: null,
@@ -60,12 +61,13 @@ vi.mock('../../../src/main/store/db', () => ({
           }))
         }
       }
-      if (sql.includes('GROUP BY date, provider_id, model')) {
+      if (sql.includes('GROUP BY date, provider_id, billing_scope, model')) {
         return {
           all: vi.fn(() => [
             {
               date: '2026-07-08',
               provider_id: 'codex',
+              billing_scope: 'default',
               model: 'gpt-5.5',
               pt: 1_000_000,
               ct: 500_000,
@@ -76,11 +78,12 @@ vi.mock('../../../src/main/store/db', () => ({
           ])
         }
       }
-      if (sql.includes('GROUP BY provider_id, model')) {
+      if (sql.includes('GROUP BY provider_id, billing_scope, model')) {
         return {
           all: vi.fn(() => [
             {
               provider_id: 'codex',
+              billing_scope: 'default',
               model: 'gpt-5.5',
               pt: 1_000_000,
               ct: 500_000,

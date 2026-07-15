@@ -1,6 +1,6 @@
 # TokenLub
 
-**TokenLub is a Windows-first desktop dashboard for LLM token usage, API key
+**TokenLub is a Windows and macOS desktop dashboard for LLM token usage, API key
 balances, model pricing, and local coding-session cost analysis.**
 
 [中文说明](./README.zh-CN.md) · [Architecture](./docs/ARCHITECTURE.md) ·
@@ -24,22 +24,22 @@ money are going.
 | Cost accounting       | Estimate spend with high-precision decimal math and configurable per-model pricing.                                                  |
 | API key management    | Store API keys locally with Electron `safeStorage`; the renderer never receives raw secrets.                                         |
 | Request logs          | Browse, filter, inspect, and export request-level token usage as CSV.                                                                |
-| Windows packaging     | Ships as both an NSIS installer and a portable executable.                                                                           |
+| Desktop packaging     | Ships Windows installer/portable builds and separate macOS x64/arm64 DMGs.                                                           |
 
 ---
 
 ## Latest Release
 
-Current formal build: **TokenLub 1.0.1**
+Current formal build: **TokenLub 1.0.3**
 
 | Artifact     | Path                                         |
 | ------------ | -------------------------------------------- |
-| Installer    | `artifacts/dist/TokenLub-1.0.1-x64.exe`      |
-| Portable app | `artifacts/dist/TokenLub-1.0.1-portable.exe` |
+| Installer    | `artifacts/dist/TokenLub-1.0.3-x64.exe`      |
+| Portable app | `artifacts/dist/TokenLub-1.0.3-portable.exe` |
 | Unpacked app | `artifacts/dist/win-unpacked/`               |
 
-The app icon is bundled through `build/icon.ico` for Windows packaging and
-`build/icon.png` for local development windows.
+The app icon is bundled through `build/icon.ico` on Windows, `build/icon.icns`
+on macOS, and `build/icon.png` for local development windows.
 
 ---
 
@@ -47,7 +47,7 @@ The app icon is bundled through `build/icon.ico` for Windows packaging and
 
 ### Requirements
 
-- Windows 10/11 for the packaged desktop app
+- Windows 10/11 or macOS 12+
 - Node.js 24.x, matching `.nvmrc`
 - npm 11+
 
@@ -90,6 +90,32 @@ npm run dist:win
 ```
 
 Outputs are written to `artifacts/dist/`.
+
+### Package for macOS
+
+Run these commands on macOS; each architecture is intentionally packaged as a
+separate DMG:
+
+```bash
+npm run dist:mac:x64
+npm run dist:mac:arm64
+```
+
+Signing and notarization credentials must come from the macOS Keychain or the
+`CSC_NAME`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
+`APPLE_TEAM_ID` environment variables. A build without these credentials is an
+unsigned local build, not a formal release.
+
+Before publishing, verify the identity, app signature, Gatekeeper assessment,
+notarization staple, and checksum without printing credential values:
+
+```bash
+security find-identity -v -p codesigning
+codesign --verify --deep --strict --verbose=2 "/path/to/TokenLub.app"
+spctl --assess --type execute --verbose=4 "/path/to/TokenLub.app"
+xcrun stapler validate "/path/to/TokenLub.app"
+shasum -a 256 artifacts/dist/TokenLub-*.dmg
+```
 
 ---
 
@@ -146,6 +172,8 @@ For a deeper handoff, read `docs/ARCHITECTURE_SYNC.md`.
 - Do not add telemetry or network calls unless explicitly requested.
 - Do not print or commit secrets.
 - Use `npm run dist:win` for the canonical Windows release path.
+- Build macOS DMGs on macOS and verify signing, notarization, and Gatekeeper
+  before calling them release artifacts.
 
 ---
 

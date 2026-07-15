@@ -48,7 +48,17 @@ export const pricingSetInputSchema = z.object({
   cacheReadPricePerMtok: z.number().nonnegative().optional(),
   cacheCreationPricePerMtok: z.number().nonnegative().optional(),
   currency: z.string().min(1).max(8),
+  billingScope: z.string().min(1).max(64).optional(),
   source: z.enum(['catalog', 'user'])
+})
+
+export const pricingCatalogApplyInputSchema = z.object({
+  previewId: z.string().uuid()
+})
+
+export const pricingExchangePolicySetInputSchema = z.object({
+  policy: z.enum(['realtime', 'fallback', 'fixed']),
+  fixedRates: z.record(z.string().min(3).max(8), z.number().positive()).default({})
 })
 
 // Alerts
@@ -72,6 +82,18 @@ export const settingsSetInputSchema = z.object({
   key: z.string().min(1).max(64),
   value: z.unknown()
 })
+
+export const syncLoginInputSchema = z.object({
+  baseUrl: z.string().url(),
+  email: z.string().email(),
+  password: z.string().min(1),
+  deviceId: z.string().min(1),
+  mode: z.enum(['upload', 'restore', 'merge']).default('merge')
+})
+
+export const syncModeSchema = z.enum(['upload', 'restore', 'merge'])
+
+export const syncDeviceIdInputSchema = z.object({ deviceId: z.string().min(1) })
 
 // Log sync (Phase D2)
 /** 会话日志同步入参校验(指定来源 claude-code 或 codex)。 */

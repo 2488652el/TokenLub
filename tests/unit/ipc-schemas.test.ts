@@ -9,6 +9,7 @@ import {
   apiKeyUpdateInputSchema,
   usageFilterSchema,
   pricingSetInputSchema,
+  pricingCatalogApplyInputSchema,
   alertAddInputSchema,
   alertToggleInputSchema,
   settingsSetInputSchema
@@ -88,6 +89,17 @@ describe('ipc-schemas', () => {
       source: 'user'
     })
     expect(r.success).toBe(false)
+  })
+
+  it('requires a UUID when applying a pricing catalog preview', () => {
+    expect(pricingCatalogApplyInputSchema.safeParse({ previewId: 'not-a-uuid' }).success).toBe(
+      false
+    )
+    expect(
+      pricingCatalogApplyInputSchema.safeParse({
+        previewId: '550e8400-e29b-41d4-a716-446655440000'
+      }).success
+    ).toBe(true)
   })
 
   it('accepts valid alert rule', () => {

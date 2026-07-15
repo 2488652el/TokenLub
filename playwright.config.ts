@@ -12,10 +12,14 @@ export default defineConfig({
     trace: 'on-first-retry'
   },
   projects: [{ name: 'electron', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  }
+  ...(process.env['TOKENLUB_PACKAGED_APP']
+    ? {}
+    : {
+        webServer: {
+          command: 'npm run dev',
+          url: 'http://localhost:5173',
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000
+        }
+      })
 })

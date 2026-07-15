@@ -9,12 +9,14 @@ import { IPC } from '../../src/shared/ipc-channels'
 const handlers = new Map<string, (...args: unknown[]) => unknown>()
 const syncAllSessionsMock = vi.fn()
 const statSyncMock = vi.fn()
+const openPathMock = vi.fn()
 
 async function loadRegisterIpcHandlers(): Promise<() => void> {
   vi.resetModules()
   handlers.clear()
   syncAllSessionsMock.mockReset()
   statSyncMock.mockReset()
+  openPathMock.mockReset()
 
   vi.doMock('electron', () => ({
     ipcMain: {
@@ -25,7 +27,7 @@ async function loadRegisterIpcHandlers(): Promise<() => void> {
     BrowserWindow: {
       getAllWindows: () => [{ webContents: { send: vi.fn() } }]
     },
-    shell: { openPath: vi.fn(), openExternal: vi.fn() }
+    shell: { openPath: openPathMock, openExternal: vi.fn() }
   }))
   vi.doMock('node:fs', () => ({ statSync: statSyncMock }))
   vi.doMock('../../src/main/store/keys-repo', () => ({
@@ -113,5 +115,32 @@ describe('log IPC input validation', () => {
 
     await expect(async () => handler?.({}, { path: 123 })).rejects.toBeInstanceOf(Error)
     expect(statSyncMock).not.toHaveBeenCalled()
+  })
+
+  it('returns only display paths without input', async () => {
+    const registerIpcHandlers = await loadRegisterIpcHandlers()
+    registerIpcHandlers()
+
+    const handler = handlers.get(IPC.logLocations)
+    expect(handler).toBeTypeOf('function')
+
+    const result = await handler?.({})
+    expect(result).toEqual(
+      expect.objectContaining({
+        claudeProjects: expect.any(String),
+        codexSessions: expect.any(String)
+      })
+    )
+    expect(result).not.toHaveProperty('codexAuthFile')
+  })
+
+  it('opens a directory whose path contains spaces and Unicode', async () => {
+    const registerIpcHandlers = await loadRegisterIpcHandlers()
+    statSyncMock.mockReturnValue({ isDirectory: () => true })
+    registerIpcHandlers()
+    const path = 'C:\\Users\\测试 用户\\.claude\\projects'
+
+    expect(await handlers.get(IPC.logOpenFolder)?.({}, { path })).toEqual({ ok: true, path })
+    expect(openPathMock).toHaveBeenCalledWith(path)
   })
 })

@@ -1,0 +1,13 @@
+node_modules
+out
+dist
+release
+artifacts
+.git
+.cache
+.codex
+.claude
+.agents
+test-results
+coverage
+*.log

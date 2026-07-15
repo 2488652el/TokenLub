@@ -43,6 +43,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     completionPricePerMtok: 8.4,
     cacheReadPricePerMtok: 0.42,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   // --- M2.7 family (legacy) ---
@@ -54,6 +55,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.42,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   {
@@ -64,6 +66,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.42,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   // --- M2.5 family (legacy) ---
@@ -75,6 +78,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.21,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   {
@@ -85,6 +89,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.21,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   // --- M2.1 family (legacy) ---
@@ -96,6 +101,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.21,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   {
@@ -106,6 +112,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.21,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   },
   // --- M2 (legacy) ---
@@ -117,6 +124,7 @@ export const MINIMAX_PRICING: readonly Omit<PricingEntry, 'id' | 'updatedAt'>[] 
     cacheReadPricePerMtok: 0.21,
     cacheCreationPricePerMtok: 2.625,
     currency: 'CNY',
+    billingScope: 'cn',
     source: 'catalog'
   }
 ]

@@ -97,7 +97,7 @@ export function syncFiles(
     if (byteOffset > 0 && st.mtimeMs === mtimeMs && st.size === byteOffset) {
       continue
     }
-    const { records, nextOffset } = syncOne(file, byteOffset)
+    const { records, nextOffset } = syncOne(file, st.size < byteOffset ? 0 : byteOffset)
     if (records.length > 0) {
       inserted += insertUsage(records).inserted
     }

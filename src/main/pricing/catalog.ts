@@ -1,40 +1,41 @@
 /**
- * 价格目录同步模块:从 models.dev 拉取各模型官方价格 JSON,
- * 将 `provider/model` 前缀映射到 TokenLub 内部 providerId,
- * 并把 USD/每 token 转换为 USD/每百万 token 写入本地价格表。
+ * 价格目录同步模块:从 models.dev 正式 API 拉取各 Provider 的模型价格,
+ * 映射到 TokenLub providerId,并保留其 USD/每百万 token 原始单位。
  * (glm-5.2)
  */
 import type { PricingEntry } from '@shared/types/pricing'
 import { ProviderError } from '@shared/types/provider'
+import { DEFAULT_BILLING_SCOPE } from '@shared/pricing-scope'
 
 /**
- * Raw pricing object from models.dev (all values are USD-per-token strings).
+ * Raw pricing object from models.dev (scalar values are USD per million tokens).
  * Extra fields (web_search, image, audio, internal_reasoning) are ignored.
  *
- * models.dev 返回的原始价格对象(值均为 USD/每 token 字符串);额外字段被忽略。 (glm-5.2)
+ * models.dev 返回的原始价格对象(标量值为 USD/百万 token);额外字段被忽略。 (glm-5.2)
  */
-interface CatalogPricing {
-  prompt?: string
-  completion?: string
-  input_cache_read?: string
-  input_cache_write?: string
+interface CatalogCost {
+  input?: number
+  output?: number
+  cache_read?: number
+  cache_write?: number
 }
 
-/** models.dev 目录单条条目结构(id 形如 "anthropic/claude-opus-4.7-fast")。 (glm-5.2) */
-interface CatalogEntry {
-  id: string // e.g. "anthropic/claude-opus-4.7-fast"
+/** models.dev `api.json` 中的模型条目。 */
+interface CatalogModel {
+  id?: string
   name?: string
-  pricing?: CatalogPricing
+  cost?: CatalogCost
 }
 
-/** models.dev 目录响应顶层结构。 (glm-5.2) */
-interface CatalogResp {
-  data: CatalogEntry[]
+/** models.dev `api.json` 中的 Provider 条目。 */
+interface CatalogProvider {
+  models?: Record<string, CatalogModel>
 }
 
-/** models.dev catalog URL (raw JSON, dev branch - the default).
- *  models.dev 目录 URL(原始 JSON,dev 分支,默认值)。 (glm-5.2) */
-export const CATALOG_URL = 'https://raw.githubusercontent.com/anomalyco/models.dev/dev/models.json'
+type CatalogResponse = Record<string, CatalogProvider>
+
+/** models.dev 对外承诺的正式 Provider API。 */
+export const CATALOG_URL = 'https://models.dev/api.json'
 
 /** HTTP fetch timeout for catalog sync (30s - the file is ~500KB).
  *  目录同步的 HTTP 拉取超时(30 秒,文件约 500KB)。 (glm-5.2) */
@@ -60,25 +61,37 @@ export const PROVIDER_MAPPING: Readonly<Record<string, string>> = {
   openai: 'openai-admin',
   deepseek: 'deepseek',
   moonshotai: 'moonshot',
-  qwen: 'qwen-manual',
-  stepfun: 'stepfun'
+  alibaba: 'qwen-manual',
+  stepfun: 'stepfun',
+  zhipuai: 'zhipu',
+  minimax: 'minimax',
+  longcat: 'longcat',
+  siliconflow: 'siliconflow',
+  openrouter: 'openrouter',
+  google: 'gemini-manual'
 }
 
-/** models.dev prices are USD per token; TokenLub stores USD per million tokens.
- *  models.dev 价格单位为 USD/每 token,TokenLub 存储为 USD/每百万 token,故乘 1,000,000。 (glm-5.2) */
-const PER_TOKEN_TO_PER_MTOK = 1_000_000
+/** models.dev 中只有部分直连 Provider 明确对应国际站价格。 */
+export const PROVIDER_SCOPE_MAPPING: Readonly<Record<string, string>> = {
+  moonshotai: 'global',
+  minimax: 'global'
+}
 
-/**
- * Parse a price string ("0.00003") into a finite per-million-token number.
- * Returns null when the value is missing, empty, or not a finite number.
- *
- * 将价格字符串解析为有限值并转换为 USD/每百万 token;值缺失、空串或非有限数时返回 null。 (glm-5.2)
- */
-function toPerMtok(raw: string | undefined): number | null {
-  if (raw === undefined || raw === '') return null
-  const perToken = Number(raw)
-  if (!Number.isFinite(perToken)) return null
-  return perToken * PER_TOKEN_TO_PER_MTOK
+/** 完整目录成功下载后需要参与失效对账的 TokenLub provider + scope 集合。 */
+export const CATALOG_MANAGED_SCOPES = Object.freeze(
+  Object.entries(PROVIDER_MAPPING).map(([catalogProvider, providerId]) => ({
+    providerId,
+    billingScope: PROVIDER_SCOPE_MAPPING[catalogProvider] ?? DEFAULT_BILLING_SCOPE
+  }))
+)
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** 官方 API 的价格已经是 USD/百万 token，只接受有限非负数。 */
+function toPerMtok(raw: unknown): number | null {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null
 }
 
 /**
@@ -88,37 +101,35 @@ function toPerMtok(raw: string | undefined): number | null {
  *
  * 将单条 models.dev 目录条目转换为 TokenLub PricingEntry;未知 provider 或缺少必填价格时返回 null。纯函数,可不依赖 DB 测试。 (glm-5.2)
  */
-export function transformCatalogEntry(entry: CatalogEntry): PricingEntry | null {
-  const slashIdx = entry.id.indexOf('/')
-  if (slashIdx < 0) return null
-  const catalogProvider = entry.id.slice(0, slashIdx)
-  const model = entry.id.slice(slashIdx + 1)
-  if (!model) return null
-
+export function transformCatalogModel(
+  catalogProvider: string,
+  modelId: string,
+  entry: CatalogModel
+): PricingEntry | null {
   const providerId = PROVIDER_MAPPING[catalogProvider]
-  if (!providerId) return null // unknown provider — skip
+  if (!providerId || !modelId.trim()) return null
 
-  const pricing = entry.pricing
-  if (!pricing) return null
+  const cost = entry.cost
+  if (!cost) return null
 
-  const promptPricePerMtok = toPerMtok(pricing.prompt)
-  const completionPricePerMtok = toPerMtok(pricing.completion)
-  // prompt + completion are required; skip entries missing either.
-  // prompt 与 completion 为必填,缺少任一则跳过该条目。 (glm-5.2)
+  const promptPricePerMtok = toPerMtok(cost.input)
+  const completionPricePerMtok = toPerMtok(cost.output)
   if (promptPricePerMtok === null || completionPricePerMtok === null) return null
 
   const entry_: PricingEntry = {
     providerId,
-    model,
+    model: modelId,
     promptPricePerMtok,
     completionPricePerMtok,
     currency: 'USD',
-    source: 'catalog'
+    billingScope: PROVIDER_SCOPE_MAPPING[catalogProvider] ?? DEFAULT_BILLING_SCOPE,
+    source: 'catalog',
+    catalogActive: true
   }
 
-  const cacheRead = toPerMtok(pricing.input_cache_read)
+  const cacheRead = toPerMtok(cost.cache_read)
   if (cacheRead !== null) entry_.cacheReadPricePerMtok = cacheRead
-  const cacheCreation = toPerMtok(pricing.input_cache_write)
+  const cacheCreation = toPerMtok(cost.cache_write)
   if (cacheCreation !== null) entry_.cacheCreationPricePerMtok = cacheCreation
 
   return entry_
@@ -136,16 +147,36 @@ export function transformCatalogEntry(entry: CatalogEntry): PricingEntry | null 
  *
  * 返回值:`{ synced, skipped }`,synced 为已写入条目数,skipped 为未匹配 provider 或缺价格而跳过的条目数。 (glm-5.2)
  */
-export async function syncCatalog(upsert: (entries: PricingEntry[]) => void): Promise<{
+export interface CatalogFetchOptions {
+  etag?: string
+}
+
+export interface CatalogFetchResult {
   synced: number
   skipped: number
-}> {
+  protected: number
+  notModified: boolean
+  checkedAt: string
+  etag?: string
+}
+
+interface CatalogUpsertResult {
+  updated: number
+  skipped: number
+}
+
+export async function syncCatalog(
+  upsert: (entries: PricingEntry[]) => CatalogUpsertResult | void,
+  options: CatalogFetchOptions = {}
+): Promise<CatalogFetchResult> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), CATALOG_TIMEOUT_MS)
+  const headers = new Headers()
+  if (options.etag) headers.set('If-None-Match', options.etag)
 
   let res: Response
   try {
-    res = await fetch(CATALOG_URL, { signal: ctrl.signal })
+    res = await fetch(CATALOG_URL, { signal: ctrl.signal, headers })
   } catch (e) {
     clearTimeout(timer)
     throw new ProviderError(
@@ -157,6 +188,19 @@ export async function syncCatalog(upsert: (entries: PricingEntry[]) => void): Pr
   }
   clearTimeout(timer)
 
+  const checkedAt = new Date().toISOString()
+  const etag = res.headers.get('etag') ?? options.etag
+  if (res.status === 304) {
+    return {
+      synced: 0,
+      skipped: 0,
+      protected: 0,
+      notModified: true,
+      checkedAt,
+      ...(etag ? { etag } : {})
+    }
+  }
+
   if (!res.ok) {
     throw new ProviderError(
       'pricing-catalog',
@@ -166,22 +210,47 @@ export async function syncCatalog(upsert: (entries: PricingEntry[]) => void): Pr
     )
   }
 
-  const body = (await res.json()) as CatalogResp
+  const rawBody: unknown = await res.json()
+  if (!isRecord(rawBody)) {
+    throw new ProviderError(
+      'pricing-catalog',
+      'INVALID_RESPONSE',
+      undefined,
+      'Invalid models.dev catalog'
+    )
+  }
+  const body = rawBody as CatalogResponse
   const entries: PricingEntry[] = []
   let skipped = 0
 
-  for (const raw of body.data ?? []) {
-    const transformed = transformCatalogEntry(raw)
-    if (transformed === null) {
-      skipped++
-      continue
+  for (const [catalogProvider, provider] of Object.entries(body)) {
+    if (!isRecord(provider) || !isRecord(provider.models)) continue
+    for (const [modelId, rawModel] of Object.entries(provider.models)) {
+      if (!isRecord(rawModel)) {
+        skipped++
+        continue
+      }
+      const transformed = transformCatalogModel(catalogProvider, modelId, rawModel as CatalogModel)
+      if (transformed === null) {
+        skipped++
+        continue
+      }
+      entries.push(transformed)
     }
-    entries.push(transformed)
   }
 
+  let applied: CatalogUpsertResult = { updated: 0, skipped: 0 }
   if (entries.length > 0) {
-    upsert(entries)
+    const result = upsert(entries)
+    applied = result ?? { updated: entries.length, skipped: 0 }
   }
 
-  return { synced: entries.length, skipped }
+  return {
+    synced: applied.updated,
+    skipped,
+    protected: applied.skipped,
+    notModified: false,
+    checkedAt,
+    ...(etag ? { etag } : {})
+  }
 }

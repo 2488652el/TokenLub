@@ -3,17 +3,24 @@
  * 校验解析入库、缺失文件跳过与进度回调。
  * (glm-5.2)
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Ponytail: syncFiles is non-trivial (incremental byte-offset + fast-path),
 // so it gets ONE runnable check. Mock the DB + usage-repo so the test never
 // touches Electron's userData path or the developer's real ~/.claude logs.
 
+const syncState = vi.hoisted(() => ({
+  rows: new Map<string, { byte_offset: number; mtime_ms: number }>()
+}))
+
 vi.mock('../../../src/main/store/db', () => ({
   getDb: () => ({
     prepare: () => ({
-      get: () => undefined, // readSyncState → {byteOffset:0, mtimeMs:0} → no fast-path
-      run: () => ({ changes: 1 }) // writeSyncState
+      get: (_source: string, file: string) => syncState.rows.get(file),
+      run: (_source: string, file: string, mtimeMs: number, byteOffset: number) => {
+        syncState.rows.set(file, { byte_offset: byteOffset, mtime_ms: mtimeMs })
+        return { changes: 1 }
+      }
     })
   })
 }))
@@ -27,6 +34,8 @@ import { syncCodexFile } from '../../../src/main/log-parsers/codex'
 import { writeFileSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+
+beforeEach(() => syncState.rows.clear())
 
 function claudeAssistantLine(input: number, output: number, seq: string): string {
   return JSON.stringify({
@@ -87,6 +96,19 @@ describe('syncFiles (Claude)', () => {
     )
     expect(progress).toHaveLength(1)
     expect(progress[0]!.lines).toBe(1)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('restarts from zero when a session file was truncated', () => {
+    const dir = join(tmpdir(), `tokenlub-sync-truncated-${process.pid}`)
+    mkdirSync(dir, { recursive: true })
+    const file = join(dir, 'sess.jsonl')
+    writeFileSync(file, claudeAssistantLine(20, 5, 'new') + '\n')
+    syncState.rows.set(file, { byte_offset: 10_000, mtime_ms: 0 })
+
+    const result = syncFiles('claude-code', [file], syncClaudeFile)
+
+    expect(result.totals).toEqual({ lines: 1, tokens: 25, inserted: 1 })
     rmSync(dir, { recursive: true, force: true })
   })
 })

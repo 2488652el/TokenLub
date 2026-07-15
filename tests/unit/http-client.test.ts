@@ -58,6 +58,30 @@ describe('ProviderHttpClient', () => {
     expect(out.ok).toBe(true)
   })
 
+  it('caps an excessive retry-after delay', async () => {
+    vi.useFakeTimers()
+    try {
+      let calls = 0
+      globalThis.fetch = vi.fn(async () => {
+        calls++
+        return calls === 1
+          ? new Response('{}', { status: 429, headers: { 'retry-after': '999999' } })
+          : jsonResponse(200, { ok: true })
+      }) as typeof fetch
+      const c = new ProviderHttpClient({
+        baseUrl: 'https://x.test',
+        auth: { type: 'bearer', token: 't' },
+        providerId: 'p'
+      })
+      const result = c.getJSON<{ ok: boolean }>('/foo')
+      await vi.advanceTimersByTimeAsync(60_000)
+      await expect(result).resolves.toEqual({ ok: true })
+      expect(calls).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('uses x-api-key auth header', async () => {
     const seen: Record<string, string> = {}
     globalThis.fetch = vi.fn(async (_url, init) => {
