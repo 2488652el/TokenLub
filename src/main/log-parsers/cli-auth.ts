@@ -5,8 +5,7 @@
  * (glm-5.2)
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { getCliPaths } from '../platform/paths'
 
 /**
  * Claude Code 密钥检测结果。
@@ -72,11 +71,7 @@ export function detectClaudeKey(): ClaudeKeyDetection {
   }
 
   // 2. Credential files (newest first)
-  const home = homedir()
-  const candidates = [
-    join(home, '.claude', '.credentials.json'),
-    join(home, '.claude', 'credentials.json')
-  ]
+  const candidates = getCliPaths().claudeCredentialFiles
   for (const credPath of candidates) {
     if (!existsSync(credPath)) continue
     try {
@@ -123,8 +118,7 @@ export function detectCodexKey(): CodexKeyDetection {
   }
 
   // 2. auth.json
-  const home = homedir()
-  const authPath = join(home, '.codex', 'auth.json')
+  const authPath = getCliPaths().codexAuthFile
   if (existsSync(authPath)) {
     try {
       const raw = readFileSync(authPath, { encoding: 'utf8' })

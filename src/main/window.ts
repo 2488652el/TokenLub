@@ -3,20 +3,9 @@
  * 开发/生产环境加载入口切换,以及窗口内导航的安全拦截。
  * (glm-5.2)
  */
-import { BrowserWindow, app, shell } from 'electron'
+import { BrowserWindow, app } from 'electron'
 import { join } from 'path'
-
-const ALLOWED_EXTERNAL_SCHEMES = new Set(['http:', 'https:', 'mailto:'])
-
-/** 安全地打开外部链接:仅允许 http/https/mailto 协议,拦截其余协议。 (glm-5.2) */
-function safeOpenExternal(url: string): boolean {
-  try {
-    const parsed = new URL(url)
-    return ALLOWED_EXTERNAL_SCHEMES.has(parsed.protocol)
-  } catch {
-    return false
-  }
-}
+import { openAllowedExternalUrl } from './platform/external-links'
 
 /**
  * 创建并配置应用主窗口。
@@ -49,7 +38,7 @@ export function createWindow(): void {
   win.on('ready-to-show', () => win.show())
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (safeOpenExternal(url)) shell.openExternal(url)
+    void openAllowedExternalUrl(url)
     return { action: 'deny' }
   })
 

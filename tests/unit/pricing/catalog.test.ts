@@ -1,14 +1,11 @@
-/**
- * pricing catalog 单元测试:覆盖 PROVIDER_MAPPING / transformCatalogEntry / syncCatalog,
- * 校验 models.dev 目录的拉取、转换与 upsert 流程。
- * (glm-5.2)
- */
-import { describe, expect, it, vi, afterEach } from 'vitest'
+/** models.dev 正式 API 的价格转换、ETag 与批量同步测试。 */
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  transformCatalogEntry,
-  syncCatalog,
+  CATALOG_MANAGED_SCOPES,
+  CATALOG_URL,
   PROVIDER_MAPPING,
-  CATALOG_URL
+  syncCatalog,
+  transformCatalogModel
 } from '../../../src/main/pricing/catalog'
 import type { PricingEntry } from '../../../src/shared/types/pricing'
 
@@ -18,224 +15,173 @@ afterEach(() => {
   globalThis.fetch = realFetch
 })
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
-    headers: { 'content-type': 'application/json' }
+    headers: { 'content-type': 'application/json', ...headers }
   })
 }
 
-// PROVIDER_MAPPING:models.dev 前缀到 TokenLub providerId 的映射
 describe('PROVIDER_MAPPING', () => {
-  it('maps models.dev prefixes to TokenLub providerIds', () => {
-    expect(PROVIDER_MAPPING.anthropic).toBe('anthropic-admin')
-    expect(PROVIDER_MAPPING.openai).toBe('openai-admin')
-    expect(PROVIDER_MAPPING.deepseek).toBe('deepseek')
-    expect(PROVIDER_MAPPING.moonshotai).toBe('moonshot')
-    expect(PROVIDER_MAPPING.qwen).toBe('qwen-manual')
-    expect(PROVIDER_MAPPING.stepfun).toBe('stepfun')
+  it('covers TokenLub providers backed by models.dev provider pricing', () => {
+    expect(PROVIDER_MAPPING).toMatchObject({
+      anthropic: 'anthropic-admin',
+      openai: 'openai-admin',
+      deepseek: 'deepseek',
+      moonshotai: 'moonshot',
+      alibaba: 'qwen-manual',
+      stepfun: 'stepfun',
+      zhipuai: 'zhipu',
+      minimax: 'minimax',
+      longcat: 'longcat',
+      siliconflow: 'siliconflow',
+      openrouter: 'openrouter',
+      google: 'gemini-manual'
+    })
+  })
+
+  it('declares every mapped provider scope for full-catalog lifecycle reconciliation', () => {
+    expect(CATALOG_MANAGED_SCOPES).toHaveLength(Object.keys(PROVIDER_MAPPING).length)
+    expect(CATALOG_MANAGED_SCOPES).toContainEqual({
+      providerId: 'moonshot',
+      billingScope: 'global'
+    })
+    expect(CATALOG_MANAGED_SCOPES).toContainEqual({
+      providerId: 'deepseek',
+      billingScope: 'default'
+    })
+    expect(CATALOG_MANAGED_SCOPES).not.toContainEqual({
+      providerId: 'minimax',
+      billingScope: 'cn'
+    })
   })
 })
 
-// transformCatalogEntry:将目录条目转换为内部 PricingEntry,含价格单位换算与异常过滤
-describe('transformCatalogEntry', () => {
-  it('converts a standard anthropic entry with cache prices and ×1e6 unit', () => {
-    const raw = {
-      id: 'anthropic/claude-opus-4.7-fast',
-      name: 'Anthropic: Claude Opus 4.7 (Fast)',
-      pricing: {
-        prompt: '0.00003',
-        completion: '0.00015',
-        input_cache_read: '0.000003',
-        input_cache_write: '0.0000375'
-      }
-    }
-    const e = transformCatalogEntry(raw)!
-    expect(e.providerId).toBe('anthropic-admin')
-    expect(e.model).toBe('claude-opus-4.7-fast')
-    // 0.00003 * 1_000_000 = 30
-    expect(e.promptPricePerMtok).toBe(30)
-    // 0.00015 * 1_000_000 = 150
-    expect(e.completionPricePerMtok).toBe(150)
-    expect(e.cacheReadPricePerMtok).toBe(3)
-    expect(e.cacheCreationPricePerMtok).toBeCloseTo(37.5, 5)
-    expect(e.currency).toBe('USD')
-    expect(e.source).toBe('catalog')
+describe('transformCatalogModel', () => {
+  it('keeps official per-million USD prices without multiplying again', () => {
+    const entry = transformCatalogModel('anthropic', 'claude-opus-4-6', {
+      cost: { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25 }
+    })
+    expect(entry).toMatchObject({
+      providerId: 'anthropic-admin',
+      model: 'claude-opus-4-6',
+      promptPricePerMtok: 5,
+      completionPricePerMtok: 25,
+      cacheReadPricePerMtok: 0.5,
+      cacheCreationPricePerMtok: 6.25,
+      currency: 'USD',
+      source: 'catalog',
+      billingScope: 'default',
+      catalogActive: true
+    })
   })
 
-  it('converts a deepseek entry', () => {
-    const raw = {
-      id: 'deepseek/deepseek-chat',
-      pricing: { prompt: '0.00000014', completion: '0.00000028' }
-    }
-    const e = transformCatalogEntry(raw)!
-    expect(e.providerId).toBe('deepseek')
-    expect(e.model).toBe('deepseek-chat')
-    expect(e.promptPricePerMtok).toBeCloseTo(0.14, 5)
-    expect(e.completionPricePerMtok).toBeCloseTo(0.28, 5)
-    expect(e.cacheReadPricePerMtok).toBeUndefined()
-    expect(e.cacheCreationPricePerMtok).toBeUndefined()
+  it('maps global models.dev prices to the matching provider billing scope', () => {
+    expect(
+      transformCatalogModel('moonshotai', 'kimi-k2', { cost: { input: 0.5, output: 2 } })
+    ).toMatchObject({ providerId: 'moonshot', billingScope: 'global' })
+    expect(
+      transformCatalogModel('minimax', 'MiniMax-M2.1', { cost: { input: 0.3, output: 1.2 } })
+    ).toMatchObject({ providerId: 'minimax', billingScope: 'global' })
   })
 
-  it('handles free models (price "0")', () => {
-    const raw = {
-      id: 'openai/gpt-4o-mini:free',
-      pricing: { prompt: '0', completion: '0' }
-    }
-    const e = transformCatalogEntry(raw)!
-    expect(e.providerId).toBe('openai-admin')
-    expect(e.promptPricePerMtok).toBe(0)
-    expect(e.completionPricePerMtok).toBe(0)
-  })
-
-  it('returns null for unknown provider (not in mapping)', () => {
-    const raw = {
-      id: 'google/gemini-2.0-flash',
-      pricing: { prompt: '0.0000003', completion: '0.0000006' }
-    }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('returns null when prompt price is missing', () => {
-    const raw = {
-      id: 'anthropic/claude-test',
-      pricing: { completion: '0.00015' }
-    }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('returns null when completion price is missing', () => {
-    const raw = {
-      id: 'anthropic/claude-test',
-      pricing: { prompt: '0.00003' }
-    }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('returns null when pricing object is missing entirely', () => {
-    const raw = { id: 'anthropic/claude-test' }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('returns null when id has no slash (malformed)', () => {
-    const raw = { id: 'anthropic', pricing: { prompt: '0.00003', completion: '0.00015' } }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('returns null when model part after slash is empty', () => {
-    const raw = { id: 'anthropic/', pricing: { prompt: '0.00003', completion: '0.00015' } }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('skips non-numeric price strings (NaN guard)', () => {
-    const raw = {
-      id: 'anthropic/claude-bad',
-      pricing: { prompt: 'N/A', completion: '0.00015' }
-    }
-    expect(transformCatalogEntry(raw)).toBeNull()
-  })
-
-  it('handles empty string cache prices (omits them)', () => {
-    const raw = {
-      id: 'anthropic/claude-test',
-      pricing: { prompt: '0.00003', completion: '0.00015', input_cache_read: '' }
-    }
-    const e = transformCatalogEntry(raw)!
-    expect(e.cacheReadPricePerMtok).toBeUndefined()
-  })
-
-  it('handles model names with colons (e.g. openai/gpt-4o-mini:free)', () => {
-    const raw = {
-      id: 'openai/gpt-4o-mini:free',
-      pricing: { prompt: '0', completion: '0' }
-    }
-    const e = transformCatalogEntry(raw)!
-    expect(e.model).toBe('gpt-4o-mini:free')
-  })
-})
-
-// syncCatalog:拉取目录、转换匹配条目并回调 upsert,含错误与空数据处理
-describe('syncCatalog', () => {
-  it('fetches the catalog, transforms matching entries, and calls upsert', async () => {
-    const fetchCalls: string[] = []
-    globalThis.fetch = vi.fn(async (input: string | URL | Request) => {
-      fetchCalls.push(String(input))
-      return jsonResponse({
-        data: [
-          {
-            id: 'anthropic/claude-opus-4.7',
-            pricing: { prompt: '0.00003', completion: '0.00015', input_cache_read: '0.000003' }
-          },
-          {
-            id: 'deepseek/deepseek-chat',
-            pricing: { prompt: '0.00000014', completion: '0.00000028' }
-          },
-          // unknown provider — should be skipped
-          {
-            id: 'google/gemini-flash',
-            pricing: { prompt: '0.0000003', completion: '0.0000006' }
-          }
-        ]
+  it('accepts free models and optional cache prices', () => {
+    expect(
+      transformCatalogModel('openrouter', 'vendor/free-model', {
+        cost: { input: 0, output: 0 }
       })
+    ).toMatchObject({
+      providerId: 'openrouter',
+      model: 'vendor/free-model',
+      promptPricePerMtok: 0,
+      completionPricePerMtok: 0
+    })
+  })
+
+  it('rejects unknown providers, empty ids, missing prices and invalid numbers', () => {
+    expect(transformCatalogModel('unknown', 'model', { cost: { input: 1, output: 2 } })).toBeNull()
+    expect(transformCatalogModel('openai', '', { cost: { input: 1, output: 2 } })).toBeNull()
+    expect(transformCatalogModel('openai', 'model', { cost: { output: 2 } })).toBeNull()
+    expect(
+      transformCatalogModel('openai', 'model', { cost: { input: Number.NaN, output: 2 } })
+    ).toBeNull()
+    expect(transformCatalogModel('openai', 'model', { cost: { input: -1, output: 2 } })).toBeNull()
+  })
+})
+
+describe('syncCatalog', () => {
+  it('reads provider model maps and reports applied/protected/skipped counts', async () => {
+    const fetchCalls: Array<{ url: string; etag: string | null }> = []
+    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      fetchCalls.push({
+        url: String(input),
+        etag: new Headers(init?.headers).get('if-none-match')
+      })
+      return jsonResponse(
+        {
+          anthropic: {
+            models: {
+              'claude-opus-4-6': { cost: { input: 5, output: 25, cache_read: 0.5 } },
+              broken: { cost: { input: 1 } }
+            }
+          },
+          deepseek: {
+            models: { 'deepseek-chat': { cost: { input: 0.14, output: 0.28 } } }
+          },
+          unsupported: {
+            models: { model: { cost: { input: 1, output: 2 } } }
+          }
+        },
+        { etag: '"catalog-v2"' }
+      )
     }) as typeof fetch
 
     const upsertCalls: PricingEntry[][] = []
-    const result = await syncCatalog((entries) => upsertCalls.push(entries))
+    const result = await syncCatalog(
+      (entries) => {
+        upsertCalls.push(entries)
+        return { updated: 1, skipped: 1 }
+      },
+      { etag: '"catalog-v1"' }
+    )
 
-    // fetched the right URL
-    expect(fetchCalls[0]).toBe(CATALOG_URL)
-    // 2 matched (anthropic + deepseek), 1 skipped (google)
-    expect(result.synced).toBe(2)
-    expect(result.skipped).toBe(1)
-    // upsert called once with 2 entries
-    expect(upsertCalls).toHaveLength(1)
+    expect(fetchCalls).toEqual([{ url: CATALOG_URL, etag: '"catalog-v1"' }])
     expect(upsertCalls[0]).toHaveLength(2)
-    // unit conversion applied
-    expect(upsertCalls[0]?.[0]?.promptPricePerMtok).toBe(30)
-    expect(upsertCalls[0]?.[1]?.promptPricePerMtok).toBeCloseTo(0.14, 5)
-  })
-
-  it('does not call upsert when no entries match', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      jsonResponse({
-        data: [{ id: 'unknown/model', pricing: { prompt: '0', completion: '0' } }]
-      })
-    ) as typeof fetch
-
-    let upsertCalled = false
-    const result = await syncCatalog(() => {
-      upsertCalled = true
+    expect(result).toMatchObject({
+      synced: 1,
+      skipped: 2,
+      protected: 1,
+      notModified: false,
+      etag: '"catalog-v2"'
     })
+  })
 
-    expect(upsertCalled).toBe(false)
+  it('handles 304 without parsing or writing', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(null, { status: 304 })) as typeof fetch
+    const upsert = vi.fn()
+    const result = await syncCatalog(upsert, { etag: '"same"' })
+    expect(result).toMatchObject({ synced: 0, skipped: 0, protected: 0, notModified: true })
+    expect(upsert).not.toHaveBeenCalled()
+  })
+
+  it('does not write when no valid entries exist', async () => {
+    globalThis.fetch = vi.fn(async () => jsonResponse({ unknown: { models: {} } })) as typeof fetch
+    const upsert = vi.fn()
+    const result = await syncCatalog(upsert)
     expect(result.synced).toBe(0)
-    expect(result.skipped).toBe(1)
+    expect(upsert).not.toHaveBeenCalled()
   })
 
-  it('throws ProviderError on HTTP failure', async () => {
-    globalThis.fetch = vi.fn(async () => new Response('Not Found', { status: 503 })) as typeof fetch
+  it('throws ProviderError on HTTP, network and malformed responses', async () => {
+    globalThis.fetch = vi.fn(async () => new Response('no', { status: 503 })) as typeof fetch
+    await expect(syncCatalog(() => undefined)).rejects.toThrow(/catalog fetch failed/)
 
-    await expect(syncCatalog(() => {})).rejects.toThrow(/models.dev catalog fetch failed/)
-  })
-
-  it('throws ProviderError on network error', async () => {
     globalThis.fetch = vi.fn(async () => {
       throw new TypeError('fetch failed')
     }) as typeof fetch
+    await expect(syncCatalog(() => undefined)).rejects.toThrow(/Failed to fetch models.dev/)
 
-    await expect(syncCatalog(() => {})).rejects.toThrow(/Failed to fetch models.dev catalog/)
-  })
-
-  it('handles empty data array', async () => {
-    globalThis.fetch = vi.fn(async () => jsonResponse({ data: [] })) as typeof fetch
-    const result = await syncCatalog(() => {})
-    expect(result.synced).toBe(0)
-    expect(result.skipped).toBe(0)
-  })
-
-  it('handles null/missing data array (defensive)', async () => {
-    globalThis.fetch = vi.fn(async () => jsonResponse({})) as typeof fetch
-    const result = await syncCatalog(() => {})
-    expect(result.synced).toBe(0)
+    globalThis.fetch = vi.fn(async () => jsonResponse([])) as typeof fetch
+    await expect(syncCatalog(() => undefined)).rejects.toThrow(/Invalid models.dev catalog/)
   })
 })

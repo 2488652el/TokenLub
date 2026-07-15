@@ -12,6 +12,7 @@ export interface UsageRecord {
   id?: number
   apiKeyId?: string
   providerId: string
+  billingScope?: string
   model: string
   periodStart?: string
   periodEnd?: string

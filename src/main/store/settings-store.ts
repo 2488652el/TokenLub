@@ -4,6 +4,15 @@
  * (glm-5.2)
  */
 import { getDb } from './db'
+import { SYNCABLE_SETTING_KEYS } from '../../shared/sync-v2'
+import { markSyncV2Dirty } from './sync-v2-repo'
+
+const SYNCABLE_SETTINGS = new Set<string>(SYNCABLE_SETTING_KEYS)
+const INTERNAL_SETTING_PREFIXES = ['pricing_catalog_', 'pricing_exchange_']
+
+function isInternalSetting(key: string): boolean {
+  return INTERNAL_SETTING_PREFIXES.some((prefix) => key.startsWith(prefix))
+}
 
 /**
  * 读取指定键的设置值,值以 JSON 存储,无法反序列化时回退为原始字符串。
@@ -29,12 +38,17 @@ export function getSetting<T = unknown>(key: string): T | null {
  */
 export function setSetting(key: string, value: unknown): void {
   const db = getDb()
-  db.prepare(
+  const write = () => {
+    db.prepare(
+      `
+      INSERT INTO app_settings (key, value) VALUES (?, ?)
+      ON CONFLICT (key) DO UPDATE SET value = excluded.value
     `
-    INSERT INTO app_settings (key, value) VALUES (?, ?)
-    ON CONFLICT (key) DO UPDATE SET value = excluded.value
-  `
-  ).run(key, JSON.stringify(value))
+    ).run(key, JSON.stringify(value))
+    if (SYNCABLE_SETTINGS.has(key)) markSyncV2Dirty()
+  }
+  if (SYNCABLE_SETTINGS.has(key)) db.transaction(write)()
+  else write()
 }
 
 /**
@@ -49,6 +63,7 @@ export function getAllSettings(): Record<string, unknown> {
   }>
   const out: Record<string, unknown> = {}
   for (const r of rows) {
+    if (isInternalSetting(r.key)) continue
     try {
       out[r.key] = JSON.parse(r.value)
     } catch {

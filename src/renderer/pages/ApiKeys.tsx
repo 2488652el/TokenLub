@@ -16,6 +16,7 @@ import type { ApiKeyCreateInput, ApiKeyRecord, ApiKeyUpdateInput } from '../../s
 import type { UsageRecord } from '../../shared/types/usage'
 import type { BalanceSnapshot, ProviderManifest } from '../../shared/types/provider'
 import type { ProviderCatalogEntry } from '../../shared/provider-catalog'
+import type { CliDisplayPaths } from '../../shared/types/platform'
 
 type SessionSource = 'claude-code' | 'codex'
 
@@ -60,12 +61,6 @@ const SESSION_COUNT_KEY: Record<SessionSource, keyof SessionCounts> = {
   codex: 'codex'
 }
 
-/** 来源到本机扫描路径的映射(用于展示) */
-const SESSION_PATH: Record<SessionSource, string> = {
-  'claude-code': '%USERPROFILE%\\.claude\\projects\\',
-  codex: '%USERPROFILE%\\.codex\\sessions\\'
-}
-
 /** 空统计对象,用于初始化与重置 */
 const EMPTY_SESSION_STATS: SessionStats = {
   'claude-code': {
@@ -106,6 +101,9 @@ export default function ApiKeys() {
   const [importing, setImporting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sessionCounts, setSessionCounts] = useState<SessionCounts | null>(null)
+  const [sessionPaths, setSessionPaths] = useState<CliDisplayPaths | null>(null)
+  const [sessionPathsLoading, setSessionPathsLoading] = useState(true)
+  const [sessionPathsError, setSessionPathsError] = useState(false)
   const [sessionStats, setSessionStats] = useState<SessionStats>(EMPTY_SESSION_STATS)
   const [sessionAutoParse, setSessionAutoParse] = useState(false)
   const [sessionAutoLoaded, setSessionAutoLoaded] = useState(false)
@@ -261,6 +259,14 @@ export default function ApiKeys() {
   useEffect(() => {
     void loadSessionPanel()
   }, [loadSessionPanel])
+
+  useEffect(() => {
+    void window.api.log
+      .locations()
+      .then(setSessionPaths)
+      .catch(() => setSessionPathsError(true))
+      .finally(() => setSessionPathsLoading(false))
+  }, [])
 
   useEffect(() => {
     if (!sessionAutoLoaded || !sessionAutoParse || autoParsedRef.current) return
@@ -547,6 +553,9 @@ export default function ApiKeys() {
               syncing={sessionSyncing.has('claude-code')}
               progress={sessionProgress['claude-code']}
               done={sessionDone['claude-code']}
+              path={sessionPaths?.claudeProjects}
+              pathLoading={sessionPathsLoading}
+              pathError={sessionPathsError}
               onSync={syncSessionSource}
             />
             <SessionUsageCard
@@ -556,6 +565,9 @@ export default function ApiKeys() {
               syncing={sessionSyncing.has('codex')}
               progress={sessionProgress.codex}
               done={sessionDone.codex}
+              path={sessionPaths?.codexSessions}
+              pathLoading={sessionPathsLoading}
+              pathError={sessionPathsError}
               onSync={syncSessionSource}
             />
           </div>
@@ -699,6 +711,9 @@ function SessionUsageCard({
   syncing,
   progress,
   done,
+  path,
+  pathLoading,
+  pathError,
   onSync
 }: {
   source: SessionSource
@@ -707,15 +722,19 @@ function SessionUsageCard({
   syncing: boolean
   progress?: { file: string; lines: number; tokens: number } | undefined
   done?: { totals: SessionSyncTotals; error?: string } | undefined
+  path?: string | undefined
+  pathLoading: boolean
+  pathError: boolean
   onSync: (source: SessionSource) => Promise<void>
 }) {
   const fileCount = counts?.[SESSION_COUNT_KEY[source]] ?? 0
   const hasUsage = stats.requests > 0 || stats.tokens > 0
+  const pathLabel = pathLoading ? '正在读取本机路径' : pathError ? '路径读取失败' : `扫描 ${path}`
 
   return (
     <Card
       title={SESSION_LABEL[source]}
-      subtitle={`扫描 ${SESSION_PATH[source]}`}
+      subtitle={pathLabel}
       iconNode={<ProviderIcon providerId={source} title={SESSION_LABEL[source]} size={18} />}
       action={
         <button

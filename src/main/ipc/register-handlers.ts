@@ -12,12 +12,17 @@ import {
   apiKeyUpdateInputSchema,
   usageFilterSchema,
   pricingSetInputSchema,
+  pricingCatalogApplyInputSchema,
+  pricingExchangePolicySetInputSchema,
   alertAddInputSchema,
   alertToggleInputSchema,
   settingsSetInputSchema,
   keysSetUsageQueryInputSchema,
   logOpenFolderInputSchema,
-  logSyncInputSchema
+  logSyncInputSchema,
+  syncLoginInputSchema,
+  syncDeviceIdInputSchema,
+  syncModeSchema
 } from '@shared/ipc-schemas'
 import type { ApiKeyCreateInput, ApiKeyUpdateInput } from '@shared/types/api-key'
 import type { PricingEntry } from '@shared/types/pricing'
@@ -40,17 +45,38 @@ import {
   computeModelSpend,
   computeSpendByKey
 } from '../store/usage-repo'
-import { listPricing, setPricing, deletePricing, upsertCatalogBatch } from '../store/pricing-repo'
+import { listPricing, listPricingHistory, setPricing, deletePricing } from '../store/pricing-repo'
 import { listAlerts, addAlert, toggleAlert, deleteAlert } from '../store/alerts-repo'
 import { setSetting, getAllSettings } from '../store/settings-store'
 import { listProviders, getProvider } from '../providers/registry'
 import { PROVIDER_CATALOG } from '@shared/provider-catalog'
-import { syncCatalog } from '../pricing/catalog'
+import {
+  getCatalogSyncStatus,
+  previewCatalogNow,
+  applyCatalogPreview,
+  setCatalogAutoUpdate,
+  syncCatalogNow
+} from '../pricing/catalog-service'
 import { refreshAll, restartAutoRefresh } from '../scheduler/refresh'
-import { withCnySpendConversion } from '../services/exchange-rate'
+import {
+  getCnyRateQuote,
+  getPricingExchangePolicy,
+  setPricingExchangePolicy,
+  withCnySpendConversion
+} from '../services/exchange-rate'
 import { syncAllSessions, discoverAllSessions } from '../log-parsers/sync'
 import { detectClaudeKey, detectCodexKey } from '../log-parsers/cli-auth'
+import { getCliDisplayPaths } from '../platform/paths'
 import { statSync } from 'node:fs'
+import {
+  getSyncStatus,
+  previewSync,
+  listSyncDevices,
+  loginSync,
+  revokeSyncDevice,
+  scheduleSyncAfterChange,
+  syncNow
+} from '../sync/service'
 
 /**
  * Remove keys whose value is `undefined` so the object is assignable to types
@@ -185,6 +211,26 @@ export function registerIpcHandlers(): void {
     return { started: true, queued, ...result }
   })
 
+  // Sync status exposes only non-sensitive state; tokens stay in main.
+  ipcMain.handle(IPC.syncStatus, () => getSyncStatus())
+  ipcMain.handle(IPC.syncPreview, (_e, mode) => previewSync(syncModeSchema.parse(mode)))
+  ipcMain.handle(IPC.syncNow, async () => {
+    await syncNow()
+    return { started: true }
+  })
+  ipcMain.handle(IPC.syncOnline, async () => {
+    await syncNow()
+    return { started: true }
+  })
+  ipcMain.handle(IPC.syncLogin, async (_e, input) => {
+    return loginSync(syncLoginInputSchema.parse(input))
+  })
+  ipcMain.handle(IPC.syncDevices, () => listSyncDevices())
+  ipcMain.handle(IPC.syncRevokeDevice, async (_e, input) => {
+    await revokeSyncDevice(syncDeviceIdInputSchema.parse(input).deviceId)
+    return { ok: true }
+  })
+
   // pricing
   ipcMain.handle(IPC.pricingList, () => listPricing())
   ipcMain.handle(IPC.pricingSet, (_e, entry) => {
@@ -192,19 +238,44 @@ export function registerIpcHandlers(): void {
       PricingEntry,
       'id' | 'updatedAt'
     >
-    return setPricing(parsed)
+    // Anything edited through the UI is a user override. Catalog rows are
+    // written only by the trusted models.dev sync path.
+    const result = setPricing({ ...parsed, source: 'user' })
+    scheduleSyncAfterChange()
+    return result
   })
   ipcMain.handle(IPC.pricingRestore, (_e, id: number) => {
     deletePricing(id)
+    scheduleSyncAfterChange()
     return { ok: true }
   })
-  ipcMain.handle(IPC.pricingCatalog, async () => syncCatalog(upsertCatalogBatch))
+  ipcMain.handle(IPC.pricingCatalog, () => syncCatalogNow())
+  ipcMain.handle(IPC.pricingCatalogPreview, () => previewCatalogNow())
+  ipcMain.handle(IPC.pricingCatalogApply, (_e, input) => {
+    const parsed = pricingCatalogApplyInputSchema.parse(input)
+    const result = applyCatalogPreview(parsed.previewId)
+    return result
+  })
+  ipcMain.handle(IPC.pricingHistory, (_e, limit?: unknown) =>
+    listPricingHistory(typeof limit === 'number' ? limit : 100)
+  )
+  ipcMain.handle(IPC.pricingExchangePolicy, () => getPricingExchangePolicy())
+  ipcMain.handle(IPC.pricingExchangePolicySet, (_e, input) =>
+    setPricingExchangePolicy(pricingExchangePolicySetInputSchema.parse(input))
+  )
+  ipcMain.handle(IPC.pricingCatalogStatus, () => getCatalogSyncStatus())
+  ipcMain.handle(IPC.pricingCatalogAutoUpdate, (_e, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('pricing auto-update must be boolean')
+    return setCatalogAutoUpdate(enabled)
+  })
+  ipcMain.handle(IPC.pricingCnyRate, () => getCnyRateQuote('USD'))
 
   // settings
   ipcMain.handle(IPC.settingsGet, () => getAllSettings())
   ipcMain.handle(IPC.settingsSet, (_e, kv: { key: string; value: unknown }) => {
     const parsed = settingsSetInputSchema.parse(kv)
     setSetting(parsed.key, parsed.value)
+    scheduleSyncAfterChange()
     // Changing the refresh interval must reconfigure the running timer so the
     // new value takes effect immediately (no app restart required).
     if (parsed.key === 'refresh_interval_min') {
@@ -246,6 +317,7 @@ export function registerIpcHandlers(): void {
   // Local log parsing (Phase D2): discover + sync session JSONL files, detect
   // existing CLI keys for one-click import, and open log folders in the OS.
   ipcMain.handle(IPC.logDiscover, () => discoverAllSessions())
+  ipcMain.handle(IPC.logLocations, () => getCliDisplayPaths())
   ipcMain.handle(IPC.logSync, (_e, input) => {
     const parsed = logSyncInputSchema.parse(input)
     const win = BrowserWindow.getAllWindows()[0]

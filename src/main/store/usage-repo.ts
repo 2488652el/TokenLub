@@ -13,6 +13,7 @@ import type {
   KeySpendSummary,
   ModelSpendAggregate
 } from '@shared/types/usage'
+import { normalizeBillingScope, resolveBillingScope } from '@shared/pricing-scope'
 
 /**
  * Compute a provider's cost share of the grand total.
@@ -29,6 +30,7 @@ interface DbRow {
   id: number
   api_key_id: string | null
   provider_id: string
+  billing_scope: string
   model: string
   period_start: string | null
   period_end: string | null
@@ -49,6 +51,7 @@ interface DbRow {
 /** 按供应商+模型分组的聚合行(含各类 token 与存储成本)。 */
 interface SpendGroupRow {
   provider_id: string
+  billing_scope: string
   model: string
   pt: number
   ct: number
@@ -68,13 +71,19 @@ interface PricedUsageGroup {
   cacheCreationTokens: number
   storedCost?: number | null | undefined
   preferredCurrency?: string | null | undefined
+  billingScope?: string | null | undefined
 }
 
 /** 查找用量分组的定价:先按供应商+模型,再仅按模型回退。(内部辅助函数) */
-function findPricingForUsage(providerId: string, model: string, preferredCurrency?: string) {
+function findPricingForUsage(
+  providerId: string,
+  model: string,
+  preferredCurrency?: string,
+  billingScope?: string
+) {
   return (
-    findPricing(providerId, model, preferredCurrency) ??
-    findPricingByModel(model, preferredCurrency)
+    findPricing(providerId, model, preferredCurrency, billingScope) ??
+    findPricingByModel(model, preferredCurrency, billingScope)
   )
 }
 
@@ -87,7 +96,8 @@ function priceUsageGroup(group: PricedUsageGroup): {
   const pricing = findPricingForUsage(
     group.providerId,
     group.model,
-    group.preferredCurrency ?? undefined
+    group.preferredCurrency ?? undefined,
+    group.billingScope ?? undefined
   )
   if (!pricing) {
     return {
@@ -128,6 +138,7 @@ function rowToRecord(r: DbRow, options: { priceFromConfig?: boolean } = {}): Usa
   const priced = options.priceFromConfig
     ? priceUsageGroup({
         providerId: r.provider_id,
+        billingScope: r.billing_scope,
         model: r.model,
         promptTokens: r.prompt_tokens ?? 0,
         completionTokens: r.completion_tokens ?? 0,
@@ -141,6 +152,7 @@ function rowToRecord(r: DbRow, options: { priceFromConfig?: boolean } = {}): Usa
   const currency = priced?.currency ?? r.currency
   return {
     providerId: r.provider_id,
+    billingScope: normalizeBillingScope(r.billing_scope),
     model: r.model,
     source: r.source as UsageRecord['source'],
     capturedAt: r.captured_at,
@@ -180,10 +192,10 @@ export function insertUsage(records: UsageRecord[]): { inserted: number; skipped
   //     (NULL != NULL in SQLite), so the business-key constraint above governs.
   const stmt = db.prepare(`
     INSERT OR IGNORE INTO usage_records (
-      api_key_id, provider_id, model, period_start, period_end,
+      api_key_id, provider_id, billing_scope, model, period_start, period_end,
       prompt_tokens, completion_tokens, cache_creation_tokens, cache_read_tokens,
       total_tokens, cost, currency, source, session_id, message_id, agent_label, captured_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   let inserted = 0
   let skipped = 0
@@ -192,6 +204,7 @@ export function insertUsage(records: UsageRecord[]): { inserted: number; skipped
       const res = stmt.run(
         r.apiKeyId ?? null,
         r.providerId,
+        normalizeBillingScope(r.billingScope),
         r.model,
         r.periodStart ?? null,
         r.periodEnd ?? null,
@@ -361,7 +374,7 @@ export function getDashboardSummary(days = 30): {
   const costGroups = db
     .prepare(
       `
-    SELECT provider_id, model,
+    SELECT provider_id, billing_scope, model,
            COALESCE(SUM(prompt_tokens), 0) AS pt,
            COALESCE(SUM(completion_tokens), 0) AS ct,
            COALESCE(SUM(cache_read_tokens), 0) AS crt,
@@ -369,7 +382,7 @@ export function getDashboardSummary(days = 30): {
            COALESCE(SUM(cost), 0) AS stored_cost,
            COUNT(*) AS n
     FROM usage_records ${where}
-    GROUP BY provider_id, model
+    GROUP BY provider_id, billing_scope, model
   `
     )
     .all(...args) as SpendGroupRow[]
@@ -379,6 +392,7 @@ export function getDashboardSummary(days = 30): {
   for (const g of costGroups) {
     const priced = priceUsageGroup({
       providerId: g.provider_id,
+      billingScope: g.billing_scope,
       model: g.model,
       promptTokens: g.pt,
       completionTokens: g.ct,
@@ -408,6 +422,7 @@ export function getDashboardSummary(days = 30): {
       `
     SELECT substr(captured_at, 1, 10) AS date,
            provider_id,
+           billing_scope,
            model,
            COALESCE(SUM(prompt_tokens), 0) AS pt,
            COALESCE(SUM(completion_tokens), 0) AS ct,
@@ -415,7 +430,7 @@ export function getDashboardSummary(days = 30): {
            COALESCE(SUM(cache_creation_tokens), 0) AS cct,
            COALESCE(SUM(cost), 0) AS stored_cost
     FROM usage_records ${where}
-    GROUP BY date, provider_id, model ORDER BY date ASC
+    GROUP BY date, provider_id, billing_scope, model ORDER BY date ASC
   `
     )
     .all(...args) as Array<SpendGroupRow & { date: string }>
@@ -424,6 +439,7 @@ export function getDashboardSummary(days = 30): {
   for (const g of dailyGroups) {
     const priced = priceUsageGroup({
       providerId: g.provider_id,
+      billingScope: g.billing_scope,
       model: g.model,
       promptTokens: g.pt,
       completionTokens: g.ct,
@@ -468,18 +484,19 @@ export function computeTotalSpend(days = 30): TotalSpendSummary {
   const groups = db
     .prepare(
       `
-    SELECT provider_id, model,
+    SELECT provider_id, billing_scope, model,
            COALESCE(SUM(prompt_tokens), 0) AS pt,
            COALESCE(SUM(completion_tokens), 0) AS ct,
            COALESCE(SUM(cache_read_tokens), 0) AS crt,
            COALESCE(SUM(cache_creation_tokens), 0) AS cct,
            COUNT(*) AS n
     FROM usage_records ${where}
-    GROUP BY provider_id, model
+    GROUP BY provider_id, billing_scope, model
   `
     )
     .all(...args) as Array<{
     provider_id: string
+    billing_scope: string
     model: string
     pt: number
     ct: number
@@ -495,7 +512,7 @@ export function computeTotalSpend(days = 30): TotalSpendSummary {
 
   for (const g of groups) {
     totalRequests += g.n
-    const p = findPricingForUsage(g.provider_id, g.model)
+    const p = findPricingForUsage(g.provider_id, g.model, undefined, g.billing_scope)
     if (!p) {
       unpricedRequests += g.n
       continue
@@ -555,7 +572,7 @@ export function computeModelSpend(
   const groups = db
     .prepare(
       `
-    SELECT provider_id, model,
+    SELECT provider_id, billing_scope, model,
            COALESCE(SUM(prompt_tokens), 0) AS pt,
            COALESCE(SUM(completion_tokens), 0) AS ct,
            COALESCE(SUM(cache_read_tokens), 0) AS crt,
@@ -564,7 +581,7 @@ export function computeModelSpend(
            COALESCE(SUM(cost), 0) AS stored_cost,
            COUNT(*) AS n
     FROM usage_records ${where}
-    GROUP BY provider_id, model
+    GROUP BY provider_id, billing_scope, model
   `
     )
     .all(...args) as Array<SpendGroupRow & { tt: number }>
@@ -609,6 +626,7 @@ export function computeModelSpend(
 
     const priced = priceUsageGroup({
       providerId: g.provider_id,
+      billingScope: g.billing_scope,
       model: g.model,
       promptTokens: g.pt,
       completionTokens: g.ct,
@@ -663,7 +681,7 @@ export function computeModelSpend(
  *
  * Vendors that don't fill `model` on usage records (most admin endpoints,
  * some third-party gateways) will have their rows fall into `unpricedRequests`
- * because `findPricing` keys on (provider_id, model). The renderer should
+ * because `findPricing` keys on (provider_id, billing_scope, model). The renderer should
  * surface this gap so users can either configure pricing or check the
  * provider's own dashboard.
  * 按密钥维度的消费估算:无直接归属行时,用该密钥所属供应商的定价表对未归属的 session-log 行进行估算。(glm-5.2)
@@ -671,13 +689,17 @@ export function computeModelSpend(
 export function computeSpendByKey(apiKeyId: string, days = 30): KeySpendSummary {
   const db = getDb()
   const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString()
-  const key = db.prepare('SELECT provider_id FROM api_keys WHERE id = ?').get(apiKeyId) as
-    { provider_id: string } | undefined
+  const key = db
+    .prepare('SELECT provider_id, base_url_override FROM api_keys WHERE id = ?')
+    .get(apiKeyId) as { provider_id: string; base_url_override: string | null } | undefined
+  const keyBillingScope = key
+    ? resolveBillingScope(key.provider_id, key.base_url_override)
+    : 'default'
 
   let groups = db
     .prepare(
       `
-    SELECT provider_id, model,
+    SELECT provider_id, billing_scope, model,
            COALESCE(SUM(prompt_tokens), 0) AS pt,
            COALESCE(SUM(completion_tokens), 0) AS ct,
            COALESCE(SUM(cache_read_tokens), 0) AS crt,
@@ -685,7 +707,7 @@ export function computeSpendByKey(apiKeyId: string, days = 30): KeySpendSummary 
            COUNT(*) AS n
     FROM usage_records
     WHERE api_key_id = ? AND captured_at >= ?
-    GROUP BY provider_id, model
+    GROUP BY provider_id, billing_scope, model
   `
     )
     .all(apiKeyId, since) as SpendGroupRow[]
@@ -702,7 +724,7 @@ export function computeSpendByKey(apiKeyId: string, days = 30): KeySpendSummary 
       db
         .prepare(
           `
-      SELECT ? AS provider_id, model,
+      SELECT ? AS provider_id, ? AS billing_scope, model,
              COALESCE(SUM(prompt_tokens), 0) AS pt,
              COALESCE(SUM(completion_tokens), 0) AS ct,
              COALESCE(SUM(cache_read_tokens), 0) AS crt,
@@ -716,12 +738,23 @@ export function computeSpendByKey(apiKeyId: string, days = 30): KeySpendSummary 
           SELECT 1 FROM pricing_entries p
           WHERE p.provider_id = ?
             AND p.model = usage_records.model
+            AND p.billing_scope IN (?, 'default')
         )
       GROUP BY model
     `
         )
-        .all(key.provider_id, since, key.provider_id) as SpendGroupRow[]
-    ).map((g) => ({ ...g, provider_id: key.provider_id }))
+        .all(
+          key.provider_id,
+          keyBillingScope,
+          since,
+          key.provider_id,
+          keyBillingScope
+        ) as SpendGroupRow[]
+    ).map((g) => ({
+      ...g,
+      provider_id: key.provider_id,
+      billing_scope: keyBillingScope
+    }))
   }
 
   const byCurrency = new Map<string, number>()
@@ -733,7 +766,7 @@ export function computeSpendByKey(apiKeyId: string, days = 30): KeySpendSummary 
   for (const g of groups) {
     totalRequests += g.n
     modelSet.add(g.model)
-    const p = findPricingForUsage(g.provider_id, g.model)
+    const p = findPricingForUsage(g.provider_id, g.model, undefined, g.billing_scope)
     if (!p) {
       unpricedRequests += g.n
       continue

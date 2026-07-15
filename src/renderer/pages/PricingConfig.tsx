@@ -8,18 +8,27 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { Modal } from '../components/Modal'
-import { fmtMoney } from '../../shared/utils/money'
-import type { PricingEntry } from '../../shared/types/pricing'
+import { fmtMoney, toDecimal } from '../../shared/utils/money'
+import type {
+  CnyRateQuote,
+  PricingCatalogStatus,
+  PricingExchangePolicyConfig,
+  PricingEntry,
+  PricingHistoryEntry
+} from '../../shared/types/pricing'
 import type { ProviderManifest } from '../../shared/types/provider'
 
 /** 支持的币种列表 */
 const CURRENCIES = ['USD', 'CNY', 'EUR'] as const
+const BILLING_SCOPES = ['default', 'cn', 'global'] as const
 type Currency = (typeof CURRENCIES)[number]
 
 /** 筛选状态:按供应商与币种过滤 */
 type FilterState = {
   providerId: string | null
   currency: Currency | null
+  billingScope: string | null
+  query: string
 }
 
 /**
@@ -32,15 +41,37 @@ export default function PricingConfig() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<PricingEntry | null>(null)
-  const [filter, setFilter] = useState<FilterState>({ providerId: null, currency: null })
+  const [filter, setFilter] = useState<FilterState>({
+    providerId: null,
+    currency: null,
+    billingScope: null,
+    query: ''
+  })
+  const [catalogStatus, setCatalogStatus] = useState<PricingCatalogStatus | null>(null)
+  const [history, setHistory] = useState<PricingHistoryEntry[]>([])
+  const [exchangePolicy, setExchangePolicy] = useState<PricingExchangePolicyConfig>({
+    policy: 'realtime',
+    fixedRates: {}
+  })
+  const [cnyRate, setCnyRate] = useState<CnyRateQuote | null>(null)
+  const [syncingCatalog, setSyncingCatalog] = useState(false)
 
   /** 刷新价格条目与供应商列表 */
   async function refresh() {
     setLoading(true)
     try {
-      const [list, p] = await Promise.all([window.api.pricing.list(), window.api.providers.list()])
+      const [list, p, status, recentHistory, policy] = await Promise.all([
+        window.api.pricing.list(),
+        window.api.providers.list(),
+        window.api.pricing.catalogStatus(),
+        window.api.pricing.history(8),
+        window.api.pricing.exchangePolicy()
+      ])
       setEntries(list)
       setProviders(p)
+      setCatalogStatus(status)
+      setHistory(recentHistory)
+      setExchangePolicy(policy)
     } finally {
       setLoading(false)
     }
@@ -48,6 +79,24 @@ export default function PricingConfig() {
 
   useEffect(() => {
     void refresh()
+    void window.api.pricing
+      .cnyRate()
+      .then(setCnyRate)
+      .catch(() => undefined)
+    const timer = window.setInterval(() => {
+      void Promise.all([
+        window.api.pricing.catalogStatus(),
+        window.api.pricing.list(),
+        window.api.pricing.history(8)
+      ])
+        .then(([status, list, recentHistory]) => {
+          setCatalogStatus(status)
+          setEntries(list)
+          setHistory(recentHistory)
+        })
+        .catch(() => undefined)
+    }, 3_000)
+    return () => window.clearInterval(timer)
   }, [])
 
   /** 按供应商与模型名排序后的条目 */
@@ -66,6 +115,9 @@ export default function PricingConfig() {
     return sorted.filter((e) => {
       if (filter.providerId && e.providerId !== filter.providerId) return false
       if (filter.currency && e.currency !== filter.currency) return false
+      if (filter.billingScope && (e.billingScope ?? 'default') !== filter.billingScope) return false
+      const query = filter.query.trim().toLocaleLowerCase()
+      if (query && !`${e.providerId} ${e.model}`.toLocaleLowerCase().includes(query)) return false
       return true
     })
   }, [sorted, filter])
@@ -82,12 +134,13 @@ export default function PricingConfig() {
     setModalOpen(true)
   }
 
-  /** 删除单条价格条目(恢复官方价) */
+  /** 删除用户覆盖后重新同步目录，以恢复 models.dev 官方价。 */
   async function handleDelete(entry: PricingEntry) {
-    if (!window.confirm(`删除 ${entry.model} 的价格条目？`)) return
+    if (!window.confirm(`删除 ${entry.model} 的自定义价格并恢复官方价？`)) return
     if (entry.id == null) return
     try {
       await window.api.pricing.restore(entry.id)
+      await window.api.pricing.syncCatalog()
       await refresh()
     } catch (e) {
       window.alert(`删除失败：${(e as Error).message}`)
@@ -112,13 +165,75 @@ export default function PricingConfig() {
         // ignore individual failures, keep going
       }
     }
+    try {
+      await window.api.pricing.syncCatalog()
+    } catch {
+      // User rows were removed successfully; the status card will show the
+      // catalog refresh error and the next automatic sync can restore them.
+    }
     await refresh()
     window.alert(`已恢复官方价：删除了 ${ok} 条用户自定义条目。`)
   }
 
   /** 重置筛选条件 */
   function resetFilter() {
-    setFilter({ providerId: null, currency: null })
+    setFilter({ providerId: null, currency: null, billingScope: null, query: '' })
+  }
+
+  async function handleCatalogSync() {
+    setSyncingCatalog(true)
+    try {
+      const preview = await window.api.pricing.catalogPreview()
+      if (!preview) {
+        window.alert('models.dev 价格目录已是最新版本。')
+      } else {
+        const summary = preview.changes.reduce(
+          (result, change) => {
+            result[change.kind]++
+            if (change.blocked) result.blocked++
+            return result
+          },
+          { added: 0, changed: 0, removed: 0, blocked: 0 }
+        )
+        const confirmed = window.confirm(
+          `目录差异：新增 ${summary.added}、变更 ${summary.changed}、下架 ${summary.removed}，异常变动 ${summary.blocked}。确认应用？`
+        )
+        if (confirmed) await window.api.pricing.applyCatalogPreview(preview.id)
+      }
+      await refresh()
+    } catch (error) {
+      await refresh()
+      window.alert(`同步失败：${(error as Error).message}`)
+    } finally {
+      setSyncingCatalog(false)
+    }
+  }
+
+  async function handleAutoUpdate(enabled: boolean) {
+    const status = await window.api.pricing.setCatalogAutoUpdate(enabled)
+    setCatalogStatus(status)
+  }
+
+  async function handleExchangePolicyChange(config: PricingExchangePolicyConfig) {
+    const saved = await window.api.pricing.setExchangePolicy(config)
+    setExchangePolicy(saved)
+    const quote = await window.api.pricing.cnyRate()
+    setCnyRate(quote)
+  }
+
+  async function handleApplyPreview() {
+    const pending = catalogStatus?.pendingPreview
+    if (!pending) return
+    const confirmed = window.confirm(
+      `检测到 ${pending.blocked} 个异常价格变动，另有新增 ${pending.added}、变更 ${pending.changed}、下架 ${pending.removed} 条。确认应用这批目录更新吗？`
+    )
+    if (!confirmed) return
+    try {
+      await window.api.pricing.applyCatalogPreview(pending.id)
+      await refresh()
+    } catch (error) {
+      window.alert(`应用目录预览失败：${(error as Error).message}`)
+    }
   }
 
   return (
@@ -128,6 +243,14 @@ export default function PricingConfig() {
         desc="覆盖各模型每百万 token 价格,支持添加、编辑、删除与恢复官方价"
         action={
           <div className="flex items-center gap-2">
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => void handleCatalogSync()}
+              disabled={syncingCatalog}
+            >
+              <i className={`fa-solid fa-arrows-rotate ${syncingCatalog ? 'fa-spin' : ''}`} />
+              {syncingCatalog ? '同步中…' : '同步官方价格'}
+            </button>
             <button className="btn btn-outline btn-sm" onClick={handleRestoreAll}>
               <i className="fa-solid fa-rotate-left" /> 恢复官方价
             </button>
@@ -137,6 +260,17 @@ export default function PricingConfig() {
           </div>
         }
       />
+
+      <CatalogStatusCard
+        status={catalogStatus}
+        cnyRate={cnyRate}
+        onAutoUpdate={(enabled) => void handleAutoUpdate(enabled)}
+        onApplyPreview={() => void handleApplyPreview()}
+        exchangePolicy={exchangePolicy}
+        onExchangePolicyChange={(config) => void handleExchangePolicyChange(config)}
+      />
+
+      <PricingHistoryCard history={history} />
 
       {loading ? (
         <Card>
@@ -172,12 +306,14 @@ export default function PricingConfig() {
                   <tr>
                     <th>Provider</th>
                     <th>Model</th>
-                    <th className="text-right">Prompt ($/Mtok)</th>
-                    <th className="text-right">Completion ($/Mtok)</th>
+                    <th>Scope</th>
+                    <th className="text-right">Prompt (/Mtok)</th>
+                    <th className="text-right">Completion (/Mtok)</th>
                     <th className="text-right">Cache Read</th>
                     <th className="text-right">Cache Creation</th>
                     <th>Currency</th>
                     <th>Source</th>
+                    <th>Status</th>
                     <th>Updated</th>
                     <th>操作</th>
                   </tr>
@@ -185,7 +321,7 @@ export default function PricingConfig() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="text-center text-text-muted py-8 text-[13px]">
+                      <td colSpan={12} className="text-center text-text-muted py-8 text-[13px]">
                         当前筛选下没有条目。
                       </td>
                     </tr>
@@ -194,25 +330,53 @@ export default function PricingConfig() {
                       <tr key={e.id ?? `${e.providerId}:${e.model}`}>
                         <td className="mono text-[12.5px]">{e.providerId}</td>
                         <td className="fw-500">{e.model}</td>
+                        <td className="mono text-[12px]">{e.billingScope ?? 'default'}</td>
                         <td className="text-right mono">
-                          {fmtMoney(e.promptPricePerMtok, e.currency)}
+                          <PriceCell
+                            value={e.promptPricePerMtok}
+                            currency={e.currency}
+                            rate={cnyRate}
+                          />
                         </td>
                         <td className="text-right mono">
-                          {fmtMoney(e.completionPricePerMtok, e.currency)}
+                          <PriceCell
+                            value={e.completionPricePerMtok}
+                            currency={e.currency}
+                            rate={cnyRate}
+                          />
                         </td>
                         <td className="text-right mono text-secondary">
-                          {e.cacheReadPricePerMtok != null
-                            ? fmtMoney(e.cacheReadPricePerMtok, e.currency)
-                            : '—'}
+                          {e.cacheReadPricePerMtok != null ? (
+                            <PriceCell
+                              value={e.cacheReadPricePerMtok}
+                              currency={e.currency}
+                              rate={cnyRate}
+                            />
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td className="text-right mono text-secondary">
-                          {e.cacheCreationPricePerMtok != null
-                            ? fmtMoney(e.cacheCreationPricePerMtok, e.currency)
-                            : '—'}
+                          {e.cacheCreationPricePerMtok != null ? (
+                            <PriceCell
+                              value={e.cacheCreationPricePerMtok}
+                              currency={e.currency}
+                              rate={cnyRate}
+                            />
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td className="text-secondary text-[12.5px]">{e.currency}</td>
                         <td>
                           <SourceBadge source={e.source} />
+                        </td>
+                        <td>
+                          {e.catalogActive === false ? (
+                            <span className="text-[11.5px] text-amber-700">上游已移除</span>
+                          ) : (
+                            <span className="text-[11.5px] text-emerald-700">有效</span>
+                          )}
                         </td>
                         <td className="text-secondary text-[12px]">
                           {e.updatedAt ? e.updatedAt.slice(0, 16).replace('T', ' ') : '—'}
@@ -226,13 +390,15 @@ export default function PricingConfig() {
                             >
                               <i className="fa-solid fa-pen" />
                             </button>
-                            <button
-                              className="btn btn-ghost btn-xs"
-                              onClick={() => handleDelete(e)}
-                              title="删除"
-                            >
-                              <i className="fa-solid fa-trash-can text-red" />
-                            </button>
+                            {e.source === 'user' && (
+                              <button
+                                className="btn btn-ghost btn-xs"
+                                onClick={() => handleDelete(e)}
+                                title="删除自定义价格并恢复官方价"
+                              >
+                                <i className="fa-solid fa-rotate-left" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -260,6 +426,156 @@ export default function PricingConfig() {
   )
 }
 
+function CatalogStatusCard({
+  status,
+  cnyRate,
+  onAutoUpdate,
+  onApplyPreview,
+  exchangePolicy,
+  onExchangePolicyChange
+}: {
+  status: PricingCatalogStatus | null
+  cnyRate: CnyRateQuote | null
+  onAutoUpdate: (enabled: boolean) => void
+  onApplyPreview: () => void
+  exchangePolicy: PricingExchangePolicyConfig
+  onExchangePolicyChange: (config: PricingExchangePolicyConfig) => void
+}) {
+  const result = status?.lastResult
+  return (
+    <Card className="mb-4" bodyClassName="py-3">
+      <div className="flex items-center justify-between gap-4 flex-wrap text-[12.5px]">
+        <div>
+          <div className="fw-600">Models.dev 官方价格</div>
+          <div className="text-text-muted mt-1">
+            {status?.state === 'syncing'
+              ? '正在从 models.dev 同步官方价格…'
+              : status?.state === 'error'
+                ? `最近同步失败：${status.lastError ?? '未知错误'}`
+                : status?.lastSuccessAt
+                  ? `上次同步：${formatDateTime(status.lastSuccessAt)}`
+                  : '尚未同步，应用启动后会在后台获取官方价格。'}
+            {result && !result.notModified
+              ? ` · 更新 ${result.synced} 条 · 新增 ${result.added ?? 0} · 变更 ${result.changed ?? 0} · 下架 ${result.removed ?? 0} · 保护自定义 ${result.protected}`
+              : result?.notModified
+                ? ' · 已是最新版本'
+                : ''}
+          </div>
+          {status?.pendingPreview && (
+            <div className="mt-2 flex items-center gap-2 text-amber-700">
+              <span>
+                有 {status.pendingPreview.blocked} 个异常价格变动待确认（检测于{' '}
+                {formatDateTime(status.pendingPreview.checkedAt)}）。
+              </span>
+              <button className="btn btn-outline btn-xs" onClick={onApplyPreview}>
+                审阅并应用
+              </button>
+            </div>
+          )}
+          <div className="text-text-muted mt-1">
+            {cnyRate
+              ? `人民币参考：1 USD ≈ ${cnyRate.rateToCny.toFixed(4)} CNY · ${
+                  cnyRate.source === 'api' ? '实时汇率' : '离线参考汇率'
+                }${cnyRate.updatedAt ? ` · ${cnyRate.updatedAt}` : ''}`
+              : '人民币参考汇率加载中…'}
+          </div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={status?.autoUpdate ?? true}
+            onChange={(event) => onAutoUpdate(event.target.checked)}
+          />
+          每 24 小时自动检查
+        </label>
+        <label className="flex items-center gap-2">
+          汇率策略
+          <select
+            className="select select-sm"
+            value={exchangePolicy.policy}
+            onChange={(event) =>
+              onExchangePolicyChange({
+                ...exchangePolicy,
+                policy: event.target.value as PricingExchangePolicyConfig['policy']
+              })
+            }
+          >
+            <option value="realtime">实时汇率</option>
+            <option value="fallback">离线参考</option>
+            <option value="fixed">固定汇率</option>
+          </select>
+        </label>
+        {exchangePolicy.policy === 'fixed' && (
+          <label className="flex items-center gap-2">
+            1 USD =
+            <input
+              className="input input-sm w-24 mono"
+              type="number"
+              min="0.0001"
+              step="0.0001"
+              value={exchangePolicy.fixedRates.USD ?? ''}
+              onChange={(event) =>
+                Number(event.target.value) > 0 &&
+                onExchangePolicyChange({
+                  ...exchangePolicy,
+                  fixedRates: { ...exchangePolicy.fixedRates, USD: Number(event.target.value) }
+                })
+              }
+            />
+            CNY
+          </label>
+        )}
+      </div>
+    </Card>
+  )
+}
+
+function PricingHistoryCard({ history }: { history: PricingHistoryEntry[] }) {
+  if (history.length === 0) return null
+  return (
+    <Card className="mb-4" bodyClassName="py-3">
+      <div className="fw-600 text-[13px] mb-2">最近价格变更</div>
+      <div className="space-y-1 text-[12px]">
+        {history.map((item) => (
+          <div key={item.id} className="flex items-center justify-between gap-3">
+            <span className="mono">
+              {item.providerId}/{item.billingScope}/{item.model}
+            </span>
+            <span className="text-text-muted">
+              {item.kind === 'added' ? '新增' : item.kind === 'changed' ? '变更' : '下架'} ·{' '}
+              {item.status === 'blocked' ? '待确认' : '已应用'} · {formatDateTime(item.detectedAt)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+function PriceCell({
+  value,
+  currency,
+  rate
+}: {
+  value: number
+  currency: string
+  rate: CnyRateQuote | null
+}) {
+  const showCny = currency === 'USD' && rate !== null
+  const cny = showCny ? toDecimal(value).mul(rate.rateToCny).toNumber() : null
+  return (
+    <>
+      <div>{fmtMoney(value, currency)}</div>
+      {cny !== null && <div className="text-[11px] text-text-muted">约 {fmtMoney(cny, 'CNY')}</div>}
+    </>
+  )
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false })
+}
+
 /** 筛选工具栏:按供应商与币种过滤 */
 function FilterBar({
   providers,
@@ -272,10 +588,17 @@ function FilterBar({
   onChange: (f: FilterState) => void
   onReset: () => void
 }) {
-  const anyFilter = !!filter.providerId || !!filter.currency
+  const anyFilter =
+    !!filter.providerId || !!filter.currency || !!filter.billingScope || !!filter.query.trim()
   return (
     <div className="flex items-center gap-4 flex-wrap text-[12.5px]">
-      <div className="flex items-center gap-2">
+      <input
+        className="input min-w-[220px]"
+        value={filter.query}
+        onChange={(event) => onChange({ ...filter, query: event.target.value })}
+        placeholder="搜索 Provider 或模型"
+      />
+      <div className="flex flex-wrap items-center gap-2 min-w-0">
         <span className="text-text-muted">Provider</span>
         <Chip active={!filter.providerId} onClick={() => onChange({ ...filter, providerId: null })}>
           全部
@@ -290,7 +613,7 @@ function FilterBar({
           </Chip>
         ))}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 min-w-0">
         <span className="text-text-muted">Currency</span>
         <Chip active={!filter.currency} onClick={() => onChange({ ...filter, currency: null })}>
           全部
@@ -302,6 +625,24 @@ function FilterBar({
             onClick={() => onChange({ ...filter, currency: c })}
           >
             {c}
+          </Chip>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 min-w-0">
+        <span className="text-text-muted">Scope</span>
+        <Chip
+          active={!filter.billingScope}
+          onClick={() => onChange({ ...filter, billingScope: null })}
+        >
+          全部
+        </Chip>
+        {BILLING_SCOPES.map((scope) => (
+          <Chip
+            key={scope}
+            active={filter.billingScope === scope}
+            onClick={() => onChange({ ...filter, billingScope: scope })}
+          >
+            {scope}
           </Chip>
         ))}
       </div>
@@ -374,6 +715,7 @@ function PricingEntryModal({
   const [providerId, setProviderId] = useState(editing?.providerId ?? providers[0]?.id ?? '')
   const [model, setModel] = useState(editing?.model ?? '')
   const [currency, setCurrency] = useState<Currency>((editing?.currency as Currency) ?? 'USD')
+  const [billingScope, setBillingScope] = useState(editing?.billingScope ?? 'default')
   const [prompt, setPrompt] = useState<string>(editing ? String(editing.promptPricePerMtok) : '')
   const [completion, setCompletion] = useState<string>(
     editing ? String(editing.completionPricePerMtok) : ''
@@ -422,7 +764,8 @@ function PricingEntryModal({
         promptPricePerMtok: p!,
         completionPricePerMtok: c!,
         currency,
-        source: editing?.source ?? 'user'
+        billingScope,
+        source: 'user'
       }
       if (cr !== undefined && cr !== null) payload.cacheReadPricePerMtok = cr
       if (cc !== undefined && cc !== null) payload.cacheCreationPricePerMtok = cc
@@ -477,9 +820,24 @@ function PricingEntryModal({
             ))}
           </select>
         </div>
+        <div className="form-group">
+          <label className="form-label">Billing Scope</label>
+          <select
+            className="select w-full"
+            value={billingScope}
+            onChange={(event) => setBillingScope(event.target.value)}
+          >
+            {BILLING_SCOPES.map((scope) => (
+              <option key={scope} value={scope}>
+                {scope}
+              </option>
+            ))}
+          </select>
+          <p className="form-hint">cn/global 用于区分中国站与国际站；普通价格使用 default。</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="form-group">
-            <label className="form-label">Prompt 价格 ($/Mtok)</label>
+            <label className="form-label">Prompt 价格 ({currency}/Mtok)</label>
             <input
               className="input w-full mono"
               type="number"
@@ -491,7 +849,7 @@ function PricingEntryModal({
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Completion 价格 ($/Mtok)</label>
+            <label className="form-label">Completion 价格 ({currency}/Mtok)</label>
             <input
               className="input w-full mono"
               type="number"

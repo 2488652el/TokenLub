@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 interface UsageRow {
   api_key_id: string | null
   provider_id: string
+  billing_scope?: string
   model: string
   prompt_tokens: number | null
   completion_tokens: number | null
@@ -22,6 +23,7 @@ interface UsageRow {
 
 interface PricingRow {
   provider_id: string
+  billing_scope?: string
   model: string
   prompt_price_per_mtok: number
   completion_price_per_mtok: number
@@ -29,11 +31,12 @@ interface PricingRow {
   cache_creation_price_per_mtok: number | null
   currency: string
   source: 'catalog' | 'user'
+  catalog_active?: number
 }
 
 let usage: UsageRow[] = []
 let pricing: PricingRow[] = []
-let apiKeys: Array<{ id: string; provider_id: string }> = []
+let apiKeys: Array<{ id: string; provider_id: string; base_url_override?: string | null }> = []
 
 function reset() {
   usage = []
@@ -71,7 +74,7 @@ function fakeQuery(sql: string, args: unknown[]) {
       UsageRow & { pt: number; ct: number; crt: number; cct: number; n: number }
     >()
     for (const r of filtered) {
-      const key = `${r.provider_id}::${r.model}`
+      const key = `${r.provider_id}::${r.billing_scope ?? 'default'}::${r.model}`
       const prev = groups.get(key)
       if (prev) {
         prev.pt += r.prompt_tokens ?? 0
@@ -94,18 +97,26 @@ function fakeQuery(sql: string, args: unknown[]) {
   }
   if (sql.includes('FROM pricing_entries')) {
     const modelOnly = sql.includes('WHERE model = ?')
-    const preferredCurrency = (modelOnly ? args[1] : args[2]) as string
+    const requestedScope = String(modelOnly ? args[1] : args[2])
+    const preferredCurrency = String(modelOnly ? args[3] : args[4])
     const rows = pricing
       .filter((p) => {
+        const scope = p.billing_scope ?? 'default'
+        if (scope !== requestedScope && scope !== 'default') return false
         if (modelOnly) return p.model === args[0]
         return p.provider_id === args[0] && p.model === args[1]
       })
       .sort((a, b) => {
+        const scopeRank =
+          Number((a.billing_scope ?? 'default') !== requestedScope) -
+          Number((b.billing_scope ?? 'default') !== requestedScope)
+        if (scopeRank !== 0) return scopeRank
         const currencyRank =
           Number(a.currency !== preferredCurrency) - Number(b.currency !== preferredCurrency)
         if (currencyRank !== 0) return currencyRank
         const sourceRank = Number(a.source !== 'user') - Number(b.source !== 'user')
-        return sourceRank
+        if (sourceRank !== 0) return sourceRank
+        return Number((b.catalog_active ?? 1) !== 0) - Number((a.catalog_active ?? 1) !== 0)
       })
     return rows.slice(0, 1)
   }
@@ -149,12 +160,58 @@ function insertUsage(rows: UsageRow[]) {
 function insertPricing(rows: PricingRow[]) {
   pricing.push(...rows)
 }
-function insertKeys(rows: Array<{ id: string; provider_id: string }>) {
+function insertKeys(
+  rows: Array<{ id: string; provider_id: string; base_url_override?: string | null }>
+) {
   apiKeys.push(...rows)
 }
 
 // 按 Key 花费估算测试套件:验证空用量、定价汇总、多币种、时间窗口与未分配行回退等场景
 describe('computeSpendByKey (per-key spend estimate)', () => {
+  it('selects the price matching the usage billing scope', () => {
+    insertPricing([
+      {
+        provider_id: 'moonshot',
+        billing_scope: 'cn',
+        model: 'kimi-test',
+        prompt_price_per_mtok: 10,
+        completion_price_per_mtok: 20,
+        cache_read_price_per_mtok: null,
+        cache_creation_price_per_mtok: null,
+        currency: 'CNY',
+        source: 'catalog'
+      },
+      {
+        provider_id: 'moonshot',
+        billing_scope: 'global',
+        model: 'kimi-test',
+        prompt_price_per_mtok: 1,
+        completion_price_per_mtok: 2,
+        cache_read_price_per_mtok: null,
+        cache_creation_price_per_mtok: null,
+        currency: 'USD',
+        source: 'catalog'
+      }
+    ])
+    insertUsage([
+      {
+        api_key_id: 'k-global',
+        provider_id: 'moonshot',
+        billing_scope: 'global',
+        model: 'kimi-test',
+        prompt_tokens: 1_000_000,
+        completion_tokens: 0,
+        cache_creation_tokens: 0,
+        cache_read_tokens: 0,
+        captured_at: new Date().toISOString()
+      }
+    ])
+
+    const result = computeSpendByKey('k-global', 30)
+
+    expect(result).toMatchObject({ total: 1, currency: 'USD', pricedRequests: 1 })
+  })
+
   it('returns zero total + no usage for a key with no usage', () => {
     insertUsage([
       {

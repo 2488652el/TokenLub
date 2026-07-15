@@ -5,15 +5,13 @@
  * (glm-5.2)
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { UsageRecord } from '@shared/types/usage'
+import { getCliPaths } from '../platform/paths'
 
 /** Default Claude Code session directory. Override for tests / portable installs.
  *  Claude Code 默认会话目录;测试或便携安装时可覆盖。 (glm-5.2)
  */
-export const CLAUDE_LOG_DIR = join(homedir(), '.claude', 'projects')
-
 /** A raw assistant entry from the JSONL - only fields we read.
  *  JSONL 中单条 assistant 原始条目,仅包含需要读取的字段。 (glm-5.2)
  */
@@ -169,8 +167,9 @@ export function parseClaudeSessionFile(content: string, filePath: string): Usage
  *
  * 使用递归遍历发现文件;目录不存在时返回空数组(未安装 Claude Code 时常见)。 (glm-5.2)
  */
-export function discoverClaudeSessions(root: string = CLAUDE_LOG_DIR): string[] {
-  if (!existsSync(root)) return []
+export function discoverClaudeSessions(root?: string): string[] {
+  const actualRoot = root ?? getCliPaths().claudeProjects
+  if (!existsSync(actualRoot)) return []
   const results: string[] = []
   /** 递归遍历目录,收集 *.jsonl 文件绝对路径。 (glm-5.2) */
   const walk = (dir: string): void => {
@@ -195,7 +194,7 @@ export function discoverClaudeSessions(root: string = CLAUDE_LOG_DIR): string[] 
       }
     }
   }
-  walk(root)
+  walk(actualRoot)
   return results
 }
 

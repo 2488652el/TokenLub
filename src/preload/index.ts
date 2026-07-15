@@ -17,11 +17,25 @@ import type {
   KeySpendSummary,
   ModelSpendAggregate
 } from '../shared/types/usage'
-import type { PricingEntry } from '../shared/types/pricing'
+import type {
+  CnyRateQuote,
+  PricingCatalogStatus,
+  PricingCatalogSyncResult,
+  PricingCatalogPreview,
+  PricingHistoryEntry,
+  PricingExchangePolicyConfig,
+  PricingEntry
+} from '../shared/types/pricing'
 import type { AlertRule } from '../shared/types/alert'
 import type { ProviderManifest, BalanceSnapshot } from '../shared/types/provider'
 import type { ProviderTestResult } from '../shared/types/provider'
 import type { ProviderCatalogEntry } from '../shared/provider-catalog'
+import type { SyncMode } from '../shared/sync-mode'
+import type { SyncPreview } from '../shared/sync-preview'
+
+window.addEventListener('online', () => {
+  void ipcRenderer.invoke(IPC.syncOnline).catch(() => undefined)
+})
 
 /**
  * Whitelisted API surface exposed to the renderer via contextBridge.
@@ -32,7 +46,7 @@ import type { ProviderCatalogEntry } from '../shared/provider-catalog'
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.0.1',
+  version: '1.0.3',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -92,6 +106,38 @@ const api = {
       ipcRenderer.invoke(IPC.usageGetKeySpend, { apiKeyId, days: days ?? 30 })
   },
 
+  sync: {
+    login: (input: {
+      baseUrl: string
+      email: string
+      password: string
+      deviceId: string
+      mode: SyncMode
+    }): Promise<{ deviceId: string; expiresAt: string }> =>
+      ipcRenderer.invoke(IPC.syncLogin, input),
+    devices: (): Promise<
+      Array<{
+        id: string
+        userId: string
+        name: string
+        createdAt: string
+        revokedAt: string | null
+      }>
+    > => ipcRenderer.invoke(IPC.syncDevices),
+    revokeDevice: (deviceId: string): Promise<{ ok: true }> =>
+      ipcRenderer.invoke(IPC.syncRevokeDevice, { deviceId }),
+    status: (): Promise<{
+      configured: boolean
+      state: 'idle' | 'syncing' | 'error' | 'needs_login'
+      revision: number
+      mode?: SyncMode
+      lastSuccessAt?: string
+      lastError?: string
+    }> => ipcRenderer.invoke(IPC.syncStatus),
+    preview: (mode: SyncMode): Promise<SyncPreview> => ipcRenderer.invoke(IPC.syncPreview, mode),
+    trigger: (): Promise<{ started: true }> => ipcRenderer.invoke(IPC.syncNow)
+  },
+
   balance: {
     latest: (): Promise<Array<BalanceSnapshot & { id: number; apiKeyId?: string }>> =>
       ipcRenderer.invoke(IPC.balanceListLatest)
@@ -102,8 +148,24 @@ const api = {
     set: (entry: Omit<PricingEntry, 'id' | 'updatedAt'>): Promise<PricingEntry> =>
       ipcRenderer.invoke(IPC.pricingSet, entry),
     restore: (id: number): Promise<{ ok: true }> => ipcRenderer.invoke(IPC.pricingRestore, id),
-    syncCatalog: (): Promise<{ synced: number; skipped: number }> =>
-      ipcRenderer.invoke(IPC.pricingCatalog)
+    syncCatalog: (): Promise<PricingCatalogSyncResult> => ipcRenderer.invoke(IPC.pricingCatalog),
+    catalogPreview: (): Promise<PricingCatalogPreview | null> =>
+      ipcRenderer.invoke(IPC.pricingCatalogPreview),
+    applyCatalogPreview: (previewId: string): Promise<PricingCatalogSyncResult> =>
+      ipcRenderer.invoke(IPC.pricingCatalogApply, { previewId }),
+    history: (limit?: number): Promise<PricingHistoryEntry[]> =>
+      ipcRenderer.invoke(IPC.pricingHistory, limit ?? 100),
+    exchangePolicy: (): Promise<PricingExchangePolicyConfig> =>
+      ipcRenderer.invoke(IPC.pricingExchangePolicy),
+    setExchangePolicy: (
+      config: PricingExchangePolicyConfig
+    ): Promise<PricingExchangePolicyConfig> =>
+      ipcRenderer.invoke(IPC.pricingExchangePolicySet, config),
+    catalogStatus: (): Promise<PricingCatalogStatus> =>
+      ipcRenderer.invoke(IPC.pricingCatalogStatus),
+    setCatalogAutoUpdate: (enabled: boolean): Promise<PricingCatalogStatus> =>
+      ipcRenderer.invoke(IPC.pricingCatalogAutoUpdate, enabled),
+    cnyRate: (): Promise<CnyRateQuote> => ipcRenderer.invoke(IPC.pricingCnyRate)
   },
 
   settings: {
@@ -139,6 +201,8 @@ const api = {
   log: {
     discover: (): Promise<{ claude: string[]; codex: string[] }> =>
       ipcRenderer.invoke(IPC.logDiscover),
+    locations: (): Promise<{ claudeProjects: string; codexSessions: string }> =>
+      ipcRenderer.invoke(IPC.logLocations),
     sync: (source: 'claude-code' | 'codex'): Promise<{ started: boolean }> =>
       ipcRenderer.invoke(IPC.logSync, { source }),
     detectCodexKey: (): Promise<{ found: boolean; maskedKey?: string; path?: string }> =>

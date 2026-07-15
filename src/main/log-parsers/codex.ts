@@ -5,16 +5,13 @@
  * (glm-5.2)
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { UsageRecord } from '@shared/types/usage'
+import { getCliPaths } from '../platform/paths'
 
 /** Default Codex CLI session directory. Override for tests / portable installs.
  *  Codex CLI 默认会话目录;测试或便携安装时可覆盖。 (glm-5.2)
  */
-export const CODEX_LOG_DIR = join(homedir(), '.codex', 'sessions')
-export const CODEX_ARCHIVED_DIR = join(homedir(), '.codex', 'archived_sessions')
-
 /** A raw token_count entry from the JSONL - only fields we read.
  *  JSONL 中单条 token_count 原始条目,仅包含需要读取的字段。 (glm-5.2)
  */
@@ -249,11 +246,10 @@ export function parseCodexSessionFile(content: string, filePath: string): UsageR
  *
  * 发现 Codex 会话文件:在指定根目录(默认 CODEX_LOG_DIR 与 CODEX_ARCHIVED_DIR)下递归查找 *.jsonl,返回绝对路径列表。 (glm-5.2)
  */
-export function discoverCodexSessions(
-  roots: string[] = [CODEX_LOG_DIR, CODEX_ARCHIVED_DIR]
-): string[] {
+export function discoverCodexSessions(roots?: string[]): string[] {
+  const actualRoots = roots ?? [getCliPaths().codexSessions, getCliPaths().codexArchivedSessions]
   const results: string[] = []
-  for (const root of roots) {
+  for (const root of actualRoots) {
     if (!existsSync(root)) continue
     const walk = (dir: string): void => {
       let entries: string[]

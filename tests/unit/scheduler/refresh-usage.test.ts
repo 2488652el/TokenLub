@@ -129,4 +129,34 @@ describe('scheduler refreshAll usage refresh', () => {
     ])
     expect(result).toMatchObject({ ok: true, refreshed: 1, usageInserted: 1, failed: 0 })
   })
+
+  it('shares one in-flight refresh between concurrent callers', async () => {
+    let release!: () => void
+    const pending = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const usage = vi.fn(async () => {
+      await pending
+      return []
+    })
+    const build = vi.fn(() => ({ usage, testConnection: vi.fn() }))
+    state.provider = {
+      manifest: {
+        id: 'mock-usage',
+        displayName: 'Mock Usage',
+        category: 'admin-org',
+        features: ['usage']
+      },
+      hasBalanceApi: false,
+      hasUsageApi: true,
+      build
+    }
+    const { refreshAll } = await import('../../../src/main/scheduler/refresh')
+    const first = refreshAll()
+    const second = refreshAll()
+    expect(second).toBe(first)
+    release()
+    await first
+    expect(usage).toHaveBeenCalledTimes(1)
+  })
 })

@@ -124,7 +124,33 @@ Claude Code / Codex CLI JSONL files
 - 不修改、不删除用户本地日志。
 - 同步状态通过 `log_sync_state` 增量记录。
 
-### 4.3 费用计算
+### 4.3 云同步 V2
+
+```mermaid
+flowchart LR
+  Local["SQLite 可同步投影"] --> Snapshot["白名单快照 + 本地 revision/dirty"]
+  Snapshot --> Exchange["POST /v1/sync/exchange"]
+  Exchange --> Guard["认证、设备、大小、敏感字段校验"]
+  Guard --> CAS["PostgreSQL 单行快照 CAS"]
+  CAS --> Apply["返回规范快照和新 revision"]
+  Apply --> Local
+```
+
+同步边界：
+
+- 每个用户在云端只有一个 `user_sync_snapshots` 记录，不复制 SQLite 表结构。
+- 只同步两个白名单设置、价格投影和已脱敏余额；API Key、token、原始响应和本地日志不上传。
+- 本地修改设置 `dirty=1`；成功应用服务端快照时，数据、revision、`dirty=0` 和一份干净
+  基线快照在同一事务提交。过期 revision 用这份基线做三方合并，只重放真实本地变化。
+- 过期 revision 只能读取当前云端快照，不能直接覆盖。dirty 客户端在最新 revision 上合并重试；
+  干净客户端直接采用云端。
+- `upload` / `restore` 是首次同步策略，成功一次后持久化为 `merge`。
+- 自动触发包括本地修改后 2 秒防抖和 30 分钟兜底；并发触发由 single-flight scheduler 合并。
+
+运行时只保留 exchange，不再提供 push、pull、ack、cursor、bootstrap、outbox、SSE 或人工冲突队列。
+旧迁移表仍保留，以支持旧数据库顺序升级和完整隐私删除。
+
+### 4.4 费用计算
 
 ```text
 usage slice
@@ -149,6 +175,7 @@ usage slice
 - `alert_rules` / `alert_events`：余额告警规则和触发记录。
 - `log_sync_state`：本地日志增量同步状态。
 - `app_settings`：非敏感设置。
+- `sync_v2_state`：云端 revision、最近成功时间、本地 dirty 状态和最近成功快照基线。
 - `schema_version`：内联 migration 版本。
 
 迁移逻辑目前在 `src/main/store/db.ts` 内联执行。修改 schema 时必须：

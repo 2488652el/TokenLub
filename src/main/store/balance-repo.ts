@@ -4,7 +4,9 @@
  * (glm-5.2)
  */
 import { getDb } from './db'
+import { randomUUID } from 'node:crypto'
 import type { BalanceSnapshot } from '@shared/types/provider'
+import { markSyncV2Dirty } from './sync-v2-repo'
 
 /** balance_snapshots 表的数据库行结构映射。 */
 interface DbRow {
@@ -17,6 +19,7 @@ interface DbRow {
   currency: string | null
   captured_at: string
   raw_json: string | null
+  sync_id: string | null
 }
 
 /** 将数据库行映射为 BalanceSnapshot 对象,处理可选字段与 raw_json 反序列化。 */
@@ -41,21 +44,27 @@ function rowToSnapshot(r: DbRow): BalanceSnapshot & { id: number; apiKeyId?: str
  */
 export function insertBalance(snap: BalanceSnapshot & { apiKeyId: string }): void {
   const db = getDb()
-  db.prepare(
-    `
-    INSERT INTO balance_snapshots (api_key_id, provider_id, total, used, remaining, currency, captured_at, raw_json)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `
-  ).run(
-    snap.apiKeyId,
-    snap.providerId,
-    snap.total ?? null,
-    snap.used ?? null,
-    snap.remaining ?? null,
-    snap.currency ?? null,
-    snap.capturedAt,
-    snap.raw !== undefined ? JSON.stringify(snap.raw) : null
-  )
+  const syncId = randomUUID()
+  db.transaction(() => {
+    db.prepare(
+      `
+          INSERT INTO balance_snapshots (
+            api_key_id, provider_id, total, used, remaining, currency, captured_at, raw_json, sync_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+    ).run(
+      snap.apiKeyId,
+      snap.providerId,
+      snap.total ?? null,
+      snap.used ?? null,
+      snap.remaining ?? null,
+      snap.currency ?? null,
+      snap.capturedAt,
+      snap.raw !== undefined ? JSON.stringify(snap.raw) : null,
+      syncId
+    )
+    markSyncV2Dirty()
+  })()
 }
 
 /**
@@ -72,10 +81,12 @@ export function latestBalances(): Array<BalanceSnapshot & { id: number; apiKeyId
       `
     SELECT b.* FROM balance_snapshots b
     INNER JOIN (
-      SELECT api_key_id, MAX(captured_at) AS mx
+      SELECT api_key_id, provider_id, MAX(captured_at) AS mx
       FROM balance_snapshots
-      GROUP BY api_key_id
-    ) m ON b.api_key_id = m.api_key_id AND b.captured_at = m.mx
+      GROUP BY api_key_id, provider_id
+    ) m ON b.api_key_id IS m.api_key_id
+      AND b.provider_id = m.provider_id
+      AND b.captured_at = m.mx
     ORDER BY b.captured_at DESC
   `
     )

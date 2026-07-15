@@ -6,6 +6,7 @@
 import { listKeys, getDecryptedExtraCredentials, getDecryptedKey } from '../store/keys-repo'
 import { getProvider } from '../providers/registry'
 import { insertBalance, latestBalances } from '../store/balance-repo'
+import { scheduleSyncAfterChange } from '../sync/service'
 import { insertUsage } from '../store/usage-repo'
 import { findPricing } from '../store/pricing-repo'
 import { getSetting, setSetting } from '../store/settings-store'
@@ -15,8 +16,19 @@ import type { BalanceSnapshot, UsageSlice } from '@shared/types/provider'
 import type { RefreshFailure, UsageRecord } from '@shared/types/usage'
 import type { PricingEntry } from '@shared/types/pricing'
 import { calcCost } from '@shared/utils/money'
+import { resolveBillingScope } from '@shared/pricing-scope'
 
 let timer: NodeJS.Timeout | null = null
+let refreshInFlight: Promise<RefreshResult> | null = null
+
+type RefreshResult = {
+  ok: boolean
+  refreshed: number
+  usageInserted: number
+  usageSkipped: number
+  failed: number
+  failures: RefreshFailure[]
+}
 
 /** 清除自动刷新定时器。(内部辅助函数)(glm-5.2) */
 function clearAutoRefresh(): void {
@@ -158,11 +170,13 @@ export function usageSliceToRecord(
     apiKeyId: string
     capturedAt?: string
     pricing?: PricingEntry | null
+    billingScope?: string
   }
 ): UsageRecord {
   const record: UsageRecord = {
     apiKeyId: opts.apiKeyId,
     providerId: slice.providerId,
+    ...(opts.billingScope ? { billingScope: opts.billingScope } : {}),
     model: slice.model ?? '(unknown)',
     periodStart: slice.periodStart,
     periodEnd: slice.periodEnd,
@@ -209,14 +223,22 @@ export function usageSliceToRecord(
  * @returns 刷新结果统计:成功数、用量插入/跳过数、失败数及失败明细
  * (glm-5.2)
  */
-export async function refreshAll(): Promise<{
-  ok: boolean
-  refreshed: number
-  usageInserted: number
-  usageSkipped: number
-  failed: number
-  failures: RefreshFailure[]
-}> {
+export function refreshAll(): Promise<RefreshResult> {
+  if (refreshInFlight) return refreshInFlight
+  const promise = refreshAllImpl()
+  refreshInFlight = promise
+  promise.then(
+    () => {
+      if (refreshInFlight === promise) refreshInFlight = null
+    },
+    () => {
+      if (refreshInFlight === promise) refreshInFlight = null
+    }
+  )
+  return promise
+}
+
+async function refreshAllImpl(): Promise<RefreshResult> {
   const keys = listKeys()
   let refreshed = 0
   let usageInserted = 0
@@ -244,11 +266,13 @@ export async function refreshAll(): Promise<{
       }
       if (p.hasUsageApi && caps.usage) {
         const slices = await caps.usage(fromISO, toISO)
+        const billingScope = resolveBillingScope(k.providerId, k.baseUrlOverride)
         const records = slices.map((s) =>
           usageSliceToRecord(s, {
             apiKeyId: k.id,
             capturedAt: toISO,
-            pricing: findPricing(s.providerId, s.model ?? '(unknown)', s.currency)
+            billingScope,
+            pricing: findPricing(s.providerId, s.model ?? '(unknown)', s.currency, billingScope)
           })
         )
         const result = insertUsage(records)
@@ -271,6 +295,7 @@ export async function refreshAll(): Promise<{
     console.error('[refresh] alert evaluation failed:', (e as Error).message)
   }
   setSetting('last_refresh_at', new Date().toISOString())
+  if (refreshed > 0) scheduleSyncAfterChange()
   return { ok: true, refreshed, usageInserted, usageSkipped, failed, failures }
 }
 

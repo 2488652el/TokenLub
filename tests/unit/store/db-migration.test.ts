@@ -1,5 +1,5 @@
 /**
- * 数据库迁移契约测试:覆盖 PR-1 v5 迁移的 ADD COLUMN 步骤、PRAGMA 幂等守卫、v2 usage_records 重建与列默认值。
+ * 数据库迁移契约测试:覆盖 v5 迁移、v6 同步表、v16 区域价格键、PRAGMA 幂等守卫与列默认值。
  * (glm-5.2)
  */
 import { describe, expect, it, vi } from 'vitest'
@@ -43,8 +43,14 @@ function makeFakeDb(schemaState: { version: number; columns: ColumnInfo[] }) {
           }
           return undefined
         },
-        all: () => schemaState.columns as ColumnInfo[]
+        all: () =>
+          /SELECT id FROM pricing_entries/.test(sql)
+            ? ([{ id: 11 }, { id: 12 }] as unknown[])
+            : (schemaState.columns as ColumnInfo[])
       }
+    },
+    transaction<T>(fn: () => T) {
+      return () => fn()
     },
     exec: (sql: string) => {
       // Capture ADD COLUMN calls so we can update the fake PRAGMA view.
@@ -98,7 +104,13 @@ describe('PR-1: db v5 migration contract', () => {
     expect(source).toContain("const SQLITE_SIDECAR_SUFFIXES = ['-wal', '-shm']")
   })
 
-  it('applyMigrationsForTest brings a fresh DB up to version 5 with both new columns', () => {
+  it('checks database integrity before applying migrations', () => {
+    const source = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(source).toContain("pragma('quick_check', { simple: true })")
+    expect(source).toContain("throw new Error('database integrity check failed')")
+  })
+
+  it('applyMigrationsForTest brings a fresh DB up to the latest version with sync tables', () => {
     // A brand-new DB: schema_version table will be created, no rows yet.
     const fresh = makeFakeDb({ version: 0, columns: [] })
     // applyMigrations creates api_keys via CREATE TABLE IF NOT EXISTS; we
@@ -120,11 +132,12 @@ describe('PR-1: db v5 migration contract', () => {
 
     applyMigrationsForTest(fresh as unknown as Parameters<typeof applyMigrationsForTest>[0])
 
-    // After v5 migration, schema_version should have reached 5.
+    // A fresh database should reach the latest schema version.
     const versionRow = fresh
       .prepare('SELECT MAX(version) AS v FROM schema_version')
       .get() as SchemaVersionRow
-    expect(versionRow.v).toBe(5)
+    expect(versionRow.v).toBe(17)
+    expect(readFileSync(resolve('src/main/store/db.ts'), 'utf8')).toContain('model_pricing')
 
     // Both new columns should be visible via PRAGMA table_info(api_keys).
     const cols = fresh.prepare('PRAGMA table_info(api_keys)').all() as ColumnInfo[]
@@ -145,6 +158,104 @@ describe('PR-1: db v5 migration contract', () => {
     expect(modeMatch?.[1]).toBe('manual') // legacy rows opt in via toggle
   })
 
+  it('v6 source defines non-destructive sync tables and the outbox due index', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(6)")
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS sync_outbox\s*\(/)
+    expect(sql).toMatch(/operation_id TEXT PRIMARY KEY/)
+    expect(sql).toMatch(/CHECK \(operation IN \('upsert', 'delete'\)\)/)
+    expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS idx_sync_outbox_due\s+ON sync_outbox/)
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS sync_entity_map\s*\(/)
+    expect(sql).toMatch(/sync_id TEXT NOT NULL UNIQUE/)
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS sync_state\s*\(/)
+    expect(sql).toMatch(/bootstrap_required INTEGER NOT NULL DEFAULT 0/)
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS sync_conflicts\s*\(/)
+    expect(sql).toMatch(
+      /status TEXT NOT NULL CHECK \(status IN \('open', 'resolved', 'discarded'\)\)/
+    )
+  })
+
+  it('v7 source defines a local-only encrypted sync session table', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(7)")
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS sync_session\s*\(/)
+    expect(sql).toMatch(/access_token BLOB NOT NULL/)
+    expect(sql).toMatch(/refresh_token BLOB NOT NULL/)
+    expect(sql).toMatch(/CHECK \(id = 1\)/)
+  })
+
+  it('v9 source persists the initial sync mode', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(9)")
+    expect(sql).toContain("ALTER TABLE sync_session ADD COLUMN mode TEXT NOT NULL DEFAULT 'merge'")
+  })
+
+  it('v10 source adds stable UUIDs and a unique index for balance snapshots', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(10)")
+    expect(sql).toContain('ALTER TABLE balance_snapshots ADD COLUMN sync_id TEXT')
+    expect(sql).toContain('idx_balance_snapshots_sync_id')
+  })
+
+  it('v11 upgrades the balance UUID index for ON CONFLICT(sync_id)', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(11)")
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX IF NOT EXISTS idx_balance_snapshots_sync_id\s+ON balance_snapshots\(sync_id\)(?!\s+WHERE)/s
+    )
+  })
+
+  it('v12 adds compact Sync V2 revision state while retaining historical upgrade tables', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(12)")
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS sync_v2_state\s*\(/)
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS sync_outbox')
+  })
+
+  it('v13 tracks whether local sync data changed after the last applied revision', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(13)")
+    expect(sql).toContain('ALTER TABLE sync_v2_state ADD COLUMN dirty')
+    expect(sql).toContain('WHERE revision = 0')
+  })
+
+  it('v14 stores one clean baseline for three-way snapshot rebases', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(14)")
+    expect(sql).toContain('ALTER TABLE sync_v2_state ADD COLUMN base_snapshot TEXT')
+  })
+
+  it('v16 rebuilds pricing identities with billing scope and preserves historical usage scope', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(16)")
+    expect(sql).toMatch(/billing_scope TEXT NOT NULL DEFAULT 'default'/)
+    expect(sql).toMatch(/catalog_active INTEGER NOT NULL DEFAULT 1/)
+    expect(sql).toContain('UNIQUE (provider_id, billing_scope, model, currency)')
+    expect(sql).toContain('ON pricing_entries(provider_id, billing_scope, model, currency)')
+    expect(sql).toContain(
+      "ALTER TABLE usage_records ADD COLUMN billing_scope TEXT NOT NULL DEFAULT 'default'"
+    )
+    expect(sql).toMatch(
+      /provider_id IN \('moonshot', 'minimax'\)[\s\S]*currency = 'USD'[\s\S]*THEN 'global'/
+    )
+    expect(sql).toMatch(/provider_id = 'minimax'[\s\S]*currency = 'CNY'[\s\S]*THEN 'cn'/)
+  })
+
+  it('v17 creates an auditable pricing change history table', () => {
+    const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
+
+    expect(sql).toContain("INSERT INTO schema_version (version) VALUES (?)').run(17)")
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS pricing_change_history\s*\(/)
+    expect(sql).toContain(
+      "change_kind TEXT NOT NULL CHECK (change_kind IN ('added', 'changed', 'removed'))"
+    )
+    expect(sql).toContain("status TEXT NOT NULL CHECK (status IN ('applied', 'blocked'))")
+    expect(sql).toContain('idx_pricing_history_detected')
+  })
+
   it('v2 usage_records rebuild preserves agent_label while copying legacy rows', () => {
     const sql = readFileSync(resolve('src/main/store/db.ts'), 'utf8')
 
@@ -152,9 +263,9 @@ describe('PR-1: db v5 migration contract', () => {
     expect(sql).toMatch(/SELECT\s+[^;]*agent_label[^;]*\s+FROM usage_records/s)
   })
 
-  it('v5 migration is idempotent: re-running does not duplicate columns or bump the schema version', () => {
-    const state = { version: 5, columns: [] as ColumnInfo[] }
-    // Pre-populate columns as if the v5 migration had already run.
+  it('migration is idempotent: re-running does not duplicate pricing identities', () => {
+    const state = { version: 14, columns: [] as ColumnInfo[] }
+    // Pre-populate columns as if the latest migration had already run.
     state.columns.push(
       { name: 'id' },
       { name: 'existing_marker' },
@@ -179,7 +290,10 @@ describe('PR-1: db v5 migration contract', () => {
         },
         get: () => ({ v: state.version }) as SchemaVersionRow,
         all: () => state.columns as ColumnInfo[]
-      })
+      }),
+      transaction<T>(fn: () => T) {
+        return () => fn()
+      }
     }
 
     applyMigrationsForTest(fakeDb as unknown as Parameters<typeof applyMigrationsForTest>[0])
@@ -187,8 +301,32 @@ describe('PR-1: db v5 migration contract', () => {
     // The PRAGMA guards must prevent the migration from re-running its body.
     expect(state.columns.filter((c) => c.name === 'usage_query_enabled').length).toBe(1)
     expect(state.columns.filter((c) => c.name === 'query_mode').length).toBe(1)
-    // schema_version should NOT be bumped past 5 (the version 5 stamp
-    // already happened; re-running skips the v5 block entirely).
-    expect(state.version).toBe(5)
+    // Re-running an up-to-date database must not bump the schema version.
+    expect(state.version).toBe(17)
+  })
+
+  it('v8 migration maps existing pricing rows without creating duplicate identities', () => {
+    const state = { version: 7, columns: [] as ColumnInfo[] }
+    const maps: string[] = []
+    const fakeDb = {
+      exec: () => undefined,
+      prepare: (sql: string) => ({
+        run: (...args: unknown[]) => {
+          if (/INSERT INTO schema_version/.test(sql)) state.version = Number(args[0])
+          if (/INSERT OR IGNORE INTO sync_entity_map/.test(sql)) maps.push(`${args[0]}:${args[1]}`)
+          return { changes: 1 }
+        },
+        get: () => ({ v: state.version }) as SchemaVersionRow,
+        all: () => (/SELECT id FROM pricing_entries/.test(sql) ? [{ id: 21 }, { id: 22 }] : [])
+      }),
+      transaction<T>(fn: () => T) {
+        return () => fn()
+      }
+    }
+
+    applyMigrationsForTest(fakeDb as unknown as Parameters<typeof applyMigrationsForTest>[0])
+    expect(state.version).toBe(17)
+    expect(maps).toHaveLength(2)
+    expect(maps.every((map) => map.startsWith('model_pricing:'))).toBe(true)
   })
 })

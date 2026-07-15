@@ -1,11 +1,12 @@
 /**
- * 数据库初始化与 schema 迁移:管理 SQLite 数据库连接、旧库迁移与 v1-v5 版本迁移。
+ * 数据库初始化与 schema 迁移:管理 SQLite 数据库连接、旧库迁移与 v1-v11 版本迁移。
  * 该模块属于 main 进程的 store 模块,是所有 repo 模块的数据库单例来源。
  * (glm-5.2)
  */
 import { app } from 'electron'
 import Database from 'better-sqlite3'
-import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { basename, join } from 'node:path'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 
 /** 数据库文件名与历史遗留文件名/目录名常量。 */
@@ -30,6 +31,11 @@ export function getDb(): Database.Database {
   dbInstance = new Database(dbPath)
   dbInstance.pragma('journal_mode = WAL')
   dbInstance.pragma('foreign_keys = ON')
+  if (dbInstance.pragma('quick_check', { simple: true }) !== 'ok') {
+    dbInstance.close()
+    dbInstance = null
+    throw new Error('database integrity check failed')
+  }
   applyMigrations(dbInstance)
   return dbInstance
 }
@@ -57,7 +63,9 @@ function legacyDbCandidates(userData: string): string[] {
   const roots = new Set<string>([userData])
   try {
     const appData = app.getPath('appData')
-    for (const dir of LEGACY_USER_DATA_DIRS) roots.add(join(appData, dir))
+    if (basename(userData).toLowerCase() === 'tokenlub') {
+      for (const dir of LEGACY_USER_DATA_DIRS) roots.add(join(appData, dir))
+    }
   } catch {
     // getDb() is only called after app ready; keep the helper defensive for tests.
   }
@@ -74,16 +82,16 @@ function legacyDbCandidates(userData: string): string[] {
 /**
  * Test-only migration runner. Accepts an externally-owned better-sqlite3
  * connection (e.g. `:memory:`) so {@link db-migration.test.ts} can assert the
- * v5 schema without touching the Electron `app.getPath('userData')` path used
+ * v11 schema without touching the Electron `app.getPath('userData')` path used
  * by {@link getDb}. The migration logic itself lives in {@link applyMigrations}
  * - keep them in lockstep.
- * 测试专用迁移入口:接受外部连接(如 :memory:)以在测试中验证 v5 schema,不依赖 Electron 路径。(glm-5.2)
+ * 测试专用迁移入口:接受外部连接(如 :memory:)以在测试中验证 v11 schema,不依赖 Electron 路径。(glm-5.2)
  */
 export function applyMigrationsForTest(db: Database.Database): void {
   applyMigrations(db)
 }
 
-/** 执行 schema 迁移:创建表与索引,按版本号依次应用 v1-v5 迁移逻辑。(内部核心函数) */
+/** 执行 schema 迁移:创建表与索引,按版本号依次应用迁移逻辑。(内部核心函数) */
 function applyMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
@@ -312,5 +320,268 @@ function applyMigrations(db: Database.Database): void {
       db.exec("ALTER TABLE api_keys ADD COLUMN query_mode TEXT NOT NULL DEFAULT 'manual'")
     }
     db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(5)
+  }
+
+  // --- v6: local sync state and outbox ---
+  if (currentVersion < 6) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_outbox (
+        operation_id TEXT PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        base_version INTEGER NOT NULL,
+        operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
+        payload TEXT,
+        created_at TEXT NOT NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT,
+        last_error_code TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_sync_outbox_due
+        ON sync_outbox(next_attempt_at, created_at);
+      CREATE TABLE IF NOT EXISTS sync_entity_map (
+        entity_type TEXT NOT NULL,
+        local_key TEXT NOT NULL,
+        sync_id TEXT NOT NULL UNIQUE,
+        sync_version INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT,
+        deleted_at TEXT,
+        PRIMARY KEY (entity_type, local_key)
+      );
+      CREATE TABLE IF NOT EXISTS sync_state (
+        scope TEXT PRIMARY KEY,
+        cursor TEXT,
+        last_success_at TEXT,
+        last_error_code TEXT,
+        bootstrap_required INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS sync_conflicts (
+        id TEXT PRIMARY KEY,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        local_change TEXT NOT NULL,
+        server_entity TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('open', 'resolved', 'discarded')),
+        created_at TEXT NOT NULL,
+        resolved_at TEXT
+      );
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(6)
+  }
+
+  // --- v7: encrypted local sync session ---
+  if (currentVersion < 7) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_session (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        base_url TEXT NOT NULL,
+        device_id TEXT NOT NULL,
+        access_token BLOB NOT NULL,
+        refresh_token BLOB NOT NULL,
+        expires_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(7)
+  }
+
+  // --- v8: stable identities for existing pricing entries ---
+  if (currentVersion < 8) {
+    const rows = db.prepare('SELECT id FROM pricing_entries').all() as Array<{ id: number }>
+    const insertMap = db.prepare(
+      `
+        INSERT OR IGNORE INTO sync_entity_map (entity_type, local_key, sync_id)
+        VALUES (?, ?, ?)
+      `
+    )
+    db.transaction(() => {
+      for (const row of rows) insertMap.run('model_pricing', String(row.id), randomUUID())
+    })()
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(8)
+  }
+
+  // --- v9: persisted initial sync mode ---
+  if (currentVersion < 9) {
+    const columns = db.prepare('PRAGMA table_info(sync_session)').all() as Array<{ name: string }>
+    if (!columns.some((column) => column.name === 'mode')) {
+      db.exec("ALTER TABLE sync_session ADD COLUMN mode TEXT NOT NULL DEFAULT 'merge'")
+    }
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(9)
+  }
+
+  // --- v10: stable UUIDs for append-only balance snapshots ---
+  if (currentVersion < 10) {
+    const columns = db.prepare('PRAGMA table_info(balance_snapshots)').all() as Array<{
+      name: string
+    }>
+    if (!columns.some((column) => column.name === 'sync_id')) {
+      db.exec('ALTER TABLE balance_snapshots ADD COLUMN sync_id TEXT')
+    }
+    db.exec(`
+      UPDATE balance_snapshots
+      SET sync_id = lower(
+        substr(hex(randomblob(16)), 1, 8) || '-' ||
+        substr(hex(randomblob(16)), 9, 4) || '-4' ||
+        substr(hex(randomblob(16)), 14, 3) || '-a' ||
+        substr(hex(randomblob(16)), 18, 3) || '-' ||
+        substr(hex(randomblob(16)), 21, 12)
+      )
+      WHERE sync_id IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_balance_snapshots_sync_id
+        ON balance_snapshots(sync_id);
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(10)
+  }
+
+  // --- v11: make the balance UUID index a valid UPSERT conflict target ---
+  if (currentVersion < 11) {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_balance_snapshots_sync_id;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_balance_snapshots_sync_id
+        ON balance_snapshots(sync_id);
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(11)
+  }
+
+  // --- v12: compact Sync V2 revision state ---
+  if (currentVersion < 12) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS sync_v2_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        revision INTEGER NOT NULL DEFAULT 0,
+        last_success_at TEXT
+      );
+      INSERT OR IGNORE INTO sync_v2_state (id, revision) VALUES (1, 0);
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(12)
+  }
+
+  // --- v13: distinguish clean snapshots from unsynced local changes ---
+  if (currentVersion < 13) {
+    const columns = db.prepare('PRAGMA table_info(sync_v2_state)').all() as Array<{
+      name: string
+    }>
+    if (!columns.some((column) => column.name === 'dirty')) {
+      db.exec('ALTER TABLE sync_v2_state ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0')
+    }
+    db.exec(`
+      UPDATE sync_v2_state
+      SET dirty = 1
+      WHERE revision = 0
+        AND (
+          EXISTS (SELECT 1 FROM pricing_entries)
+          OR EXISTS (SELECT 1 FROM balance_snapshots WHERE sync_id IS NOT NULL)
+          OR EXISTS (
+            SELECT 1 FROM app_settings
+            WHERE key IN ('refresh_interval_min', 'session_auto_parse_enabled')
+          )
+        )
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(13)
+  }
+
+  // --- v14: retain one clean baseline for three-way snapshot rebases ---
+  if (currentVersion < 14) {
+    const columns = db.prepare('PRAGMA table_info(sync_v2_state)').all() as Array<{
+      name: string
+    }>
+    if (!columns.some((column) => column.name === 'base_snapshot')) {
+      db.exec('ALTER TABLE sync_v2_state ADD COLUMN base_snapshot TEXT')
+    }
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(14)
+  }
+
+  // --- v15: track local mutations that happen while a sync request is in flight ---
+  if (currentVersion < 15) {
+    const columns = db.prepare('PRAGMA table_info(sync_v2_state)').all() as Array<{
+      name: string
+    }>
+    if (!columns.some((column) => column.name === 'mutation_generation')) {
+      db.exec('ALTER TABLE sync_v2_state ADD COLUMN mutation_generation INTEGER NOT NULL DEFAULT 0')
+    }
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(15)
+  }
+
+  // --- v16: scope pricing by billing region/channel and retain inactive catalog rows ---
+  if (currentVersion < 16) {
+    db.exec(`
+      ALTER TABLE pricing_entries RENAME TO pricing_entries_v15;
+      CREATE TABLE pricing_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_id TEXT NOT NULL,
+        billing_scope TEXT NOT NULL DEFAULT 'default',
+        model TEXT NOT NULL,
+        prompt_price_per_mtok REAL NOT NULL,
+        completion_price_per_mtok REAL NOT NULL,
+        cache_read_price_per_mtok REAL,
+        cache_creation_price_per_mtok REAL,
+        currency TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'user',
+        catalog_active INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL,
+        UNIQUE (provider_id, billing_scope, model, currency)
+      );
+      INSERT INTO pricing_entries (
+        id, provider_id, billing_scope, model,
+        prompt_price_per_mtok, completion_price_per_mtok,
+        cache_read_price_per_mtok, cache_creation_price_per_mtok,
+        currency, source, catalog_active, updated_at
+      )
+      SELECT
+        id,
+        provider_id,
+        CASE
+          WHEN provider_id IN ('moonshot', 'minimax') AND currency = 'USD' AND source = 'catalog'
+            THEN 'global'
+          WHEN provider_id = 'minimax' AND currency = 'CNY' AND source = 'catalog'
+            THEN 'cn'
+          ELSE 'default'
+        END,
+        model,
+        prompt_price_per_mtok,
+        completion_price_per_mtok,
+        cache_read_price_per_mtok,
+        cache_creation_price_per_mtok,
+        currency,
+        source,
+        1,
+        updated_at
+      FROM pricing_entries_v15;
+      DROP TABLE pricing_entries_v15;
+      CREATE INDEX IF NOT EXISTS idx_pricing_lookup
+        ON pricing_entries(provider_id, billing_scope, model, currency);
+    `)
+    const usageColumns = db.prepare('PRAGMA table_info(usage_records)').all() as Array<{
+      name: string
+    }>
+    if (!usageColumns.some((column) => column.name === 'billing_scope')) {
+      db.exec("ALTER TABLE usage_records ADD COLUMN billing_scope TEXT NOT NULL DEFAULT 'default'")
+    }
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(16)
+  }
+
+  // --- v17: retain pricing catalog change history for review and audit ---
+  if (currentVersion < 17) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pricing_change_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        provider_id TEXT NOT NULL,
+        billing_scope TEXT NOT NULL DEFAULT 'default',
+        model TEXT NOT NULL,
+        currency TEXT NOT NULL,
+        change_kind TEXT NOT NULL CHECK (change_kind IN ('added', 'changed', 'removed')),
+        before_json TEXT,
+        after_json TEXT,
+        change_ratio REAL,
+        status TEXT NOT NULL CHECK (status IN ('applied', 'blocked')),
+        detected_at TEXT NOT NULL,
+        applied_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_pricing_history_detected
+        ON pricing_change_history(detected_at DESC, id DESC);
+      CREATE INDEX IF NOT EXISTS idx_pricing_history_key
+        ON pricing_change_history(provider_id, billing_scope, model, currency);
+    `)
+    db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(17)
   }
 }
