@@ -42,6 +42,7 @@ interface DbRow {
   cost: number | null
   currency: string | null
   source: string
+  upstream_dimension: string
   session_id: string | null
   message_id: string | null
   agent_label: string | null
@@ -167,6 +168,7 @@ function rowToRecord(r: DbRow, options: { priceFromConfig?: boolean } = {}): Usa
     ...(r.total_tokens !== null ? { totalTokens: r.total_tokens } : {}),
     ...(cost !== null ? { cost } : {}),
     ...(currency !== null ? { currency } : {}),
+    ...(r.upstream_dimension ? { upstreamDimension: r.upstream_dimension } : {}),
     ...(r.session_id !== null ? { sessionId: r.session_id } : {}),
     ...(r.message_id !== null ? { messageId: r.message_id } : {}),
     ...(r.agent_label !== null ? { agentLabel: r.agent_label } : {})
@@ -174,37 +176,63 @@ function rowToRecord(r: DbRow, options: { priceFromConfig?: boolean } = {}): Usa
 }
 
 /**
- * 批量插入用量记录(INSERT OR IGNORE 去重),依赖 v2 schema 的两条 UNIQUE 约束:
- *   - UNIQUE(source, provider_id, model, period_start) 对 vendor-api 去重
- *   - UNIQUE(source, message_id) 对 session-log 去重(message_id 为 NULL 时该约束不生效)
- * 重新刷新不会插入重复行,避免仪表盘 SUM(cost) 虚高。(glm-5.2)
+ * 批量写入用量记录。Session 日志按 message_id 去重；Vendor API 记录按
+ * API Key、Provider、计费区域、模型、周期和上游维度更新，避免不同 Key
+ * 或同一响应中的多条聚合结果互相覆盖。
  * @param records 待插入的用量记录数组
- * @returns 插入数与跳过数(去重命中)
+ * @returns 插入、更新与跳过数量
  */
-export function insertUsage(records: UsageRecord[]): { inserted: number; skipped: number } {
+export function insertUsage(records: UsageRecord[]): {
+  inserted: number
+  updated: number
+  skipped: number
+} {
   const db = getDb()
-  // INSERT OR IGNORE relies on two UNIQUE constraints (added in schema v2, N2):
-  //   - UNIQUE(source, provider_id, model, period_start) dedupes vendor-api
-  //     slices (which have no message_id) so re-running a usage refresh does
-  //     not insert duplicate rows and inflate dashboard SUM(cost).
-  //   - UNIQUE(source, message_id) dedupes session-log entries by message id.
-  //     When message_id is NULL (vendor-api), this constraint is a no-op
-  //     (NULL != NULL in SQLite), so the business-key constraint above governs.
-  const stmt = db.prepare(`
+  const sessionStmt = db.prepare(`
     INSERT OR IGNORE INTO usage_records (
       api_key_id, provider_id, billing_scope, model, period_start, period_end,
       prompt_tokens, completion_tokens, cache_creation_tokens, cache_read_tokens,
-      total_tokens, cost, currency, source, session_id, message_id, agent_label, captured_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      total_tokens, cost, currency, source, upstream_dimension, session_id,
+      message_id, agent_label, captured_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  const vendorStmt = db.prepare(`
+    INSERT INTO usage_records (
+      api_key_id, provider_id, billing_scope, model, period_start, period_end,
+      prompt_tokens, completion_tokens, cache_creation_tokens, cache_read_tokens,
+      total_tokens, cost, currency, source, upstream_dimension, session_id,
+      message_id, agent_label, captured_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(
+      source, COALESCE(api_key_id, ''), provider_id, billing_scope, model,
+      COALESCE(period_start, ''), upstream_dimension
+    ) WHERE source = 'vendor-api' DO UPDATE SET
+      period_end = excluded.period_end,
+      prompt_tokens = excluded.prompt_tokens,
+      completion_tokens = excluded.completion_tokens,
+      cache_creation_tokens = excluded.cache_creation_tokens,
+      cache_read_tokens = excluded.cache_read_tokens,
+      total_tokens = excluded.total_tokens,
+      cost = excluded.cost,
+      currency = excluded.currency,
+      captured_at = excluded.captured_at
+  `)
+  const vendorExists = db.prepare(`
+    SELECT 1 FROM usage_records
+    WHERE source = 'vendor-api' AND COALESCE(api_key_id, '') = COALESCE(?, '')
+      AND provider_id = ? AND billing_scope = ? AND model = ?
+      AND COALESCE(period_start, '') = COALESCE(?, '') AND upstream_dimension = ?
   `)
   let inserted = 0
+  let updated = 0
   let skipped = 0
   const tx = db.transaction((rows: UsageRecord[]) => {
     for (const r of rows) {
-      const res = stmt.run(
+      const billingScope = normalizeBillingScope(r.billingScope)
+      const params = [
         r.apiKeyId ?? null,
         r.providerId,
-        normalizeBillingScope(r.billingScope),
+        billingScope,
         r.model,
         r.periodStart ?? null,
         r.periodEnd ?? null,
@@ -216,17 +244,33 @@ export function insertUsage(records: UsageRecord[]): { inserted: number; skipped
         r.cost ?? null,
         r.currency ?? null,
         r.source,
+        r.upstreamDimension ?? '',
         r.sessionId ?? null,
         r.messageId ?? null,
         r.agentLabel ?? null,
         r.capturedAt
-      )
-      if (res.changes > 0) inserted++
-      else skipped++
+      ]
+      if (r.source === 'vendor-api') {
+        const existed = vendorExists.get(
+          r.apiKeyId ?? null,
+          r.providerId,
+          billingScope,
+          r.model,
+          r.periodStart ?? null,
+          r.upstreamDimension ?? ''
+        )
+        vendorStmt.run(...params)
+        if (existed) updated++
+        else inserted++
+      } else {
+        const res = sessionStmt.run(...params)
+        if (res.changes > 0) inserted++
+        else skipped++
+      }
     }
   })
   tx(records)
-  return { inserted, skipped }
+  return { inserted, updated, skipped }
 }
 
 /**

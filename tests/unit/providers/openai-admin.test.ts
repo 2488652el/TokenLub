@@ -78,4 +78,28 @@ describe('openaiAdminProvider', () => {
     expect(slices[0]?.model).toBe('gpt-4o')
     expect(slices[0]?.promptTokens).toBe(100)
   })
+
+  it('maps separate Admin result dimensions to stable usage slices', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      jsonResp(200, {
+        data: [
+          {
+            start_time: 1751328000,
+            end_time: 1751414400,
+            results: [
+              { object: 'a', model: 'gpt-4o', input_tokens: 1, output_tokens: 1, project_id: 'p1' },
+              { object: 'a', model: 'gpt-4o', input_tokens: 2, output_tokens: 2, project_id: 'p2' }
+            ]
+          }
+        ]
+      })
+    ) as typeof fetch
+
+    const slices = await openaiAdminProvider.build({
+      baseUrl: 'https://x.test',
+      apiKey: 'synthetic-key'
+    }).usage!('2025-07-01T00:00:00Z', '2025-07-02T00:00:00Z')
+
+    expect(slices.map((slice) => slice.upstreamDimension)).toEqual(['project:p1', 'project:p2'])
+  })
 })

@@ -160,16 +160,73 @@ describe('api key extra credential storage', () => {
       id: saved.id,
       alias: 'OpenAI Admin Renamed',
       apiKey: 'sk-new-primary-secret',
-      baseUrlOverride: 'https://api.example.com/v1',
+      baseUrlOverride: 'https://api.openai.com/v1',
       notes: 'rotated',
       extra: { adminKey: 'sk-new-admin-secret' }
     })
 
     expect(updated.alias).toBe('OpenAI Admin Renamed')
     expect(updated.keyTail).toBe('cret')
-    expect(updated.baseUrlOverride).toBe('https://api.example.com/v1')
+    expect(updated.baseUrlOverride).toBe('https://api.openai.com/v1')
     expect(updated.notes).toBe('rotated')
     expect(getDecryptedKey(saved.id)).toBe('sk-new-primary-secret')
     expect(getDecryptedExtraCredentials(saved.id)).toEqual({ adminKey: 'sk-new-admin-secret' })
+  })
+
+  it('rejects origin change when apiKey is omitted', async () => {
+    const { addKey, updateKey } = await loadKeysRepo()
+    const saved = addKey({
+      providerId: 'newapi-generic',
+      alias: 'OpenAI Admin',
+      apiKey: 'sk-primary-secret',
+      baseUrlOverride: 'http://127.0.0.1:3000'
+    })
+
+    expect(() =>
+      updateKey({
+        id: saved.id,
+        alias: saved.alias,
+        baseUrlOverride: 'http://10.0.0.8:3000'
+      })
+    ).toThrow(/credential/i)
+  })
+
+  it('rejects origin change when apiKey is whitespace only', async () => {
+    const { addKey, updateKey } = await loadKeysRepo()
+    const saved = addKey({
+      providerId: 'newapi-generic',
+      alias: 'NewAPI',
+      apiKey: 'sk-primary-secret',
+      baseUrlOverride: 'http://127.0.0.1:3000'
+    })
+
+    expect(() =>
+      updateKey({
+        id: saved.id,
+        alias: saved.alias,
+        apiKey: '   ',
+        baseUrlOverride: 'https://proxy.example'
+      })
+    ).toThrow(/credential/i)
+  })
+
+  it('rejects origin change when an existing extra credential is omitted', async () => {
+    const { addKey, updateKey } = await loadKeysRepo()
+    const saved = addKey({
+      providerId: 'newapi-generic',
+      alias: 'OpenAI Admin',
+      apiKey: 'sk-primary-secret',
+      baseUrlOverride: 'http://127.0.0.1:3000',
+      extra: { adminKey: 'sk-admin-secret' }
+    })
+
+    expect(() =>
+      updateKey({
+        id: saved.id,
+        alias: saved.alias,
+        apiKey: 'sk-replacement',
+        baseUrlOverride: 'http://192.168.1.10:3000'
+      })
+    ).toThrow(/credential/i)
   })
 })
