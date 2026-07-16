@@ -46,7 +46,7 @@ window.addEventListener('online', () => {
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.0.3',
+  version: '1.0.4',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -171,7 +171,8 @@ const api = {
   settings: {
     get: (): Promise<Record<string, unknown>> => ipcRenderer.invoke(IPC.settingsGet),
     set: (key: string, value: unknown): Promise<{ ok: true }> =>
-      ipcRenderer.invoke(IPC.settingsSet, { key, value })
+      ipcRenderer.invoke(IPC.settingsSet, { key, value }),
+    chooseDirectory: (): Promise<string | null> => ipcRenderer.invoke(IPC.settingsChooseDirectory)
   },
 
   alerts: {
