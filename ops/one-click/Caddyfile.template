@@ -1,0 +1,5 @@
+{$TOKENLUB_DOMAIN} {
+  email {$ACME_EMAIL}
+  encode gzip
+  reverse_proxy app:3000
+}

@@ -6,6 +6,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import type { SyncMode } from '../../shared/sync-mode'
+import { SYNC_BACKUP_DIRECTORY_SETTING_KEY } from '../../shared/sync-v2'
 
 // ponytail: scheduler reads `refresh_interval_min` (number, minutes).
 // 0 means "关闭" - refresh.ts treats intervalMin <= 0 as a no-op.
@@ -84,6 +85,7 @@ export default function Settings() {
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [backupDirectory, setBackupDirectory] = useState<string | null>(null)
   const [login, setLogin] = useState<SyncLogin>({
     baseUrl: '',
     email: '',
@@ -99,6 +101,10 @@ export default function Settings() {
       const raw = all[REFRESH_KEY]
       const n = typeof raw === 'number' ? raw : Number(raw)
       if (Number.isFinite(n) && n >= 0) setRefreshMin(n)
+      const configuredBackupDirectory = all[SYNC_BACKUP_DIRECTORY_SETTING_KEY]
+      if (typeof configuredBackupDirectory === 'string' && configuredBackupDirectory.trim()) {
+        setBackupDirectory(configuredBackupDirectory)
+      }
     })
   }, [])
 
@@ -155,6 +161,19 @@ export default function Settings() {
       await refreshSyncPanel().catch(() => undefined)
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function chooseBackupDirectory() {
+    if (syncBusy) return
+    setSyncError(null)
+    try {
+      const selected = await window.api.settings.chooseDirectory()
+      if (!selected) return
+      setBackupDirectory(selected)
+      setSyncPreview(await window.api.sync.preview(login.mode))
+    } catch (error) {
+      setSyncError(`备份目录设置失败：${(error as Error).message}`)
     }
   }
 
@@ -406,7 +425,15 @@ export default function Settings() {
                   <span className="min-w-0 break-all">
                     <strong className="font-medium text-text-primary">备份目录</strong>
                     <br />
-                    {syncPreview.backupDirectory ?? '不可用'}
+                    <span>{backupDirectory ?? syncPreview.backupDirectory ?? '不可用'}</span>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-xs ml-2 align-middle"
+                      onClick={() => void chooseBackupDirectory()}
+                      disabled={syncBusy}
+                    >
+                      修改
+                    </button>
                   </span>
                 </div>
                 <div className="mt-2 border-t border-emerald-100 pt-2 text-text-primary">
