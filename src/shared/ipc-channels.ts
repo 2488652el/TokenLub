@@ -51,6 +51,7 @@ export const IPC = {
   pricingCnyRate: 'pricing:cny-rate',
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
+  settingsChooseDirectory: 'settings:choose-directory',
   alertsList: 'alerts:list',
   alertsAdd: 'alerts:add',
   alertsToggle: 'alerts:toggle',

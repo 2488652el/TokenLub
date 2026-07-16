@@ -102,6 +102,8 @@ test('drives sync login, restore cancellation, manual sync, and responsive layou
     await expect(window).toHaveTitle('TokenLub')
     await window.getByRole('link', { name: '设置' }).click()
     await expect(window.getByRole('heading', { name: 'TokenLub 云端同步' })).toBeVisible()
+    await expect(window.getByText('备份目录', { exact: true })).toBeVisible()
+    await expect(window.getByRole('button', { name: '修改' })).toBeVisible()
     await expect(window.getByRole('button', { name: '立即同步' })).toHaveCount(0)
     await expect(window.evaluate(() => window.api.sync.status())).resolves.toMatchObject({
       configured: false
