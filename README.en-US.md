@@ -30,12 +30,12 @@ money are going.
 
 ## Latest Release
 
-Current formal build: **TokenLub 1.0.4**
+Current formal build: **TokenLub 1.0.5**
 
 | Artifact     | Path                                         |
 | ------------ | -------------------------------------------- |
-| Installer    | `artifacts/dist/TokenLub-1.0.4-x64.exe`      |
-| Portable app | `artifacts/dist/TokenLub-1.0.4-portable.exe` |
+| Installer    | `artifacts/dist/TokenLub-1.0.5-x64.exe`      |
+| Portable app | `artifacts/dist/TokenLub-1.0.5-portable.exe` |
 | Unpacked app | `artifacts/dist/win-unpacked/`               |
 
 The app icon is bundled through `build/icon.ico` on Windows, `build/icon.icns`

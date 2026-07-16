@@ -7,6 +7,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import type { SyncMode } from '../../shared/sync-mode'
 import { SYNC_BACKUP_DIRECTORY_SETTING_KEY } from '../../shared/sync-v2'
+import type { AppUpdateStatus } from '../../shared/types/app-update'
 
 // ponytail: scheduler reads `refresh_interval_min` (number, minutes).
 // 0 means "关闭" - refresh.ts treats intervalMin <= 0 as a no-op.
@@ -21,6 +22,29 @@ const REFRESH_OPTIONS: Array<{ value: number; label: string }> = [
 /** 自动刷新间隔的设置 key */
 const REFRESH_KEY = 'refresh_interval_min'
 const TOKENLUB_MARK_URL = new URL('../assets/tokenlub-mark.png', import.meta.url).href
+
+const UPDATE_PHASE_META: Record<
+  AppUpdateStatus['phase'],
+  { label: string; badgeClassName: string }
+> = {
+  idle: { label: '等待检查', badgeClassName: 'border-border-light bg-white text-text-secondary' },
+  checking: { label: '检查中', badgeClassName: 'border-sky-200 bg-sky-50 text-sky-700' },
+  available: { label: '发现新版本', badgeClassName: 'border-sky-200 bg-sky-50 text-sky-700' },
+  downloading: { label: '下载中', badgeClassName: 'border-sky-200 bg-sky-50 text-sky-700' },
+  downloaded: {
+    label: '正在安装',
+    badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  },
+  'up-to-date': {
+    label: '已是最新',
+    badgeClassName: 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  },
+  error: { label: '更新失败', badgeClassName: 'border-red-200 bg-red-50 text-red-700' },
+  unsupported: {
+    label: '不可自动更新',
+    badgeClassName: 'border-amber-200 bg-amber-50 text-amber-700'
+  }
+}
 
 type SyncStatus = Awaited<ReturnType<typeof window.api.sync.status>>
 type SyncPreview = Awaited<ReturnType<typeof window.api.sync.preview>>
@@ -75,6 +99,7 @@ const SYNC_STATE_META: Record<
  */
 export default function Settings() {
   const [refreshMin, setRefreshMin] = useState<number>(30)
+  const [appUpdateStatus, setAppUpdateStatus] = useState<AppUpdateStatus | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncPreview, setSyncPreview] = useState<SyncPreview | null>(null)
   const [devices, setDevices] = useState<SyncDevice[]>([])
@@ -106,6 +131,20 @@ export default function Settings() {
         setBackupDirectory(configuredBackupDirectory)
       }
     })
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const unsubscribe = window.api.appUpdate.onStatusChange((next) => {
+      if (active) setAppUpdateStatus(next)
+    })
+    void window.api.appUpdate.getStatus().then((next) => {
+      if (active) setAppUpdateStatus(next)
+    })
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
@@ -146,6 +185,22 @@ export default function Settings() {
     } catch (e) {
       setRefreshMin(prev)
       window.alert(`设置失败：${(e as Error).message}`)
+    }
+  }
+
+  async function checkForAppUpdate() {
+    try {
+      setAppUpdateStatus((current) => ({
+        phase: 'checking',
+        currentVersion: current?.currentVersion ?? window.api.version
+      }))
+      setAppUpdateStatus(await window.api.appUpdate.check())
+    } catch (error) {
+      setAppUpdateStatus({
+        phase: 'error',
+        currentVersion: appUpdateStatus?.currentVersion ?? window.api.version,
+        message: (error as Error).message
+      })
     }
   }
 
@@ -219,12 +274,71 @@ export default function Settings() {
 
   const statusMeta = syncStatus ? SYNC_STATE_META[syncStatus.state] : null
   const showLoginForm = !syncStatus?.configured || reconnecting
+  const updateMeta = UPDATE_PHASE_META[appUpdateStatus?.phase ?? 'idle']
+  const updateBusy =
+    appUpdateStatus?.phase === 'checking' ||
+    appUpdateStatus?.phase === 'available' ||
+    appUpdateStatus?.phase === 'downloading' ||
+    appUpdateStatus?.phase === 'downloaded'
 
   return (
     <div className="page-content animate-in">
-      <PageHeader title="设置" desc="管理自动刷新与 TokenLub 云端同步" />
+      <PageHeader title="设置" desc="管理应用更新、自动刷新与 TokenLub 云端同步" />
 
-      <Card title="余额自动刷新" icon="fa-arrows-rotate">
+      <Card title="应用更新" icon="fa-cloud-arrow-down">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] font-medium text-text-primary">
+                当前版本 {appUpdateStatus?.currentVersion ?? window.api.version}
+              </span>
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[11.5px] font-medium ${updateMeta.badgeClassName}`}
+              >
+                {updateMeta.label}
+              </span>
+              {appUpdateStatus?.latestVersion &&
+                appUpdateStatus.latestVersion !== appUpdateStatus.currentVersion && (
+                  <span className="text-[12px] text-text-secondary">
+                    最新版本 {appUpdateStatus.latestVersion}
+                  </span>
+                )}
+            </div>
+            <p className="form-hint mt-1.5">
+              安装版启动后会自动检查 GitHub Release。新版本将在后台下载，随后静默覆盖安装并重启；
+              本地数据库和设置位于独立的用户数据目录，不会被安装包覆盖。
+            </p>
+            {appUpdateStatus?.message && (
+              <div
+                className={`mt-2 text-[12px] ${appUpdateStatus.phase === 'error' ? 'text-red-600' : 'text-text-secondary'}`}
+                role="status"
+                aria-live="polite"
+              >
+                {appUpdateStatus.message}
+              </div>
+            )}
+            {appUpdateStatus?.phase === 'downloading' && (
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border-light">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-300"
+                  style={{ width: `${appUpdateStatus.percent ?? 0}%` }}
+                />
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm shrink-0"
+            onClick={() => void checkForAppUpdate()}
+            disabled={updateBusy}
+          >
+            <i className={`fa-solid fa-arrows-rotate ${updateBusy ? 'fa-spin' : ''}`} />
+            {appUpdateStatus?.phase === 'checking' ? '检查中…' : '检查更新'}
+          </button>
+        </div>
+      </Card>
+
+      <Card className="mt-4" title="余额自动刷新" icon="fa-arrows-rotate">
         <div className="flex items-center justify-between gap-3 text-[13px] text-text-secondary">
           <div>
             <div className="text-text-primary">余额自动刷新间隔</div>
