@@ -34,8 +34,10 @@ import {
   deleteKey,
   getDecryptedExtraCredentials,
   getDecryptedKey,
-  toggleUsageQuery
+  toggleUsageQuery,
+  getKey
 } from '../store/keys-repo'
+import { validateProviderEndpoint } from '../providers/endpoint-policy'
 import { latestBalances } from '../store/balance-repo'
 import {
   queryUsage,
@@ -114,6 +116,12 @@ export function registerIpcHandlers(): void {
     const parsed = stripUndefined(
       apiKeyUpdateInputSchema.parse(input)
     ) as unknown as ApiKeyUpdateInput
+    const existing = getKey(parsed.id)
+    if (!existing) throw new Error('api key not found')
+    if (Object.prototype.hasOwnProperty.call(parsed, 'baseUrlOverride')) {
+      const endpoint = validateProviderEndpoint(existing.providerId, parsed.baseUrlOverride)
+      if (!endpoint.ok) throw new Error(endpoint.reason)
+    }
     return updateKey(parsed)
   })
   ipcMain.handle(IPC.keysDelete, (_e, id: string) => {

@@ -97,6 +97,8 @@ export interface UsageSlice {
   cost?: number
   currency?: string
   source?: 'vendor-api' | 'session-log'
+  /** Stable provider-side result dimension for lossless vendor usage persistence. */
+  upstreamDimension?: string
   raw?: unknown
 }
 

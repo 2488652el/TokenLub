@@ -31,6 +31,7 @@ interface UsageResp {
       output_tokens?: number
       cache_creation_input_tokens?: number
       cache_read_input_tokens?: number
+      workspace_id?: string
     }>
   }>
   has_more: boolean
@@ -97,13 +98,14 @@ export const anthropicAdminProvider: ProviderImpl = {
           `/v1/organizations/usage?start_time=${encodeURIComponent(fromISO)}&end_time=${encodeURIComponent(toISO)}&bucket_width=1d`
         )
         return (body.data ?? []).flatMap((bucket) =>
-          (bucket.results ?? []).map((r) => {
+          (bucket.results ?? []).map((r, index) => {
             const slice: UsageSlice = {
               providerId: MANIFEST.id,
               periodStart: bucket.starting_at,
               periodEnd: bucket.ending_at,
               model: 'anthropic-org-aggregate',
               source: 'vendor-api',
+              upstreamDimension: r.workspace_id ? `workspace:${r.workspace_id}` : `result:${index}`,
               raw: r
             }
             if (typeof r.input_tokens === 'number') slice.promptTokens = r.input_tokens

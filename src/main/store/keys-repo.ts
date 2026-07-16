@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto'
 import { getDb } from './db'
 import { encryptSecret, decryptSecret, keyTail } from '../crypto/safe-storage'
 import { deriveQueryMode } from './db-usage-defaults'
+import { originChanged, validateProviderEndpoint } from '../providers/endpoint-policy'
 import type {
   ApiKeyCreateInput,
   ApiKeyRecord,
@@ -135,6 +136,8 @@ export function addKey(
   input: ApiKeyCreateInput & { source?: ApiKeyRecord['source'] }
 ): ApiKeyRecord {
   const db = getDb()
+  const endpoint = validateProviderEndpoint(input.providerId, input.baseUrlOverride)
+  if (!endpoint.ok) throw new Error(endpoint.reason)
   const id = randomUUID()
   const now = new Date().toISOString()
   const encrypted = encryptSecret(input.apiKey)
@@ -194,11 +197,32 @@ export function updateKey(input: ApiKeyUpdateInput): ApiKeyRecord {
     DbRow | undefined
   if (!existing) throw new Error(`api key not found: ${input.id}`)
 
+  const hasEndpointUpdate = Object.prototype.hasOwnProperty.call(input, 'baseUrlOverride')
+  const rebound =
+    hasEndpointUpdate &&
+    originChanged(existing.provider_id, existing.base_url_override, input.baseUrlOverride)
+  const existingExtra = decryptExtra(existing.extra_credentials)
+  if (rebound) {
+    const nextUrl = input.baseUrlOverride
+    const endpoint = validateProviderEndpoint(existing.provider_id, nextUrl)
+    if (!endpoint.ok) throw new Error(endpoint.reason)
+    if (!input.apiKey?.trim()) {
+      throw new Error('credential re-entry required when changing provider endpoint')
+    }
+    for (const key of Object.keys(existingExtra)) {
+      if (!input.extra || typeof input.extra[key] !== 'string' || input.extra[key].length === 0) {
+        throw new Error('credential re-entry required for provider credentials')
+      }
+    }
+  }
+
   const now = new Date().toISOString()
   const nextKey = input.apiKey?.trim()
   const encrypted = nextKey ? encryptSecret(nextKey) : existing.encrypted_key
   const tail = nextKey ? keyTail(nextKey) : existing.key_tail
-  const mergedExtra = { ...decryptExtra(existing.extra_credentials), ...(input.extra ?? {}) }
+  const mergedExtra = rebound
+    ? { ...(input.extra ?? {}) }
+    : { ...existingExtra, ...(input.extra ?? {}) }
   const nextExtra = Object.keys(mergedExtra).length > 0 ? encryptExtra(mergedExtra) : null
 
   db.prepare(
