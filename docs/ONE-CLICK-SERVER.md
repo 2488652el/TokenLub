@@ -38,7 +38,7 @@ sudo bash ops/one-click/install.sh \
 ```sh
 sudo bash install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.4 \
+  --ref v1.0.5 \
   --domain sync.example.com \
   --email admin@example.com
 ```

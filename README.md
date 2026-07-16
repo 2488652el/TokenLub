@@ -38,16 +38,16 @@
 | ------------------------------------------------ | ----------------------------------------------------- |
 | ![请求日志](./docs/screenshots/request-logs.png) | ![云端同步设置](./docs/screenshots/settings-sync.png) |
 
-## 1.0.4 最新版本
+## 1.0.5 最新版本
 
 本次版本新增可选本地备份目录、Ubuntu 一键同步服务部署脚本，以及完整的
 服务器健康检查、备份、升级和卸载命令。
 
 ### Windows 下载
 
-- [安装版 TokenLub-1.0.4-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.4/TokenLub-1.0.4-x64.exe)
-- [便携版 TokenLub-1.0.4-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.4/TokenLub-1.0.4-portable.exe)
-- [GitHub Release v1.0.4](https://github.com/2488652el/TokenLub/releases/tag/v1.0.4)
+- [安装版 TokenLub-1.0.5-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.5/TokenLub-1.0.5-x64.exe)
+- [便携版 TokenLub-1.0.5-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.5/TokenLub-1.0.5-portable.exe)
+- [GitHub Release v1.0.5](https://github.com/2488652el/TokenLub/releases/tag/v1.0.5)
 
 本地构建产物位于 `artifacts/dist/`；正式 Windows 构建命令为：
 
@@ -94,7 +94,7 @@ npm run build
 ```bash
 sudo bash ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.4 \
+  --ref v1.0.5 \
   --domain sync.example.com \
   --email admin@example.com
 ```
@@ -104,7 +104,7 @@ sudo bash ops/one-click/install.sh \
 ```bash
 sudo bash ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.4 \
+  --ref v1.0.5 \
   --ssh-only
 ```
 

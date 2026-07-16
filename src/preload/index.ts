@@ -32,6 +32,7 @@ import type { ProviderTestResult } from '../shared/types/provider'
 import type { ProviderCatalogEntry } from '../shared/provider-catalog'
 import type { SyncMode } from '../shared/sync-mode'
 import type { SyncPreview } from '../shared/sync-preview'
+import type { AppUpdateStatus } from '../shared/types/app-update'
 
 window.addEventListener('online', () => {
   void ipcRenderer.invoke(IPC.syncOnline).catch(() => undefined)
@@ -46,7 +47,7 @@ window.addEventListener('online', () => {
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.0.4',
+  version: '1.0.5',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -166,6 +167,16 @@ const api = {
     setCatalogAutoUpdate: (enabled: boolean): Promise<PricingCatalogStatus> =>
       ipcRenderer.invoke(IPC.pricingCatalogAutoUpdate, enabled),
     cnyRate: (): Promise<CnyRateQuote> => ipcRenderer.invoke(IPC.pricingCnyRate)
+  },
+
+  appUpdate: {
+    getStatus: (): Promise<AppUpdateStatus> => ipcRenderer.invoke(IPC.appUpdateGetStatus),
+    check: (): Promise<AppUpdateStatus> => ipcRenderer.invoke(IPC.appUpdateCheck),
+    onStatusChange: (cb: (status: AppUpdateStatus) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, status: AppUpdateStatus) => cb(status)
+      ipcRenderer.on(IPC.appUpdateStatusChanged, listener)
+      return () => ipcRenderer.off(IPC.appUpdateStatusChanged, listener)
+    }
   },
 
   settings: {

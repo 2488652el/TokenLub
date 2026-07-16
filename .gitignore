@@ -23,3 +23,6 @@ tmp-visual-audit/
 .codex/
 .omc/
 /.worktrees/
+AGENTS.md
+docs/ADVERSARIAL-REPORTS/
+docs/superpowers/
