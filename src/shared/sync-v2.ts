@@ -3,6 +3,7 @@ import { normalizeBillingScope } from './pricing-scope'
 export const SYNC_V2_PROTOCOL_VERSION = 2
 export const MAX_SYNC_V2_BYTES = 2 * 1024 * 1024
 export const MAX_SYNC_V2_BALANCES = 5_000
+export const SYNC_BACKUP_DIRECTORY_SETTING_KEY = 'sync_backup_directory'
 
 export const SYNCABLE_SETTING_KEYS = ['refresh_interval_min', 'session_auto_parse_enabled'] as const
 

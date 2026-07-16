@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
 }))
 
 const db = {
+  name: 'C:/TokenLub/tokenlub.db',
   prepare(sql: string) {
     return {
       get: (...args: unknown[]) => {
@@ -100,6 +101,7 @@ vi.mock('../../../src/main/store/db', () => ({ getDb: () => db }))
 import {
   applySyncV2Snapshot,
   createSyncV2Snapshot,
+  getSyncV2Preview,
   getSyncV2BaseSnapshot,
   getSyncV2Revision,
   isSyncV2Dirty,
@@ -145,6 +147,12 @@ describe('local Sync V2 snapshot repository', () => {
       capturedAt: '2026-07-14T00:00:00.000Z',
       remaining: 10
     })
+  })
+
+  it('uses the configured local backup directory in the sync preview', () => {
+    state.settings.set('sync_backup_directory', JSON.stringify('D:/TokenLub/backups'))
+
+    expect(getSyncV2Preview('merge').backupDirectory).toBe('D:/TokenLub/backups')
   })
 
   it('applies the canonical snapshot in one transaction while preserving local-only settings', () => {

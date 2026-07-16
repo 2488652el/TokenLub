@@ -8,6 +8,7 @@ import {
 import type { SyncMode } from '../../shared/sync-mode'
 import type { SyncPreview } from '../../shared/sync-preview'
 import { dirname } from 'node:path'
+import { SYNC_BACKUP_DIRECTORY_SETTING_KEY } from '../../shared/sync-v2'
 import { normalizeBillingScope } from '../../shared/pricing-scope'
 
 type PricingRow = {
@@ -132,6 +133,20 @@ export function createSyncV2Snapshot(): SyncV2Snapshot {
 export function getSyncV2Preview(mode: SyncMode): SyncPreview {
   const db = getDb()
   const snapshot = createSyncV2Snapshot()
+  const configuredBackupDirectory = (
+    db
+      .prepare('SELECT value FROM app_settings WHERE key = ?')
+      .get(SYNC_BACKUP_DIRECTORY_SETTING_KEY) as { value?: string } | undefined
+  )?.value
+  let backupDirectory: string | null = null
+  if (configuredBackupDirectory) {
+    try {
+      const parsed = JSON.parse(configuredBackupDirectory)
+      if (typeof parsed === 'string' && parsed.trim()) backupDirectory = parsed
+    } catch {
+      backupDirectory = null
+    }
+  }
   return {
     mode,
     settings: Object.keys(snapshot.settings).length,
@@ -149,7 +164,7 @@ export function getSyncV2Preview(mode: SyncMode): SyncPreview {
         : mode === 'upload'
           ? '将以本机快照覆盖云端同步数据。'
           : '将按自然键合并本机与云端快照。',
-    backupDirectory: db.name === ':memory:' ? null : dirname(db.name)
+    backupDirectory: backupDirectory ?? (db.name === ':memory:' ? null : dirname(db.name))
   }
 }
 

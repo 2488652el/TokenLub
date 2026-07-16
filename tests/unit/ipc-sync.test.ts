@@ -7,6 +7,7 @@ const syncNowMock = vi.fn()
 const loginSyncMock = vi.fn()
 const listSyncDevicesMock = vi.fn()
 const revokeSyncDeviceMock = vi.fn()
+const showOpenDialogMock = vi.fn()
 
 async function loadHandlers(): Promise<() => void> {
   vi.resetModules()
@@ -16,6 +17,7 @@ async function loadHandlers(): Promise<() => void> {
   loginSyncMock.mockReset()
   listSyncDevicesMock.mockReset()
   revokeSyncDeviceMock.mockReset()
+  showOpenDialogMock.mockReset()
   vi.doMock('electron', () => ({
     ipcMain: {
       handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
@@ -23,6 +25,7 @@ async function loadHandlers(): Promise<() => void> {
       }
     },
     BrowserWindow: { getAllWindows: () => [] },
+    dialog: { showOpenDialog: showOpenDialogMock },
     shell: { openPath: vi.fn(), openExternal: vi.fn() }
   }))
   vi.doMock('../../src/main/sync/service', () => ({
@@ -119,5 +122,16 @@ describe('sync IPC', () => {
     expect(devices).toEqual([{ id: 'device-1', name: 'Laptop' }])
     expect(revoke).toEqual({ ok: true })
     expect(JSON.stringify(status)).not.toMatch(/token|secret/i)
+  })
+
+  it('lets the user choose and persist a local backup directory', async () => {
+    const registerHandlers = await loadHandlers()
+    showOpenDialogMock.mockResolvedValue({ canceled: false, filePaths: ['D:/TokenLub/backups'] })
+    registerHandlers()
+
+    await expect(handlers.get(IPC.settingsChooseDirectory)?.()).resolves.toBe('D:/TokenLub/backups')
+    expect(showOpenDialogMock).toHaveBeenCalledWith({
+      properties: ['openDirectory', 'createDirectory']
+    })
   })
 })

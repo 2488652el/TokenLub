@@ -21,4 +21,5 @@ tmp-visual-audit/
 .zcode/
 .agents/
 .codex/
+.omc/
 /.worktrees/

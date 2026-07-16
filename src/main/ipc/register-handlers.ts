@@ -5,7 +5,7 @@
  * 并使用 zod schema 进行入参校验。
  * (glm-5.2)
  */
-import { ipcMain, BrowserWindow, shell } from 'electron'
+import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
 import { IPC } from '@shared/ipc-channels'
 import {
   apiKeyCreateInputSchema,
@@ -48,6 +48,7 @@ import {
 import { listPricing, listPricingHistory, setPricing, deletePricing } from '../store/pricing-repo'
 import { listAlerts, addAlert, toggleAlert, deleteAlert } from '../store/alerts-repo'
 import { setSetting, getAllSettings } from '../store/settings-store'
+import { SYNC_BACKUP_DIRECTORY_SETTING_KEY } from '@shared/sync-v2'
 import { listProviders, getProvider } from '../providers/registry'
 import { PROVIDER_CATALOG } from '@shared/provider-catalog'
 import {
@@ -282,6 +283,14 @@ export function registerIpcHandlers(): void {
       restartAutoRefresh()
     }
     return { ok: true }
+  })
+  ipcMain.handle(IPC.settingsChooseDirectory, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory']
+    })
+    const selected = result.canceled ? null : (result.filePaths[0] ?? null)
+    if (selected) setSetting(SYNC_BACKUP_DIRECTORY_SETTING_KEY, selected)
+    return selected
   })
 
   // alerts
