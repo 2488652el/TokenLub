@@ -1,9 +1,13 @@
 {
   "name": "tokenlub",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "TokenLub - unified LLM token usage & cost aggregator for Windows and macOS",
   "main": "out/main/index.js",
   "author": "bestzuge@gmail.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/2488652el/TokenLub.git"
+  },
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -37,6 +41,7 @@
     "date-fns": "^3.6.0",
     "decimal.js": "^10.4.3",
     "electron-store": "^10.0.0",
+    "electron-updater": "^6.8.9",
     "nodemailer": "^9.0.3",
     "pg": "^8.22.0",
     "react": "^18.3.1",
@@ -99,6 +104,14 @@
       "output": "artifacts/dist",
       "buildResources": "build"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "2488652el",
+        "repo": "TokenLub",
+        "releaseType": "release"
+      }
+    ],
     "files": [
       "out/main/**/*",
       "out/preload/**/*",
