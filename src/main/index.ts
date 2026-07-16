@@ -14,6 +14,7 @@ import { bindSync, getSyncStatus, initializeSync, syncNow } from './sync/service
 import { openAllowedExternalUrl } from './platform/external-links'
 import { parseSyncBindingLink } from './sync/deep-link'
 import { startCatalogAutoRefresh } from './pricing/catalog-service'
+import { initializeAppUpdater } from './services/app-updater'
 
 const isDev = !app.isPackaged
 const pendingBindingLinks: string[] = []
@@ -94,6 +95,7 @@ app.whenReady().then(() => {
   startCatalogAutoRefresh()
 
   registerIpcHandlers()
+  initializeAppUpdater()
   startAutoRefresh()
 
   createWindow()
