@@ -156,12 +156,10 @@ src/
   renderer/   React UI, pages, layout, charts, forms
   shared/     Shared types, IPC contracts, pure utilities
 tests/        Vitest unit tests
-docs/         Architecture, provider notes, progress, review reports
+docs/         Architecture, provider notes, cloud-sync and deployment notes
 build/        Electron Builder resources, including app icons
 artifacts/    Generated packages and local verification outputs
 ```
-
-For a deeper handoff, read `docs/ARCHITECTURE_SYNC.md`.
 
 ---
 
