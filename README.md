@@ -3,7 +3,7 @@
 **TokenLub 是一款 Windows 与 macOS 桌面应用，把多家 LLM 服务商的 Token 用量、余额、模型价格和本机编码会话成本集中到一个本地工作台。**
 
 [English README](./README.en-US.md) · [架构说明](./docs/ARCHITECTURE.md) ·
-[Provider 说明](./docs/PROVIDERS.md) · [云端同步说明](./docs/CLOUD-SYNC-GUIDE.md)
+[Provider 说明](./docs/PROVIDERS.md) · [云端同步部署](./docs/ONE-CLICK-SERVER.md)
 
 ![TokenLub 用量概览](./docs/screenshots/dashboard.png)
 

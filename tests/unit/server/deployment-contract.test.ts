@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const compose = readFileSync(resolve('docker-compose.yml'), 'utf8')
 const dockerfile = readFileSync(resolve('Dockerfile'), 'utf8')
-const deployGuide = readFileSync(resolve('docs/DEPLOY-UBUNTU.md'), 'utf8')
+const deployGuide = readFileSync(resolve('docs/ONE-CLICK-SERVER.md'), 'utf8')
 const privacyAudit = readFileSync(resolve('ops/privacy-audit.sh'), 'utf8')
 const restoreRehearsal = readFileSync(resolve('ops/restore-postgres-rehearsal.sh'), 'utf8')
 const serverEntry = readFileSync(resolve('src/server/index.ts'), 'utf8')

@@ -67,6 +67,7 @@ sudo tokenlub-sync logs
 sudo tokenlub-sync backup
 sudo tokenlub-sync upgrade
 sudo tokenlub-sync uninstall
+sh ops/privacy-audit.sh
 ```
 
 普通卸载只停止容器并保留数据。确认要删除数据库卷时才使用：
@@ -78,7 +79,7 @@ sudo tokenlub-sync uninstall --purge --yes
 压缩包部署（没有 `.git`）时，升级时显式传入新的部署包：
 
 ```sh
-sudo tokenlub-sync upgrade --archive /home/ubuntu/Zcode-server-phase1-20260716.tgz
+sudo tokenlub-sync upgrade --archive /path/to/tokenlub-server-<version>.tgz
 ```
 
 ## 数据和安全边界
