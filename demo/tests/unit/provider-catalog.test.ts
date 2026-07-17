@@ -19,6 +19,7 @@ describe('PROVIDER_CATALOG', () => {
       'moonshot',
       'longcat',
       'minimax',
+      'kimi-coding',
       'siliconflow',
       'openrouter',
       'stepfun',
@@ -164,6 +165,13 @@ describe('PROVIDER_CATALOG', () => {
     const urls = moonshot.baseUrlTemplates.map((t) => t.url)
     expect(urls).toContain('https://api.moonshot.cn/v1')
     expect(urls).toContain('https://api.moonshot.ai/v1')
+  })
+
+  it('Kimi Coding Plan exposes the documented OpenAI-compatible endpoint', () => {
+    const kimi = requireCatalogEntry('kimi-coding')
+    expect(kimi.defaultBaseUrl).toBe('https://api.kimi.com/coding/v1')
+    expect(kimi.defaultModels).toContain('kimi-for-coding')
+    expect(kimi.baseUrlTemplates.map((t) => t.url)).toContain('https://api.kimi.com/coding/')
   })
 
   it('defaultBaseUrl always matches one of the listed templates', () => {

@@ -38,16 +38,17 @@
 | -------------------------------------------------- | ------------------------------------------------------- |
 | ![请求日志](./design/screenshots/request-logs.png) | ![云端同步设置](./design/screenshots/settings-sync.png) |
 
-## 1.0.6 最新版本
+## 1.0.7 最新版本
 
-本次版本修复本机 CLI Session 解析触发逻辑：自动解析仅在开关开启时后台执行，
-手动解析仅通过 API Keys 页面中的“解析全部”或“解析入库”按钮执行。
+本次版本新增异常价格变动审批开关，默认开启并记住用户选择；关闭后官方价格目录
+同步会直接放行。并修复本机 CLI Session 解析触发逻辑：自动解析仅在开关开启时
+后台执行，手动解析仅通过 API Keys 页面中的“解析全部”或“解析入库”按钮执行。
 
 ### Windows 下载
 
-- [安装版 TokenLub-1.0.6-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.6/TokenLub-1.0.6-x64.exe)
-- [便携版 TokenLub-1.0.6-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.6/TokenLub-1.0.6-portable.exe)
-- [GitHub Release v1.0.6](https://github.com/2488652el/TokenLub/releases/tag/v1.0.6)
+- [安装版 TokenLub-1.0.7-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.7/TokenLub-1.0.7-x64.exe)
+- [便携版 TokenLub-1.0.7-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.7/TokenLub-1.0.7-portable.exe)
+- [GitHub Release v1.0.7](https://github.com/2488652el/TokenLub/releases/tag/v1.0.7)
 
 安装包统一输出到 `demo/tokenlub-<版本号>-<修改说明>-<执行模型>/`。正式
 Windows 构建命令为：
@@ -109,7 +110,7 @@ npm run build
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.6 \
+  --ref v1.0.7 \
   --domain sync.example.com \
   --email admin@example.com
 ```
@@ -119,7 +120,7 @@ sudo bash drive/ops/one-click/install.sh \
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.6 \
+  --ref v1.0.7 \
   --ssh-only
 ```
 

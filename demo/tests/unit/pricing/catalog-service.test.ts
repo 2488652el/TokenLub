@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   settings: new Map<string, unknown>(),
   syncCatalog: vi.fn(),
   upsertCatalogBatch: vi.fn(),
-  listPricing: vi.fn(() => []),
+  listPricing: vi.fn((): unknown[] => []),
   recordPricingHistory: vi.fn(),
   scheduleSyncAfterChange: vi.fn()
 }))
@@ -38,6 +38,7 @@ import {
   getCatalogSyncStatus,
   previewCatalogNow,
   refreshCatalogIfStale,
+  setCatalogApprovalRequired,
   setCatalogAutoUpdate,
   syncCatalogNow
 } from '../../../../code/src/main/pricing/catalog-service'
@@ -65,7 +66,11 @@ describe('catalog-service', () => {
       etag: '"new"'
     })
 
-    expect(getCatalogSyncStatus()).toMatchObject({ state: 'idle', autoUpdate: true })
+    expect(getCatalogSyncStatus()).toMatchObject({
+      state: 'idle',
+      autoUpdate: true,
+      approvalRequired: true
+    })
     await expect(syncCatalogNow()).resolves.toMatchObject({ synced: 12, protected: 2 })
     expect(mocks.syncCatalog).toHaveBeenCalledWith(expect.any(Function), { etag: '"old"' })
     expect(getCatalogSyncStatus()).toMatchObject({
@@ -159,6 +164,96 @@ describe('catalog-service', () => {
       applied: true
     })
     expect(getCatalogSyncStatus().pendingPreview).toBeUndefined()
+  })
+
+  it('requires approval for anomalous changes by default', async () => {
+    const before = {
+      providerId: 'openrouter',
+      model: 'moonshotai/kimi-latest',
+      promptPricePerMtok: 0.66,
+      completionPricePerMtok: 3.41,
+      currency: 'USD',
+      source: 'catalog' as const
+    }
+    const after = { ...before, promptPricePerMtok: 3, completionPricePerMtok: 15 }
+    mocks.listPricing.mockReturnValue([before])
+    mocks.syncCatalog.mockImplementation(async (capture: (entries: unknown[]) => unknown) => {
+      capture([after])
+      return {
+        synced: 1,
+        skipped: 0,
+        protected: 0,
+        notModified: false,
+        checkedAt: '2026-07-17T09:35:44.774Z'
+      }
+    })
+
+    await expect(syncCatalogNow()).resolves.toMatchObject({ applied: false, blocked: 1 })
+
+    expect(mocks.upsertCatalogBatch).not.toHaveBeenCalled()
+    expect(getCatalogSyncStatus().pendingPreview).toMatchObject({ blocked: 1 })
+  })
+
+  it('persists disabled approval and immediately releases a pending preview', async () => {
+    const entry = {
+      providerId: 'openrouter',
+      model: 'moonshotai/kimi-latest',
+      promptPricePerMtok: 3,
+      completionPricePerMtok: 15,
+      currency: 'USD',
+      source: 'catalog' as const
+    }
+    mocks.settings.set('pricing_catalog_pending_preview', {
+      id: '80811c73-cda3-47a8-923e-f4a3df914a4b',
+      checkedAt: '2026-07-17T09:35:44.774Z',
+      entries: [entry],
+      changes: [
+        { key: 'openrouter:default:moonshotai/kimi-latest:USD', kind: 'changed', blocked: true }
+      ],
+      maxChangeRatio: 2
+    })
+    mocks.upsertCatalogBatch.mockReturnValue({ updated: 1, skipped: 0 })
+
+    const status = setCatalogApprovalRequired(false)
+    expect(status.approvalRequired).toBe(false)
+    expect(status.pendingPreview).toBeUndefined()
+
+    expect(mocks.settings.get('pricing_catalog_approval_required')).toBe(false)
+    expect(mocks.upsertCatalogBatch).toHaveBeenCalledWith([entry], {
+      deactivateMissing: true,
+      managedScopes: expect.any(Array)
+    })
+  })
+
+  it('directly applies anomalous changes while approval is disabled', async () => {
+    const before = {
+      providerId: 'openrouter',
+      model: 'moonshotai/kimi-latest',
+      promptPricePerMtok: 0.66,
+      completionPricePerMtok: 3.41,
+      currency: 'USD',
+      source: 'catalog' as const
+    }
+    const after = { ...before, promptPricePerMtok: 3, completionPricePerMtok: 15 }
+    setCatalogApprovalRequired(false)
+    mocks.listPricing.mockReturnValue([before])
+    mocks.upsertCatalogBatch.mockReturnValue({ updated: 1, skipped: 0 })
+    mocks.syncCatalog.mockImplementation(async (capture: (entries: unknown[]) => unknown) => {
+      capture([after])
+      return {
+        synced: 1,
+        skipped: 0,
+        protected: 0,
+        notModified: false,
+        checkedAt: '2026-07-17T09:35:44.774Z'
+      }
+    })
+
+    await expect(syncCatalogNow()).resolves.toMatchObject({ applied: true, blocked: 1 })
+
+    expect(mocks.upsertCatalogBatch).toHaveBeenCalled()
+    expect(getCatalogSyncStatus().pendingPreview).toBeUndefined()
+    expect(getCatalogSyncStatus().approvalRequired).toBe(false)
   })
 
   it('skips fresh or disabled automatic refreshes', async () => {

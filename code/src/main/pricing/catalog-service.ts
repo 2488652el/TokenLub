@@ -19,6 +19,7 @@ import {
 } from '@shared/pricing-diff'
 
 const AUTO_UPDATE_KEY = 'pricing_catalog_auto_update'
+const APPROVAL_REQUIRED_KEY = 'pricing_catalog_approval_required'
 const ETAG_KEY = 'pricing_catalog_etag'
 const LAST_ATTEMPT_KEY = 'pricing_catalog_last_attempt_at'
 const LAST_SUCCESS_KEY = 'pricing_catalog_last_success_at'
@@ -53,6 +54,10 @@ function getMaxChangeRatio(): number {
     : DEFAULT_MAX_PRICE_CHANGE_RATIO
 }
 
+function isCatalogApprovalRequired(): boolean {
+  return getSetting<boolean>(APPROVAL_REQUIRED_KEY) !== false
+}
+
 function previewSummary(preview: PricingCatalogPreview): PricingCatalogPreviewSummary {
   const summary = summarizePricingDiff(preview.changes)
   return { id: preview.id, checkedAt: preview.checkedAt, ...summary }
@@ -73,6 +78,7 @@ export function getCatalogSyncStatus(): PricingCatalogStatus {
   return {
     state: activeSync ? 'syncing' : lastError ? 'error' : 'idle',
     autoUpdate: getSetting<boolean>(AUTO_UPDATE_KEY) !== false,
+    approvalRequired: isCatalogApprovalRequired(),
     ...(lastAttemptAt ? { lastAttemptAt } : {}),
     ...(lastSuccessAt ? { lastSuccessAt } : {}),
     ...(lastError ? { lastError } : {}),
@@ -83,6 +89,13 @@ export function getCatalogSyncStatus(): PricingCatalogStatus {
 
 export function setCatalogAutoUpdate(enabled: boolean): PricingCatalogStatus {
   setSetting(AUTO_UPDATE_KEY, enabled)
+  return getCatalogSyncStatus()
+}
+
+export function setCatalogApprovalRequired(enabled: boolean): PricingCatalogStatus {
+  setSetting(APPROVAL_REQUIRED_KEY, enabled)
+  const pending = readPendingPreview()
+  if (!enabled && pending) applyCatalogPreview(pending.id)
   return getCatalogSyncStatus()
 }
 
@@ -129,7 +142,7 @@ export function syncCatalogNow(): Promise<PricingCatalogSyncResult> {
       const protectedCount = entries.filter((entry) =>
         currentUsers.has(pricingNaturalKey(entry))
       ).length
-      if (summary.blocked > 0) {
+      if (summary.blocked > 0 && isCatalogApprovalRequired()) {
         setSetting(PENDING_PREVIEW_KEY, preview)
         recordPricingHistory(changes, 'blocked', result.checkedAt)
         const visible: PricingCatalogSyncResult = {

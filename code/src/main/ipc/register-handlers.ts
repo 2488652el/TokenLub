@@ -57,6 +57,7 @@ import {
   getCatalogSyncStatus,
   previewCatalogNow,
   applyCatalogPreview,
+  setCatalogApprovalRequired,
   setCatalogAutoUpdate,
   syncCatalogNow
 } from '../pricing/catalog-service'
@@ -284,6 +285,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.pricingCatalogAutoUpdate, (_e, enabled: unknown) => {
     if (typeof enabled !== 'boolean') throw new Error('pricing auto-update must be boolean')
     return setCatalogAutoUpdate(enabled)
+  })
+  ipcMain.handle(IPC.pricingCatalogApprovalRequired, (_e, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('pricing approval setting must be boolean')
+    return setCatalogApprovalRequired(enabled)
   })
   ipcMain.handle(IPC.pricingCnyRate, () => getCnyRateQuote('USD'))
 

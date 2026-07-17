@@ -14,7 +14,7 @@ import { ProviderHttpClient } from '../http-client'
 /** 供应商清单:标识、显示名、分类、特性及文档地址。 */
 const MANIFEST = {
   id: 'moonshot',
-  displayName: 'Moonshot / Kimi',
+  displayName: 'Kimi API (Moonshot)',
   category: 'token-plan' as const,
   features: ['balance'] as const,
   docsUrl: 'https://platform.moonshot.cn/docs'

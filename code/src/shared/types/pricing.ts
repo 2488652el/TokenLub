@@ -84,6 +84,7 @@ export interface PricingHistoryEntry {
 export interface PricingCatalogStatus {
   state: 'idle' | 'syncing' | 'error'
   autoUpdate: boolean
+  approvalRequired: boolean
   lastAttemptAt?: string
   lastSuccessAt?: string
   lastError?: string

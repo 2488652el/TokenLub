@@ -49,6 +49,7 @@ export const IPC = {
   pricingExchangePolicySet: 'pricing:exchange-policy-set',
   pricingCatalogStatus: 'pricing:catalog-status',
   pricingCatalogAutoUpdate: 'pricing:catalog-auto-update',
+  pricingCatalogApprovalRequired: 'pricing:catalog-approval-required',
   pricingCnyRate: 'pricing:cny-rate',
   appUpdateGetStatus: 'app-update:get-status',
   appUpdateCheck: 'app-update:check',

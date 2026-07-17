@@ -48,7 +48,7 @@ window.addEventListener('online', () => {
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.0.6',
+  version: '1.0.7',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -171,6 +171,8 @@ const api = {
       ipcRenderer.invoke(IPC.pricingCatalogStatus),
     setCatalogAutoUpdate: (enabled: boolean): Promise<PricingCatalogStatus> =>
       ipcRenderer.invoke(IPC.pricingCatalogAutoUpdate, enabled),
+    setCatalogApprovalRequired: (enabled: boolean): Promise<PricingCatalogStatus> =>
+      ipcRenderer.invoke(IPC.pricingCatalogApprovalRequired, enabled),
     cnyRate: (): Promise<CnyRateQuote> => ipcRenderer.invoke(IPC.pricingCnyRate)
   },
 

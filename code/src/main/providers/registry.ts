@@ -18,6 +18,7 @@ import { newapiGenericProvider } from './newapi-generic'
 import { qwenManualProvider } from './qwen-manual'
 import { geminiManualProvider } from './gemini-manual'
 import { minimaxProvider } from './minimax'
+import { kimiCodingProvider } from './kimi-coding'
 import { getCatalogEntry } from '@shared/provider-catalog'
 
 const BUILTIN: ProviderImpl[] = [
@@ -34,7 +35,8 @@ const BUILTIN: ProviderImpl[] = [
   newapiGenericProvider,
   qwenManualProvider,
   geminiManualProvider,
-  minimaxProvider
+  minimaxProvider,
+  kimiCodingProvider
 ]
 
 const REGISTRY = new Map<string, ProviderImpl>(BUILTIN.map((p) => [p.manifest.id, p]))

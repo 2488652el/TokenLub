@@ -9,6 +9,7 @@ import { Card } from './Card'
 import { ProviderIcon } from './ProviderIcon'
 import { fmtMoney, fmtCount } from '../../shared/utils/money'
 import { extractCodingPlanQuotas, type CodingPlanQuota } from '../../shared/utils/minimax-quota'
+import { extractKimiCodingQuotas, type KimiQuotaWindow } from '../../shared/utils/kimi-quota'
 import type { ApiKeyRecord } from '../../shared/types/api-key'
 import type { KeySpendSummary } from '../../shared/types/usage'
 import type { BalanceSnapshot, ProviderManifest } from '../../shared/types/provider'
@@ -77,6 +78,7 @@ export function ApiKeyCard({
     >
       <div className="space-y-2 text-[13px]">
         {profile === 'coding-plan' && <CodingPlanQuotaBlock balance={balance} />}
+        {profile === 'kimi-coding-plan' && <KimiCodingPlanQuotaBlock balance={balance} />}
         {profile === 'token-pack' && <TokenPackBalanceBlock balance={balance} />}
         {profile === 'cash-balance' && <CashBalanceBlock balance={balance} />}
         {profile === 'admin-usage' && <AdminUsageBlock balance={balance} keyRecord={keyRecord} />}
@@ -133,7 +135,8 @@ export function ApiKeyCard({
 }
 
 /** 卡片展示形态:决定渲染哪一种余额块 */
-type CardProfile = 'cash-balance' | 'token-pack' | 'coding-plan' | 'admin-usage' | 'gateway'
+type CardProfile =
+  'cash-balance' | 'token-pack' | 'coding-plan' | 'kimi-coding-plan' | 'admin-usage' | 'gateway'
 
 /**
  * 根据 providerId 与余额信息推断卡片应使用的展示形态。
@@ -146,6 +149,7 @@ function getCardProfile(
   balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
 ): CardProfile {
   if (keyRecord.providerId === 'minimax') return 'coding-plan'
+  if (keyRecord.providerId === 'kimi-coding') return 'kimi-coding-plan'
   if (keyRecord.providerId === 'longcat' && balance?.currency === 'TOKENS') return 'token-pack'
   if (keyRecord.providerId === 'openai-admin' || keyRecord.providerId === 'anthropic-admin') {
     return 'admin-usage'
@@ -282,6 +286,47 @@ function CodingPlanQuotaBlock({
     <div className="space-y-2">
       <CodingPlanQuotaRow label="5h 限额" quota={quotas.shortWindow} />
       <CodingPlanQuotaRow label="周限额" quota={quotas.weeklyWindow} />
+    </div>
+  )
+}
+
+function KimiCodingPlanQuotaBlock({
+  balance
+}: {
+  balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
+}) {
+  const quotas = extractKimiCodingQuotas(balance?.raw)
+  return (
+    <div className="space-y-2">
+      <KimiCodingQuotaRow label="7 天套餐" quota={quotas.weeklyWindow} />
+      <KimiCodingQuotaRow label={quotas.rateWindow?.label ?? '短周期'} quota={quotas.rateWindow} />
+    </div>
+  )
+}
+
+function KimiCodingQuotaRow({ label, quota }: { label: string; quota: KimiQuotaWindow | null }) {
+  const pct = quota?.usedPercent
+  const hasPct = typeof pct === 'number' && Number.isFinite(pct)
+  const width = hasPct ? Math.max(0, Math.min(100, pct)) : 100
+  const barColor = !hasPct ? 'bg-neutral-200' : pct >= 90 ? 'bg-red-500' : 'bg-amber-400'
+  return (
+    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-text-muted text-[12px]">{label}</span>
+        <span className="font-mono text-[12px] text-text-primary text-right">
+          {quota?.remainingText ?? '暂无自动读取'}
+        </span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-bg-hover overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
+          style={{ width: `${width}%` }}
+        />
+      </div>
+      <div className="flex justify-between gap-3 text-[11px] text-text-muted leading-snug">
+        <span>{quota?.resetText ?? 'Kimi Coding Plan 套餐限额'}</span>
+        {hasPct && <span className="font-mono">已用 {pct.toFixed(0)}%</span>}
+      </div>
     </div>
   )
 }

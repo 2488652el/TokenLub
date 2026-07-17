@@ -183,6 +183,12 @@ export default function PricingConfig() {
   async function handleCatalogSync() {
     setSyncingCatalog(true)
     try {
+      if (catalogStatus?.approvalRequired === false) {
+        const result = await window.api.pricing.syncCatalog()
+        if (result.notModified) window.alert('models.dev 价格目录已是最新版本。')
+        await refresh()
+        return
+      }
       const preview = await window.api.pricing.catalogPreview()
       if (!preview) {
         window.alert('models.dev 价格目录已是最新版本。')
@@ -212,6 +218,12 @@ export default function PricingConfig() {
   async function handleAutoUpdate(enabled: boolean) {
     const status = await window.api.pricing.setCatalogAutoUpdate(enabled)
     setCatalogStatus(status)
+  }
+
+  async function handleApprovalRequired(enabled: boolean) {
+    const status = await window.api.pricing.setCatalogApprovalRequired(enabled)
+    setCatalogStatus(status)
+    await refresh()
   }
 
   async function handleExchangePolicyChange(config: PricingExchangePolicyConfig) {
@@ -265,6 +277,7 @@ export default function PricingConfig() {
         status={catalogStatus}
         cnyRate={cnyRate}
         onAutoUpdate={(enabled) => void handleAutoUpdate(enabled)}
+        onApprovalRequired={(enabled) => void handleApprovalRequired(enabled)}
         onApplyPreview={() => void handleApplyPreview()}
         exchangePolicy={exchangePolicy}
         onExchangePolicyChange={(config) => void handleExchangePolicyChange(config)}
@@ -430,6 +443,7 @@ function CatalogStatusCard({
   status,
   cnyRate,
   onAutoUpdate,
+  onApprovalRequired,
   onApplyPreview,
   exchangePolicy,
   onExchangePolicyChange
@@ -437,6 +451,7 @@ function CatalogStatusCard({
   status: PricingCatalogStatus | null
   cnyRate: CnyRateQuote | null
   onAutoUpdate: (enabled: boolean) => void
+  onApprovalRequired: (enabled: boolean) => void
   onApplyPreview: () => void
   exchangePolicy: PricingExchangePolicyConfig
   onExchangePolicyChange: (config: PricingExchangePolicyConfig) => void
@@ -487,6 +502,14 @@ function CatalogStatusCard({
             onChange={(event) => onAutoUpdate(event.target.checked)}
           />
           每 24 小时自动检查
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={status?.approvalRequired ?? true}
+            onChange={(event) => onApprovalRequired(event.target.checked)}
+          />
+          异常价格变动需审批
         </label>
         <label className="flex items-center gap-2">
           汇率策略

@@ -150,7 +150,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
   },
   {
     id: 'moonshot',
-    displayName: 'Moonshot / Kimi',
+    displayName: 'Kimi API (Moonshot)',
     category: 'token-plan',
     protocol: 'openai-compatible',
     defaultBaseUrl: 'https://api.moonshot.cn/v1',
@@ -174,6 +174,33 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     signupUrl: 'https://platform.kimi.com/console/api-keys',
     note: '国内 api.moonshot.cn 按 CNY,海外 api.moonshot.ai 按 USD。',
     region: 'CN · CNY'
+  },
+  {
+    id: 'kimi-coding',
+    displayName: 'Kimi Coding Plan',
+    category: 'token-plan',
+    protocol: 'openai-compatible',
+    defaultBaseUrl: 'https://api.kimi.com/coding/v1',
+    baseUrlTemplates: [
+      {
+        id: 'openai',
+        label: 'OpenAI 兼容',
+        url: 'https://api.kimi.com/coding/v1',
+        protocol: 'openai-compatible',
+        hint: 'Kimi Code 官方 Coding Plan 接口，使用 `/chat/completions`。'
+      },
+      {
+        id: 'anthropic',
+        label: 'Anthropic 兼容',
+        url: 'https://api.kimi.com/coding/',
+        protocol: 'anthropic-compatible',
+        hint: 'Claude Code 等工具使用 `/v1/messages`。余额查询仍走 OpenAI 兼容地址。'
+      }
+    ],
+    defaultModels: ['kimi-for-coding', 'kimi-for-coding-highspeed', 'k3'],
+    signupUrl: 'https://www.kimi.com/code/console',
+    note: 'Kimi 会员 Coding Plan 专用，套餐用量来自 `/coding/v1/usages`，不要与 Kimi API Key 混用。',
+    region: 'Global · 会员套餐'
   },
   {
     id: 'longcat',
