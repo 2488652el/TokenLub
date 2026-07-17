@@ -8,6 +8,7 @@ function getPathImpl(platform: SupportedDesktopPlatform): typeof path.win32 | ty
 
 export function resolveCliPaths(platform: SupportedDesktopPlatform, home: string): CliPaths {
   const p = getPathImpl(platform)
+  const kimiCodeHome = p.join(home, '.kimi-code')
   return {
     claudeProjects: p.join(home, '.claude', 'projects'),
     claudeCredentialFiles: [
@@ -16,7 +17,10 @@ export function resolveCliPaths(platform: SupportedDesktopPlatform, home: string
     ],
     codexSessions: p.join(home, '.codex', 'sessions'),
     codexArchivedSessions: p.join(home, '.codex', 'archived_sessions'),
-    codexAuthFile: p.join(home, '.codex', 'auth.json')
+    codexAuthFile: p.join(home, '.codex', 'auth.json'),
+    kimiCodeHome,
+    kimiCodeSessions: p.join(kimiCodeHome, 'sessions'),
+    kimiCodeSessionIndex: p.join(kimiCodeHome, 'session_index.jsonl')
   }
 }
 
@@ -24,10 +28,19 @@ export function getCliPaths(): CliPaths {
   if (process.platform !== 'win32' && process.platform !== 'darwin') {
     throw new Error(`Unsupported desktop platform: ${process.platform}`)
   }
-  return resolveCliPaths(process.platform, homedir())
+  const paths = resolveCliPaths(process.platform, homedir())
+  const override = process.env.KIMI_CODE_HOME
+  if (!override) return paths
+  const p = getPathImpl(process.platform)
+  return {
+    ...paths,
+    kimiCodeHome: override,
+    kimiCodeSessions: p.join(override, 'sessions'),
+    kimiCodeSessionIndex: p.join(override, 'session_index.jsonl')
+  }
 }
 
 export function getCliDisplayPaths(): CliDisplayPaths {
-  const { claudeProjects, codexSessions } = getCliPaths()
-  return { claudeProjects, codexSessions }
+  const { claudeProjects, codexSessions, kimiCodeSessions } = getCliPaths()
+  return { claudeProjects, codexSessions, kimiCodeSessions }
 }

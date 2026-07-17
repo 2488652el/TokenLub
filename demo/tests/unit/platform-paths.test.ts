@@ -13,7 +13,10 @@ describe('resolveCliPaths', () => {
       ],
       codexSessions: '/Users/tester/.codex/sessions',
       codexArchivedSessions: '/Users/tester/.codex/archived_sessions',
-      codexAuthFile: '/Users/tester/.codex/auth.json'
+      codexAuthFile: '/Users/tester/.codex/auth.json',
+      kimiCodeHome: '/Users/tester/.kimi-code',
+      kimiCodeSessions: '/Users/tester/.kimi-code/sessions',
+      kimiCodeSessionIndex: '/Users/tester/.kimi-code/session_index.jsonl'
     })
   })
 
@@ -21,6 +24,7 @@ describe('resolveCliPaths', () => {
     const result = resolveCliPaths('win32', 'C:\\Users\\Best Z')
     expect(result.claudeProjects).toBe('C:\\Users\\Best Z\\.claude\\projects')
     expect(result.codexSessions).toBe('C:\\Users\\Best Z\\.codex\\sessions')
+    expect(result.kimiCodeSessions).toBe('C:\\Users\\Best Z\\.kimi-code\\sessions')
   })
 
   it('preserves unicode characters in macOS home paths', () => {

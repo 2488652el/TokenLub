@@ -8,6 +8,12 @@ import { getDb } from '../store/db'
 import { insertUsage } from '../store/usage-repo'
 import { discoverClaudeSessions, syncClaudeFile, deriveClaudeAgentLabel } from './claude'
 import { discoverCodexSessions, syncCodexFile, deriveCodexAgentLabel } from './codex'
+import {
+  discoverKimiCodeSessions,
+  syncKimiCodeFile,
+  deriveKimiCodeAgentLabel,
+  deriveKimiCodeSessionId
+} from './kimi-code'
 import type { UsageRecord } from '@shared/types/usage'
 
 /** 单文件同步进度回调载荷。 (glm-5.2) */
@@ -31,6 +37,7 @@ interface SyncStateRow {
 }
 
 const CODEX_SYNC_STATE_SOURCE = 'codex:v2'
+const KIMI_CODE_SYNC_STATE_SOURCE = 'kimi-code:v1'
 
 /** 读取指定来源+文件路径在 log_sync_state 中的字节偏移与 mtime。 (glm-5.2) */
 function readSyncState(source: string, filePath: string): { byteOffset: number; mtimeMs: number } {
@@ -130,15 +137,34 @@ export function syncCodexSessions(onProgress?: (p: SyncProgress) => void): SyncR
   return { source: 'codex', totals: result.totals }
 }
 
+/** 同步 Kimi Code CLI 的 wire.jsonl 用量事件。 */
+export function syncKimiCodeSessions(onProgress?: (p: SyncProgress) => void): SyncResult {
+  const result = syncFiles(
+    KIMI_CODE_SYNC_STATE_SOURCE,
+    discoverKimiCodeSessions(),
+    syncKimiCodeFile,
+    onProgress
+      ? (p) => {
+          onProgress({ ...p, source: 'kimi-code' })
+        }
+      : undefined
+  )
+  return { source: 'kimi-code', totals: result.totals }
+}
+
 /**
  * 按指定来源(claude-code 或 codex)同步会话文件,并在完成后尽力回填历史数据的 agent 标签。
  */
 export function syncAllSessions(
-  source: 'claude-code' | 'codex',
+  source: 'claude-code' | 'codex' | 'kimi-code',
   onProgress?: (p: SyncProgress) => void
 ): SyncResult {
   const result =
-    source === 'claude-code' ? syncClaudeSessions(onProgress) : syncCodexSessions(onProgress)
+    source === 'claude-code'
+      ? syncClaudeSessions(onProgress)
+      : source === 'codex'
+        ? syncCodexSessions(onProgress)
+        : syncKimiCodeSessions(onProgress)
   // Best-effort: label historical rows that predate the agent_label column so
   // the UI can show a project name. Guarded internally so it never breaks sync.
   // 尽力而为:为早于 agent_label 列的历史行补充标签,内部已做防护,失败不影响同步。 (glm-5.2)
@@ -203,6 +229,7 @@ export function backfillAgentLabels(): void {
     )
     const claudeFiles = discoverClaudeSessions()
     const codexFiles = discoverCodexSessions()
+    const kimiCodeFiles = discoverKimiCodeSessions()
     const tx = db.transaction(() => {
       for (const file of claudeFiles) {
         const sessionId = fileStem(file)
@@ -216,6 +243,12 @@ export function backfillAgentLabels(): void {
         const label = deriveCodexAgentLabel(readHeadLines(file))
         if (label) update.run(label, sessionId)
       }
+      for (const file of kimiCodeFiles) {
+        const sessionId = deriveKimiCodeSessionId(file)
+        if (!sessionId) continue
+        const label = deriveKimiCodeAgentLabel(file)
+        if (label) update.run(label, sessionId)
+      }
     })
     tx()
   } catch {
@@ -225,9 +258,14 @@ export function backfillAgentLabels(): void {
 
 /** Discover session file counts for the renderer's session-parse page.
  *  为渲染层的会话解析页发现 claude 与 codex 会话文件列表。 (glm-5.2) */
-export function discoverAllSessions(): { claude: string[]; codex: string[] } {
+export function discoverAllSessions(): {
+  claude: string[]
+  codex: string[]
+  kimiCode: string[]
+} {
   return {
     claude: discoverClaudeSessions(),
-    codex: discoverCodexSessions()
+    codex: discoverCodexSessions(),
+    kimiCode: discoverKimiCodeSessions()
   }
 }

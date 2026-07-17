@@ -8,7 +8,7 @@ import ClaudeCodeIcon from '@lobehub/icons/es/ClaudeCode/components/Color'
 import CodexIcon from '@lobehub/icons/es/Codex/components/Color'
 import DeepSeekIcon from '@lobehub/icons/es/DeepSeek/components/Color'
 import GeminiIcon from '@lobehub/icons/es/Gemini/components/Color'
-import KimiIcon from '@lobehub/icons/es/Kimi/components/Color'
+import KimiIcon from '@lobehub/icons/es/Kimi/components/Mono'
 import LongCatIcon from '@lobehub/icons/es/LongCat/components/Color'
 import MinimaxIcon from '@lobehub/icons/es/Minimax/components/Color'
 import NewAPIIcon from '@lobehub/icons/es/NewAPI/components/Color'
@@ -39,6 +39,14 @@ const PROVIDER_ICON: Record<string, IconType> = {
   siliconflow: SiliconCloudIcon,
   stepfun: StepfunIcon,
   zhipu: ZhipuIcon
+}
+
+// Kimi's Color variant is designed for a dark logo background: its main mark
+// is white, so it becomes nearly invisible in the light card surfaces used by
+// TokenLub. The official monochrome mark stays legible and uses the brand blue.
+const PROVIDER_ICON_COLOR: Record<string, string> = {
+  'kimi-coding': '#1783FF',
+  moonshot: '#1783FF'
 }
 
 // 无图标时回退显示的首字母映射表
@@ -102,7 +110,12 @@ export function ProviderIcon({
       className={`inline-flex items-center justify-center ${className}`}
       title={title ?? providerId}
     >
-      <Icon size={size} />
+      <Icon
+        size={size}
+        {...(PROVIDER_ICON_COLOR[providerId]
+          ? { style: { color: PROVIDER_ICON_COLOR[providerId] } }
+          : {})}
+      />
     </span>
   )
 }

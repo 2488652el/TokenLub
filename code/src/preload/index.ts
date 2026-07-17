@@ -48,7 +48,7 @@ window.addEventListener('online', () => {
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.0.7',
+  version: '1.0.8',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -218,11 +218,14 @@ const api = {
   },
 
   log: {
-    discover: (): Promise<{ claude: string[]; codex: string[] }> =>
+    discover: (): Promise<{ claude: string[]; codex: string[]; kimiCode: string[] }> =>
       ipcRenderer.invoke(IPC.logDiscover),
-    locations: (): Promise<{ claudeProjects: string; codexSessions: string }> =>
-      ipcRenderer.invoke(IPC.logLocations),
-    sync: (source: 'claude-code' | 'codex'): Promise<{ started: boolean }> =>
+    locations: (): Promise<{
+      claudeProjects: string
+      codexSessions: string
+      kimiCodeSessions: string
+    }> => ipcRenderer.invoke(IPC.logLocations),
+    sync: (source: 'claude-code' | 'codex' | 'kimi-code'): Promise<{ started: boolean }> =>
       ipcRenderer.invoke(IPC.logSync, { source }),
     detectCodexKey: (): Promise<{ found: boolean; maskedKey?: string; path?: string }> =>
       ipcRenderer.invoke(IPC.logDetectCodexKey),

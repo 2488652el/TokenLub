@@ -21,7 +21,7 @@ function getIntervalMs(): number | null {
 export function runSessionAutoParse(): void {
   if (getSetting<boolean>(SESSION_AUTO_PARSE_SETTING_KEY) !== true) return
 
-  for (const source of ['claude-code', 'codex'] as const) {
+  for (const source of ['claude-code', 'codex', 'kimi-code'] as const) {
     try {
       syncAllSessions(source)
     } catch (error) {

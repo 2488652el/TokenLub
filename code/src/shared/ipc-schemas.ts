@@ -96,9 +96,9 @@ export const syncModeSchema = z.enum(['upload', 'restore', 'merge'])
 export const syncDeviceIdInputSchema = z.object({ deviceId: z.string().min(1) })
 
 // Log sync (Phase D2)
-/** 会话日志同步入参校验(指定来源 claude-code 或 codex)。 */
+/** 会话日志同步入参校验。 */
 export const logSyncInputSchema = z.object({
-  source: z.enum(['claude-code', 'codex'])
+  source: z.enum(['claude-code', 'codex', 'kimi-code'])
 })
 
 /** 打开日志文件夹入参校验。 */

@@ -101,11 +101,13 @@ test('syncs two isolated Electron profiles and recovers after server restart', a
       await expect(window.evaluate(() => window.api.version)).resolves.toBe(packageVersion)
       await expect(window.evaluate(() => window.api.log.locations())).resolves.toEqual({
         claudeProjects: expect.any(String),
-        codexSessions: expect.any(String)
+        codexSessions: expect.any(String),
+        kimiCodeSessions: expect.any(String)
       })
       const locations = await window.evaluate(() => window.api.log.locations())
       expect(isAbsolute(locations.claudeProjects)).toBe(true)
       expect(isAbsolute(locations.codexSessions)).toBe(true)
+      expect(isAbsolute(locations.kimiCodeSessions)).toBe(true)
       await expect(window.evaluate(() => window.api.sync.status())).resolves.toMatchObject({
         configured: false
       })

@@ -30,25 +30,24 @@ money are going.
 
 ## Latest Release
 
-Current formal build: **TokenLub 1.0.7**
+Current formal build: **TokenLub 1.0.8**
 
-This release adds a persistent approval toggle for anomalous pricing changes,
-enabled by default. When disabled, official catalog changes are applied directly.
-It also fixes local CLI session parsing triggers: automatic parsing runs only
-while its toggle is enabled, opening API Keys does not parse, and manual parsing
-is limited to the **Parse all** and per-source **Parse into database** buttons.
+This release simplifies the project-usage heatmap and adds animated, color-coded
+Token trend lines for each project. Balance cards now clearly distinguish API
+balances, Coding Plans, Token packs, organization usage, gateways, and manual
+allowances, with provider-specific colors and key metrics.
 
 | Artifact     | Path                                                               |
 | ------------ | ------------------------------------------------------------------ |
-| Installer    | `demo/tokenlub-1.0.7-<change>-<model>/TokenLub-1.0.7-x64.exe`      |
-| Portable app | `demo/tokenlub-1.0.7-<change>-<model>/TokenLub-1.0.7-portable.exe` |
-| Unpacked app | `demo/tokenlub-1.0.7-<change>-<model>/win-unpacked/`               |
+| Installer    | `demo/tokenlub-1.0.8-<change>-<model>/TokenLub-1.0.8-x64.exe`      |
+| Portable app | `demo/tokenlub-1.0.8-<change>-<model>/TokenLub-1.0.8-portable.exe` |
+| Unpacked app | `demo/tokenlub-1.0.8-<change>-<model>/win-unpacked/`               |
 
 ### Windows downloads
 
-- [TokenLub-1.0.7-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.0.7/TokenLub-1.0.7-x64.exe)
-- [TokenLub-1.0.7-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.7/TokenLub-1.0.7-portable.exe)
-- [GitHub Release v1.0.7](https://github.com/2488652el/TokenLub/releases/tag/v1.0.7)
+- [TokenLub-1.0.8-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.0.8/TokenLub-1.0.8-x64.exe)
+- [TokenLub-1.0.8-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.8/TokenLub-1.0.8-portable.exe)
+- [GitHub Release v1.0.8](https://github.com/2488652el/TokenLub/releases/tag/v1.0.8)
 
 The app icon is bundled through `design/assets/icon.ico` on Windows,
 `design/assets/icon.icns` on macOS, and `design/assets/icon.png` for local

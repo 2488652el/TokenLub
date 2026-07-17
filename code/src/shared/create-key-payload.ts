@@ -10,7 +10,8 @@ import type { ProviderCatalogEntry } from '../shared/provider-catalog'
  * this on submit and forwards the result to `window.api.keys.add`.
  *
  * Validation rules:
- * - `alias` and `apiKey` must be non-empty after trim
+ * - an empty `alias` falls back to the selected provider's display name
+ * - `apiKey` must be non-empty after trim
  * - providers that need a base URL (`newapi-generic`) must supply a non-empty
  *   `baseUrl`
  * - `adminKey` is included in `extra` only when non-empty AND the provider's
@@ -54,9 +55,8 @@ export function buildCreateKeyPayload(
   const entry = catalog.find((c) => c.id === state.providerId)
   if (!entry) return { ok: false, reason: `unknown provider: ${state.providerId}` }
 
-  const alias = state.alias.trim()
+  const alias = state.alias.trim() || entry.displayName
   const apiKey = state.apiKey.trim()
-  if (alias.length === 0) return { ok: false, reason: 'alias is required' }
   if (apiKey.length === 0) return { ok: false, reason: 'apiKey is required' }
 
   const needsBaseUrl = entry.id === 'newapi-generic'

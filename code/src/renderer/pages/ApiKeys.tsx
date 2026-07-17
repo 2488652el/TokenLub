@@ -20,11 +20,12 @@ import type { BalanceSnapshot, ProviderManifest } from '../../shared/types/provi
 import type { ProviderCatalogEntry } from '../../shared/provider-catalog'
 import type { CliDisplayPaths } from '../../shared/types/platform'
 
-type SessionSource = 'claude-code' | 'codex'
+type SessionSource = 'claude-code' | 'codex' | 'kimi-code'
 
 type SessionCounts = {
   claude: number
   codex: number
+  kimiCode: number
 }
 
 type SessionSyncTotals = {
@@ -54,13 +55,15 @@ const SESSION_AUTO_SYNC_KEY = 'session_auto_parse_enabled'
 /** 来源显示名映射 */
 const SESSION_LABEL: Record<SessionSource, string> = {
   'claude-code': 'Claude Code',
-  codex: 'Codex CLI'
+  codex: 'Codex CLI',
+  'kimi-code': 'Kimi Code CLI'
 }
 
 /** 来源到 SessionCounts 字段名的映射 */
 const SESSION_COUNT_KEY: Record<SessionSource, keyof SessionCounts> = {
   'claude-code': 'claude',
-  codex: 'codex'
+  codex: 'codex',
+  'kimi-code': 'kimiCode'
 }
 
 /** 空统计对象,用于初始化与重置 */
@@ -76,6 +79,16 @@ const EMPTY_SESSION_STATS: SessionStats = {
     models: 0
   },
   codex: {
+    requests: 0,
+    tokens: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+    sessions: 0,
+    models: 0
+  },
+  'kimi-code': {
     requests: 0,
     tokens: 0,
     inputTokens: 0,
@@ -146,10 +159,14 @@ export default function ApiKeys() {
   /** 刷新 Session 统计:发现会话文件并重新构建用量统计 */
   const refreshSessionStats = useCallback(async () => {
     const [files, logs] = await Promise.all([
-      window.api.log.discover().catch(() => ({ claude: [], codex: [] })),
+      window.api.log.discover().catch(() => ({ claude: [], codex: [], kimiCode: [] })),
       window.api.usage.getLogs({ source: 'session-log', limit: 10000 }).catch(() => [])
     ])
-    setSessionCounts({ claude: files.claude.length, codex: files.codex.length })
+    setSessionCounts({
+      claude: files.claude.length,
+      codex: files.codex.length,
+      kimiCode: files.kimiCode?.length ?? 0
+    })
     setSessionStats(buildSessionStats(logs))
   }, [])
 
@@ -170,8 +187,12 @@ export default function ApiKeys() {
 
       try {
         const files = await window.api.log.discover()
-        setSessionCounts({ claude: files.claude.length, codex: files.codex.length })
-        const count = files[SESSION_COUNT_KEY[source]].length
+        setSessionCounts({
+          claude: files.claude.length,
+          codex: files.codex.length,
+          kimiCode: files.kimiCode?.length ?? 0
+        })
+        const count = files[SESSION_COUNT_KEY[source]]?.length ?? 0
         if (count === 0) {
           setSessionSyncing((prev) => {
             const next = new Set(prev)
@@ -201,10 +222,11 @@ export default function ApiKeys() {
     [refreshSessionStats]
   )
 
-  /** 同步全部来源(claude-code 与 codex)的 Session 日志 */
+  /** 同步全部来源的 Session 日志 */
   const syncAllSessions = useCallback(async () => {
     await syncSessionSource('claude-code')
     await syncSessionSource('codex')
+    await syncSessionSource('kimi-code')
   }, [syncSessionSource])
 
   /** 加载 Session 面板:读取自动解析设置并刷新统计 */
@@ -223,7 +245,12 @@ export default function ApiKeys() {
 
   useEffect(() => {
     unsubProgress.current = window.api.log.onSyncProgress((payload) => {
-      if (payload.source !== 'claude-code' && payload.source !== 'codex') return
+      if (
+        payload.source !== 'claude-code' &&
+        payload.source !== 'codex' &&
+        payload.source !== 'kimi-code'
+      )
+        return
       setSessionProgress((prev) => ({
         ...prev,
         [payload.source]: {
@@ -235,7 +262,12 @@ export default function ApiKeys() {
     })
 
     unsubDone.current = window.api.log.onSyncDone((payload) => {
-      if (payload.source !== 'claude-code' && payload.source !== 'codex') return
+      if (
+        payload.source !== 'claude-code' &&
+        payload.source !== 'codex' &&
+        payload.source !== 'kimi-code'
+      )
+        return
       const source = payload.source
       setSessionDone((prev) => ({
         ...prev,
@@ -566,6 +598,18 @@ export default function ApiKeys() {
               onSync={syncSessionSource}
               codexUsage={codexUsage}
             />
+            <SessionUsageCard
+              source="kimi-code"
+              counts={sessionCounts}
+              stats={sessionStats['kimi-code']}
+              syncing={sessionSyncing.has('kimi-code')}
+              progress={sessionProgress['kimi-code']}
+              done={sessionDone['kimi-code']}
+              path={sessionPaths?.kimiCodeSessions}
+              pathLoading={sessionPathsLoading}
+              pathError={sessionPathsError}
+              onSync={syncSessionSource}
+            />
           </div>
           <Card className="mb-3" bodyClassName="py-3">
             <div className="flex items-center gap-4 flex-wrap text-[12.5px]">
@@ -663,20 +707,30 @@ export default function ApiKeys() {
 function buildSessionStats(rows: UsageRecord[]): SessionStats {
   const out: SessionStats = {
     'claude-code': { ...EMPTY_SESSION_STATS['claude-code'] },
-    codex: { ...EMPTY_SESSION_STATS.codex }
+    codex: { ...EMPTY_SESSION_STATS.codex },
+    'kimi-code': { ...EMPTY_SESSION_STATS['kimi-code'] }
   }
   const sessions: Record<SessionSource, Set<string>> = {
     'claude-code': new Set(),
-    codex: new Set()
+    codex: new Set(),
+    'kimi-code': new Set()
   }
   const models: Record<SessionSource, Set<string>> = {
     'claude-code': new Set(),
-    codex: new Set()
+    codex: new Set(),
+    'kimi-code': new Set()
   }
 
   for (const row of rows) {
-    if (row.providerId !== 'claude-code' && row.providerId !== 'codex') continue
-    const source = row.providerId
+    const source: SessionSource | null =
+      row.providerId === 'claude-code'
+        ? 'claude-code'
+        : row.providerId === 'codex'
+          ? 'codex'
+          : row.providerId === 'kimi-coding'
+            ? 'kimi-code'
+            : null
+    if (!source) continue
     const stat = out[source]
     stat.requests++
     stat.inputTokens += row.promptTokens ?? 0
@@ -733,7 +787,13 @@ function SessionUsageCard({
     <Card
       title={SESSION_LABEL[source]}
       subtitle={pathLabel}
-      iconNode={<ProviderIcon providerId={source} title={SESSION_LABEL[source]} size={18} />}
+      iconNode={
+        <ProviderIcon
+          providerId={source === 'kimi-code' ? 'kimi-coding' : source}
+          title={SESSION_LABEL[source]}
+          size={18}
+        />
+      }
       action={
         <button
           className="btn btn-outline btn-sm"

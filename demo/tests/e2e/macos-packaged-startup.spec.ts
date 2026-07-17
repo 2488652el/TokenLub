@@ -48,11 +48,13 @@ test('starts the packaged macOS app with an isolated profile', async () => {
     expect(isAbsolute(locations.codexSessions)).toBe(true)
     expect(locations).toEqual({
       claudeProjects: join(home, '.claude', 'projects'),
-      codexSessions: join(home, '.codex', 'sessions')
+      codexSessions: join(home, '.codex', 'sessions'),
+      kimiCodeSessions: join(home, '.kimi-code', 'sessions')
     })
     await expect(window.evaluate(() => window.api.log.discover())).resolves.toEqual({
       claude: [],
-      codex: []
+      codex: [],
+      kimiCode: []
     })
 
     await window.evaluate(() => window.api.settings.set('macos_e2e_probe', 'ok'))

@@ -38,7 +38,7 @@ export function CreateKeyModal({
   ) => void | Promise<void>
 }) {
   const [providerId, setProviderId] = useState<string>(catalog[0]?.id ?? 'deepseek')
-  const [alias, setAlias] = useState('Production Key')
+  const [alias, setAlias] = useState('')
   const [key, setKey] = useState('')
   const [adminKey, setAdminKey] = useState('')
   const [platformCookie, setPlatformCookie] = useState('')
@@ -82,8 +82,7 @@ export function CreateKeyModal({
 
   // Form-state validity (cheap local check; the real IPC contract is
   // validated by the shared payload builder, which is unit-tested).
-  const canSubmit =
-    alias.trim().length > 0 && key.trim().length > 0 && (!needsBaseUrl || baseUrl.trim().length > 0)
+  const canSubmit = key.trim().length > 0 && (!needsBaseUrl || baseUrl.trim().length > 0)
 
   // 选中某个 Base URL 模板,填入输入框并展开高级面板
   function pickTemplate(tpl: BaseUrlTemplate) {
@@ -153,7 +152,7 @@ export function CreateKeyModal({
             className="input"
             value={alias}
             onChange={(e) => setAlias(e.target.value)}
-            required
+            placeholder={`留空则使用 ${entry.displayName}`}
             maxLength={100}
           />
           <p className="form-hint">用于在列表中区分同一 Provider 的多个 Key。</p>

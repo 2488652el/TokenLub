@@ -40,7 +40,7 @@ describe('session auto-parse scheduler', () => {
     expect(syncAllSessions).not.toHaveBeenCalled()
   })
 
-  it('parses both sources immediately and on the configured interval', async () => {
+  it('parses all CLI sources immediately and on the configured interval', async () => {
     const { startSessionAutoParse } =
       await import('../../../../code/src/main/scheduler/session-auto-parse')
 
@@ -48,12 +48,14 @@ describe('session auto-parse scheduler', () => {
 
     expect(syncAllSessions).toHaveBeenNthCalledWith(1, 'claude-code')
     expect(syncAllSessions).toHaveBeenNthCalledWith(2, 'codex')
+    expect(syncAllSessions).toHaveBeenNthCalledWith(3, 'kimi-code')
 
     vi.mocked(syncAllSessions).mockClear()
     await vi.advanceTimersByTimeAsync(15 * 60 * 1000)
 
     expect(syncAllSessions).toHaveBeenNthCalledWith(1, 'claude-code')
     expect(syncAllSessions).toHaveBeenNthCalledWith(2, 'codex')
+    expect(syncAllSessions).toHaveBeenNthCalledWith(3, 'kimi-code')
   })
 
   it('stops future parsing after the switch is disabled', async () => {

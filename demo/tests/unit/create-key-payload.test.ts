@@ -126,7 +126,7 @@ describe('buildCreateKeyPayload', () => {
     expect(r.reason).toMatch(/baseUrl/i)
   })
 
-  it('rejects empty alias', () => {
+  it('uses the selected provider display name when alias is empty', () => {
     const r = buildCreateKeyPayload(
       {
         providerId: 'deepseek',
@@ -139,7 +139,9 @@ describe('buildCreateKeyPayload', () => {
       },
       PROVIDER_CATALOG
     )
-    expect(r.ok).toBe(false)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.input.alias).toBe('DeepSeek')
   })
 
   it('rejects empty apiKey', () => {
