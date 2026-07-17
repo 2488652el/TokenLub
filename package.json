@@ -1,8 +1,8 @@
 {
   "name": "tokenlub",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "TokenLub - unified LLM token usage & cost aggregator for Windows and macOS",
-  "main": "out/main/index.js",
+  "main": "demo/out/main/index.js",
   "author": "bestzuge@gmail.com",
   "repository": {
     "type": "git",
@@ -13,25 +13,27 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "build:clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\" && electron-vite build",
+    "build:clean": "node -e \"require('fs').rmSync('demo/out',{recursive:true,force:true})\" && electron-vite build",
     "start": "electron-vite preview",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,html,json}\" \"tests/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,html,json}\" \"tests/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"code/src/**/*.{ts,tsx,css,html,json}\" \"drive/src/**/*.{ts,tsx,css,html,json}\" \"demo/tests/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"code/src/**/*.{ts,tsx,css,html,json}\" \"drive/src/**/*.{ts,tsx,css,html,json}\" \"demo/tests/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "server:start": "tsx src/server/index.ts",
+    "server:start": "tsx drive/src/server/index.ts",
     "prepare": "husky || true",
-    "postinstall": "node scripts/postinstall-better-sqlite3.cjs && electron-builder install-app-deps",
-    "pack": "npm run build:clean && electron-builder --dir",
-    "dist": "npm run build:clean && electron-builder",
-    "dist:win": "npm run build:clean && electron-builder --win --x64",
-    "dist:mac:x64": "npm run build:clean && electron-builder --mac dmg --x64 --config.mac.notarize.teamId=$APPLE_TEAM_ID",
-    "dist:mac:arm64": "npm run build:clean && electron-builder --mac dmg --arm64 --config.mac.notarize.teamId=$APPLE_TEAM_ID",
-    "dist:mac": "npm run build:clean && electron-builder --mac dmg --x64 --config.mac.notarize.teamId=$APPLE_TEAM_ID && electron-builder --mac dmg --arm64 --config.mac.notarize.teamId=$APPLE_TEAM_ID"
+    "postinstall": "node code/scripts/postinstall-better-sqlite3.cjs && electron-builder install-app-deps",
+    "github:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File github/prepare.ps1",
+    "github:audit": "powershell -NoProfile -ExecutionPolicy Bypass -File github/audit.ps1",
+    "pack": "node code/scripts/package-release.cjs --platform current --dir",
+    "dist": "node code/scripts/package-release.cjs --platform current",
+    "dist:win": "node code/scripts/package-release.cjs --platform win --arch x64",
+    "dist:mac:x64": "node code/scripts/package-release.cjs --platform mac --arch x64",
+    "dist:mac:arm64": "node code/scripts/package-release.cjs --platform mac --arch arm64",
+    "dist:mac": "node code/scripts/package-release.cjs --platform mac --arch all"
   },
   "dependencies": {
     "@lobehub/icons": "^5.10.1",
@@ -101,8 +103,8 @@
       }
     ],
     "directories": {
-      "output": "artifacts/dist",
-      "buildResources": "build"
+      "output": "demo",
+      "buildResources": "design/assets"
     },
     "publish": [
       {
@@ -113,9 +115,9 @@
       }
     ],
     "files": [
-      "out/main/**/*",
-      "out/preload/**/*",
-      "out/renderer/**/*",
+      "demo/out/main/**/*",
+      "demo/out/preload/**/*",
+      "demo/out/renderer/**/*",
       "package.json"
     ],
     "extraResources": [],
@@ -124,7 +126,7 @@
       "**/node_modules/better-sqlite3/**"
     ],
     "win": {
-      "icon": "build/icon.ico",
+      "icon": "design/assets/icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -142,7 +144,7 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "mac": {
-      "icon": "build/icon.icns",
+      "icon": "design/assets/icon.icns",
       "category": "public.app-category.utilities",
       "target": [
         {

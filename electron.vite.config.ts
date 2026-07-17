@@ -3,24 +3,33 @@ import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
 const sharedAlias = {
-  '@': resolve('src/renderer'),
-  '@shared': resolve('src/shared')
+  '@': resolve('code/src/renderer'),
+  '@shared': resolve('code/src/shared')
 }
 
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     resolve: { alias: sharedAlias },
-    build: { rollupOptions: { input: { index: resolve('src/main/index.ts') } } }
+    build: {
+      outDir: resolve('demo/out/main'),
+      rollupOptions: { input: { index: resolve('code/src/main/index.ts') } }
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
     resolve: { alias: sharedAlias },
-    build: { rollupOptions: { input: { index: resolve('src/preload/index.ts') } } }
+    build: {
+      outDir: resolve('demo/out/preload'),
+      rollupOptions: { input: { index: resolve('code/src/preload/index.ts') } }
+    }
   },
   renderer: {
-    root: 'src/renderer',
-    build: { rollupOptions: { input: { index: resolve('src/renderer/index.html') } } },
+    root: 'code/src/renderer',
+    build: {
+      outDir: resolve('demo/out/renderer'),
+      rollupOptions: { input: { index: resolve('code/src/renderer/index.html') } }
+    },
     resolve: { alias: sharedAlias },
     plugins: [react()]
   }

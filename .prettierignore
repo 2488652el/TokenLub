@@ -1,6 +1,9 @@
 node_modules/
 dist/
-out/
+demo/out/
 release/
+demo/artifacts/
+demo/tokenlub-*/
+github/repository/
 *.min.js
 *.lock

@@ -9,7 +9,16 @@ export default [
   {
     ignores: [
       'dist/**',
-      'out/**',
+      'demo/out/**',
+      'demo/artifacts/**',
+      'demo/tokenlub-*/**',
+      'demo/coverage/**',
+      'demo/playwright-report/**',
+      'demo/test-results/**',
+      'github/repository/**',
+      '.claude/**',
+      '.codex/**',
+      '.superpowers/**',
       'node_modules/**',
       'release/**',
       '.worktrees/**',
@@ -22,7 +31,7 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['src/renderer/**/*.{ts,tsx}', 'src/preload/**/*.ts'],
+    files: ['code/src/renderer/**/*.{ts,tsx}', 'code/src/preload/**/*.ts'],
     plugins: {
       react: reactPlugin,
       'react-hooks': reactHooks,
@@ -44,11 +53,16 @@ export default [
     }
   },
   {
-    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', 'src/shared/**/*.ts'],
+    files: [
+      'code/src/main/**/*.ts',
+      'code/src/preload/**/*.ts',
+      'code/src/shared/**/*.ts',
+      'drive/src/server/**/*.ts'
+    ],
     languageOptions: { globals: { ...globals.node } }
   },
   {
-    files: ['scripts/**/*.{cjs,mjs}'],
+    files: ['code/scripts/**/*.{cjs,mjs}', 'demo/scripts/**/*.{cjs,mjs}'],
     languageOptions: { globals: { ...globals.node } },
     rules: {
       '@typescript-eslint/no-require-imports': 'off',

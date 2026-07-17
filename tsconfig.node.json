@@ -17,18 +17,18 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
     "useDefineForClassFields": true,
-    "tsBuildInfoFile": ".cache/tsconfig.node.tsbuildinfo",
+    "tsBuildInfoFile": "demo/cache/tsconfig.node.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["code/src/shared/*"]
     }
   },
   "include": [
     "electron.vite.config.ts",
-    "src/server/**/*",
-    "src/main/**/*",
-    "src/preload/**/*",
-    "src/shared/**/*",
-    "tests/unit/**/*"
+    "drive/src/server/**/*",
+    "code/src/main/**/*",
+    "code/src/preload/**/*",
+    "code/src/shared/**/*",
+    "demo/tests/unit/**/*"
   ]
 }

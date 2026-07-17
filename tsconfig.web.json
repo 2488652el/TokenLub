@@ -18,11 +18,11 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
     "useDefineForClassFields": true,
-    "tsBuildInfoFile": ".cache/tsconfig.web.tsbuildinfo",
+    "tsBuildInfoFile": "demo/cache/tsconfig.web.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
-      "@shared/*": ["src/shared/*"]
+      "@shared/*": ["code/src/shared/*"]
     }
   },
-  "include": ["src/renderer/**/*", "src/shared/**/*"]
+  "include": ["code/src/renderer/**/*", "code/src/shared/**/*"]
 }

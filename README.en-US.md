@@ -3,8 +3,8 @@
 **TokenLub is a Windows and macOS desktop dashboard for LLM token usage, API key
 balances, model pricing, and local coding-session cost analysis.**
 
-[中文说明](./README.md) · [Architecture](./docs/ARCHITECTURE.md) ·
-[Provider Notes](./docs/PROVIDERS.md)
+[中文说明](./README.md) · [Architecture](./design/ARCHITECTURE.md) ·
+[Provider Notes](./design/PROVIDERS.md)
 
 ---
 
@@ -20,7 +20,7 @@ money are going.
 | Area                  | What it does                                                                                                                         |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Provider balances     | Query balances and token plans across DeepSeek, Zhipu, Moonshot, MiniMax, LongCat, OpenRouter, NewAPI-compatible services, and more. |
-| Local session parsing | Read Claude Code and Codex CLI JSONL logs, then roll them up by project, model, provider, and date.                                  |
+| Local session parsing | Parse Claude Code and Codex CLI JSONL logs on demand; background parsing follows the toggle and page open never triggers it.              |
 | Cost accounting       | Estimate spend with high-precision decimal math and configurable per-model pricing.                                                  |
 | API key management    | Store API keys locally with Electron `safeStorage`; the renderer never receives raw secrets.                                         |
 | Request logs          | Browse, filter, inspect, and export request-level token usage as CSV.                                                                |
@@ -30,16 +30,28 @@ money are going.
 
 ## Latest Release
 
-Current formal build: **TokenLub 1.0.5**
+Current formal build: **TokenLub 1.0.6**
 
-| Artifact     | Path                                         |
-| ------------ | -------------------------------------------- |
-| Installer    | `artifacts/dist/TokenLub-1.0.5-x64.exe`      |
-| Portable app | `artifacts/dist/TokenLub-1.0.5-portable.exe` |
-| Unpacked app | `artifacts/dist/win-unpacked/`               |
+This release fixes local CLI session parsing triggers: automatic parsing runs
+only while its toggle is enabled, opening API Keys does not parse, and manual
+parsing is limited to the **Parse all** and per-source **Parse into database**
+buttons.
 
-The app icon is bundled through `build/icon.ico` on Windows, `build/icon.icns`
-on macOS, and `build/icon.png` for local development windows.
+| Artifact     | Path                                                               |
+| ------------ | ------------------------------------------------------------------ |
+| Installer    | `demo/tokenlub-1.0.6-<change>-<model>/TokenLub-1.0.6-x64.exe`      |
+| Portable app | `demo/tokenlub-1.0.6-<change>-<model>/TokenLub-1.0.6-portable.exe` |
+| Unpacked app | `demo/tokenlub-1.0.6-<change>-<model>/win-unpacked/`               |
+
+### Windows downloads
+
+- [TokenLub-1.0.6-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.0.6/TokenLub-1.0.6-x64.exe)
+- [TokenLub-1.0.6-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.6/TokenLub-1.0.6-portable.exe)
+- [GitHub Release v1.0.6](https://github.com/2488652el/TokenLub/releases/tag/v1.0.6)
+
+The app icon is bundled through `design/assets/icon.ico` on Windows,
+`design/assets/icon.icns` on macOS, and `design/assets/icon.png` for local
+development windows.
 
 ---
 
@@ -62,7 +74,7 @@ Visual Studio Build Tools are missing, use the project helper:
 
 ```bash
 npm install --ignore-scripts
-node scripts/postinstall-better-sqlite3.cjs
+node code/scripts/postinstall-better-sqlite3.cjs
 ```
 
 The helper fetches the Electron-compatible `better-sqlite3` prebuild and is safe
@@ -85,11 +97,25 @@ npm run build
 
 ### Package for Windows
 
-```bash
-npm run dist:win
+```powershell
+npm run dist:win -- --change "project-classification" --model "GPT-5"
 ```
 
-Outputs are written to `artifacts/dist/`.
+Outputs are written to `demo/tokenlub-<version>-<change>-<model>/`. Both
+`--change` and `--model` are required; the version comes from `package.json`.
+
+### GitHub version synchronization
+
+Every latest-version package must compare the local `package.json` version with
+the default-branch `package.json`, the latest GitHub Release/Tag, and the
+versioned download links in both README files. A failed GitHub lookup is an
+unknown result, not a match.
+
+When a version differs, update both README files, run `npm run github:prepare`
+and `npm run github:audit`, review `github/repository/`, and publish source only
+from that staging directory. Update the Git tag, GitHub Release, and release
+assets afterward; generated installers must not be committed to the Git
+repository. Do not repeat an upload when every version already matches.
 
 ### Package for macOS
 
@@ -97,8 +123,8 @@ Run these commands on macOS; each architecture is intentionally packaged as a
 separate DMG:
 
 ```bash
-npm run dist:mac:x64
-npm run dist:mac:arm64
+npm run dist:mac:x64 -- --change "release-change" --model "GPT-5"
+npm run dist:mac:arm64 -- --change "release-change" --model "GPT-5"
 ```
 
 Signing and notarization credentials must come from the macOS Keychain or the
@@ -114,7 +140,7 @@ security find-identity -v -p codesigning
 codesign --verify --deep --strict --verbose=2 "/path/to/TokenLub.app"
 spctl --assess --type execute --verbose=4 "/path/to/TokenLub.app"
 xcrun stapler validate "/path/to/TokenLub.app"
-shasum -a 256 artifacts/dist/TokenLub-*.dmg
+shasum -a 256 demo/tokenlub-<version>-<change>-<model>/TokenLub-*.dmg
 ```
 
 ---
@@ -150,15 +176,13 @@ pricing, and balance snapshots after the rename.
 ## Project Layout
 
 ```text
-src/
-  main/       Electron main process: SQLite, providers, IPC, schedulers
-  preload/    Safe bridge exposed to the renderer
-  renderer/   React UI, pages, layout, charts, forms
-  shared/     Shared types, IPC contracts, pure utilities
-tests/        Vitest unit tests
-docs/         Architecture, provider notes, cloud-sync and deployment notes
-build/        Electron Builder resources, including app icons
-artifacts/    Generated packages and local verification outputs
+skill/          Project-specific skills, each with its own SKILL.md
+code/           Desktop frontend, Electron backend, shared code, and build helpers
+drive/          Cloud-sync server, Docker definitions, deployment docs, and operations
+plan/           Timestamped plans and decision records
+design/         Architecture, provider notes, screenshots, and application assets
+demo/           Unit/E2E/integration tests, temporary scripts, and generated builds
+github/         GitHub staging, allowlist, and sensitive-content audit tooling
 ```
 
 ---
@@ -169,7 +193,7 @@ artifacts/    Generated packages and local verification outputs
 - Add tests for behavior changes.
 - Do not add telemetry or network calls unless explicitly requested.
 - Do not print or commit secrets.
-- Use `npm run dist:win` for the canonical Windows release path.
+- Use `npm run dist:win -- --change "..." --model "..."` for the canonical Windows release path.
 - Build macOS DMGs on macOS and verify signing, notarization, and Gatekeeper
   before calling them release artifacts.
 

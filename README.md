@@ -2,10 +2,10 @@
 
 **TokenLub 是一款 Windows 与 macOS 桌面应用，把多家 LLM 服务商的 Token 用量、余额、模型价格和本机编码会话成本集中到一个本地工作台。**
 
-[English README](./README.en-US.md) · [架构说明](./docs/ARCHITECTURE.md) ·
-[Provider 说明](./docs/PROVIDERS.md) · [云端同步部署](./docs/ONE-CLICK-SERVER.md)
+[English README](./README.en-US.md) · [架构说明](./design/ARCHITECTURE.md) ·
+[Provider 说明](./design/PROVIDERS.md) · [云端同步部署](./drive/docs/ONE-CLICK-SERVER.md)
 
-![TokenLub 用量概览](./docs/screenshots/dashboard.png)
+![TokenLub 用量概览](./design/screenshots/dashboard.png)
 
 ## 为什么使用 TokenLub
 
@@ -21,7 +21,7 @@
 | 用量概览                | 查看 Token、请求数、成本、缓存命中率和按日/小时趋势                                        |
 | Provider 余额           | 查询 DeepSeek、智谱、Moonshot、MiniMax、LongCat、OpenRouter、NewAPI 兼容服务等余额或资源包 |
 | API Key 管理            | 本地加密保存 Key，按 Provider 查看状态并安全编辑                                           |
-| Claude Code / Codex CLI | 读取本机会话 JSONL 日志，按项目、模型、服务商和日期聚合用量                                |
+| Claude Code / Codex CLI | 按需解析本机会话 JSONL 日志；自动解析由开关控制，打开 API Keys 页面不会触发解析       |
 | 请求日志                | 筛选、分页、查看请求详情并导出 CSV                                                         |
 | 模型定价                | 配置模型价格，用高精度 decimal 估算人民币成本                                              |
 | 告警                    | 按余额或剩余百分比设置低额度提醒                                                           |
@@ -30,30 +30,45 @@
 
 ### 界面一览
 
-| 用量总览                                      | API Key 与本机会话                                |
-| --------------------------------------------- | ------------------------------------------------- |
-| ![用量总览](./docs/screenshots/dashboard.png) | ![API Key 与会话](./docs/screenshots/apikeys.png) |
+| 用量总览                                        | API Key 与本机会话                                  |
+| ----------------------------------------------- | --------------------------------------------------- |
+| ![用量总览](./design/screenshots/dashboard.png) | ![API Key 与会话](./design/screenshots/apikeys.png) |
 
-| 请求日志                                         | 云端同步设置                                          |
-| ------------------------------------------------ | ----------------------------------------------------- |
-| ![请求日志](./docs/screenshots/request-logs.png) | ![云端同步设置](./docs/screenshots/settings-sync.png) |
+| 请求日志                                           | 云端同步设置                                            |
+| -------------------------------------------------- | ------------------------------------------------------- |
+| ![请求日志](./design/screenshots/request-logs.png) | ![云端同步设置](./design/screenshots/settings-sync.png) |
 
-## 1.0.5 最新版本
+## 1.0.6 最新版本
 
-本次版本新增可选本地备份目录、Ubuntu 一键同步服务部署脚本，以及完整的
-服务器健康检查、备份、升级和卸载命令。
+本次版本修复本机 CLI Session 解析触发逻辑：自动解析仅在开关开启时后台执行，
+手动解析仅通过 API Keys 页面中的“解析全部”或“解析入库”按钮执行。
 
 ### Windows 下载
 
-- [安装版 TokenLub-1.0.5-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.5/TokenLub-1.0.5-x64.exe)
-- [便携版 TokenLub-1.0.5-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.5/TokenLub-1.0.5-portable.exe)
-- [GitHub Release v1.0.5](https://github.com/2488652el/TokenLub/releases/tag/v1.0.5)
+- [安装版 TokenLub-1.0.6-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.6/TokenLub-1.0.6-x64.exe)
+- [便携版 TokenLub-1.0.6-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.6/TokenLub-1.0.6-portable.exe)
+- [GitHub Release v1.0.6](https://github.com/2488652el/TokenLub/releases/tag/v1.0.6)
 
-本地构建产物位于 `artifacts/dist/`；正式 Windows 构建命令为：
+安装包统一输出到 `demo/tokenlub-<版本号>-<修改说明>-<执行模型>/`。正式
+Windows 构建命令为：
 
-```bash
-npm run dist:win
+```powershell
+npm run dist:win -- --change "项目目录分类" --model "GPT-5"
 ```
+
+`--change` 和 `--model` 为必填项；版本号自动读取 `package.json`。也可分别通过
+`TOKENLUB_CHANGE` 和 `TOKENLUB_EXECUTION_MODEL` 环境变量提供。
+
+### GitHub 版本同步
+
+每次打包最新版本时，必须核对本地 `package.json`、GitHub `main` 分支中的
+`package.json`、最新 GitHub Release/Tag，以及中英文 README 的版本和下载链接。
+GitHub 无法访问时不能视为版本一致。
+
+发现版本不一致时，先更新 `README.md` 和 `README.en-US.md`，再运行
+`npm run github:prepare` 与 `npm run github:audit`。人工复核
+`github/repository/` 后，只从该目录同步源码，最后更新 Tag、GitHub Release 和
+安装包；生成的安装包不提交到 Git 仓库。版本完全一致时不重复上传。
 
 ## 快速开始
 
@@ -75,7 +90,7 @@ npm run dev
 
 ```bash
 npm install --ignore-scripts
-node scripts/postinstall-better-sqlite3.cjs
+node code/scripts/postinstall-better-sqlite3.cjs
 ```
 
 ### 开发检查
@@ -92,9 +107,9 @@ npm run build
 在 Ubuntu 22.04/24.04 上，准备好域名和 80/443 端口后：
 
 ```bash
-sudo bash ops/one-click/install.sh \
+sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.5 \
+  --ref v1.0.6 \
   --domain sync.example.com \
   --email admin@example.com
 ```
@@ -102,15 +117,15 @@ sudo bash ops/one-click/install.sh \
 没有域名时可使用 SSH 隧道模式：
 
 ```bash
-sudo bash ops/one-click/install.sh \
+sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.5 \
+  --ref v1.0.6 \
   --ssh-only
 ```
 
 安装完成后可使用 `tokenlub-sync health`、`logs`、`backup`、`upgrade` 和
 `uninstall` 管理服务。完整前置条件和安全边界见
-[一键部署文档](./docs/ONE-CLICK-SERVER.md)。
+[一键部署文档](./drive/docs/ONE-CLICK-SERVER.md)。
 
 ## 安全与数据边界
 
@@ -123,15 +138,18 @@ sudo bash ops/one-click/install.sh \
 ## 项目结构
 
 ```text
-src/main/       Electron 主进程：SQLite、Provider、IPC、调度器
-src/preload/    暴露给渲染层的安全桥
-src/renderer/   React 页面、布局、图表和表单
-src/shared/     共享类型、IPC 契约和纯工具函数
-tests/          Vitest 单元测试与 Playwright E2E
-docs/           架构、Provider、同步与部署文档
-build/          electron-builder 静态资源和应用图标
-artifacts/      本地生成的安装包和验证产物
+skill/          项目专用 Skill；每个 Skill 使用独立目录和 SKILL.md
+code/           TokenLub 桌面端前端、Electron 后端、共享代码和构建脚本
+drive/          云同步服务端、Docker、部署文档和运维脚本
+plan/           带 YYYYMMDD 时间戳的执行计划与决策记录
+design/         架构、Provider 规范、视觉资源和界面截图
+demo/           单元/E2E/集成测试、临时脚本和本地构建产物
+github/         GitHub 发布准备区、白名单和敏感内容审计工具
 ```
+
+依赖目录 `node_modules/` 以及 `.git/`、`.claude/`、`.codex/` 等工具状态仍位于
+根目录，但都不属于可发布项目内容。发布前运行 `npm run github:prepare`，只从
+白名单生成 `github/repository/`，审计通过后再从该目录上传。
 
 ## 许可证
 

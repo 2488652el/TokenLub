@@ -5,16 +5,17 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['demo/tests/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/main/**/*.ts']
+      include: ['code/src/main/**/*.ts'],
+      reportsDirectory: 'demo/coverage'
     }
   },
   resolve: {
     alias: {
-      '@shared': resolve(__dirname, 'src/shared')
+      '@shared': resolve(__dirname, 'code/src/shared')
     }
   }
 })
