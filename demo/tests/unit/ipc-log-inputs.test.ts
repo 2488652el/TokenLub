@@ -1,6 +1,6 @@
 /**
- * log IPC 输入校验单元测试:覆盖 log:sync 与 log:open-folder 的 zod 输入验证,
- * 校验非法 source 与非字符串路径在调用底层前被拒绝。
+ * IPC 输入校验单元测试:覆盖日志路径、Session 来源与价格汇率币种校验,
+ * 确保非法输入在调用底层服务前被拒绝。
  * (glm-5.2)
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ const handlers = new Map<string, (...args: unknown[]) => unknown>()
 const syncAllSessionsMock = vi.fn()
 const statSyncMock = vi.fn()
 const openPathMock = vi.fn()
+const getCnyRateQuoteMock = vi.fn()
 
 async function loadRegisterIpcHandlers(): Promise<() => void> {
   vi.resetModules()
@@ -17,6 +18,7 @@ async function loadRegisterIpcHandlers(): Promise<() => void> {
   syncAllSessionsMock.mockReset()
   statSyncMock.mockReset()
   openPathMock.mockReset()
+  getCnyRateQuoteMock.mockReset()
 
   vi.doMock('electron', () => ({
     ipcMain: {
@@ -74,6 +76,7 @@ async function loadRegisterIpcHandlers(): Promise<() => void> {
     restartAutoRefresh: vi.fn()
   }))
   vi.doMock('../../../code/src/main/services/exchange-rate', () => ({
+    getCnyRateQuote: getCnyRateQuoteMock,
     withCnySpendConversion: vi.fn((value: unknown) => value)
   }))
   vi.doMock('../../../code/src/main/log-parsers/sync', () => ({
@@ -143,5 +146,25 @@ describe('log IPC input validation', () => {
 
     expect(await handlers.get(IPC.logOpenFolder)?.({}, { path })).toEqual({ ok: true, path })
     expect(openPathMock).toHaveBeenCalledWith(path)
+  })
+
+  it('forwards a valid three-letter pricing currency to the exchange-rate service', async () => {
+    const registerIpcHandlers = await loadRegisterIpcHandlers()
+    const quote = { currency: 'EUR', rateToCny: 8.1, source: 'fallback' }
+    getCnyRateQuoteMock.mockResolvedValue(quote)
+    registerIpcHandlers()
+
+    await expect(handlers.get(IPC.pricingCnyRate)?.({}, 'EUR')).resolves.toEqual(quote)
+    expect(getCnyRateQuoteMock).toHaveBeenCalledWith('EUR')
+  })
+
+  it('rejects an invalid pricing currency before requesting a quote', async () => {
+    const registerIpcHandlers = await loadRegisterIpcHandlers()
+    registerIpcHandlers()
+
+    await expect(async () => handlers.get(IPC.pricingCnyRate)?.({}, 'US')).rejects.toThrow(
+      'pricing currency must be a three-letter code'
+    )
+    expect(getCnyRateQuoteMock).not.toHaveBeenCalled()
   })
 })

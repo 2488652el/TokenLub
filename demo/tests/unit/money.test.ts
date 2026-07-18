@@ -5,6 +5,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   calcCost,
+  convertPriceCurrency,
+  convertPriceToCny,
   convertSpendToCny,
   fmtCount,
   fmtMoney,
@@ -36,6 +38,44 @@ describe('fmtMoney', () => {
   })
   it('falls back to currency code for unknown symbols', () => {
     expect(fmtMoney(10, 'JPY')).toBe('JPY 10.00')
+  })
+})
+
+describe('convertPriceToCny', () => {
+  it('keeps CNY prices unchanged', () => {
+    expect(convertPriceToCny('12.34', 'CNY')).toBe(12.34)
+    expect(convertPriceToCny(8, 'rmb')).toBe(8)
+  })
+
+  it('converts USD and EUR prices without floating-point drift', () => {
+    expect(convertPriceToCny(0.1, 'USD', 7.2)).toBe(0.72)
+    expect(convertPriceToCny(2.5, 'EUR', 8.1)).toBe(20.25)
+  })
+
+  it('returns null when a non-CNY price has no valid rate', () => {
+    expect(convertPriceToCny(1, 'USD')).toBeNull()
+    expect(convertPriceToCny(1, 'USD', 0)).toBeNull()
+    expect(convertPriceToCny(1, 'USD', Number.NaN)).toBeNull()
+  })
+})
+
+describe('convertPriceCurrency', () => {
+  const rates = { USD: 7.2, EUR: 8.1 }
+
+  it('uses CNY as the default display conversion target', () => {
+    expect(convertPriceCurrency(2, 'USD', 'CNY', rates)).toBe(14.4)
+    expect(convertPriceCurrency(2, 'CNY', 'CNY', rates)).toBe(2)
+  })
+
+  it('converts every source currency to USD display prices', () => {
+    expect(convertPriceCurrency(14.4, 'CNY', 'USD', rates)).toBe(2)
+    expect(convertPriceCurrency(2, 'USD', 'USD', rates)).toBe(2)
+    expect(convertPriceCurrency(8.1, 'EUR', 'USD', rates)).toBe(9.1125)
+  })
+
+  it('returns null when either conversion rate is unavailable', () => {
+    expect(convertPriceCurrency(1, 'EUR', 'USD', { USD: 7.2 })).toBeNull()
+    expect(convertPriceCurrency(1, 'CNY', 'USD', {})).toBeNull()
   })
 })
 

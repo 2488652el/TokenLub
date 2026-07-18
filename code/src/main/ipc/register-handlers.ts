@@ -290,7 +290,12 @@ export function registerIpcHandlers(): void {
     if (typeof enabled !== 'boolean') throw new Error('pricing approval setting must be boolean')
     return setCatalogApprovalRequired(enabled)
   })
-  ipcMain.handle(IPC.pricingCnyRate, () => getCnyRateQuote('USD'))
+  ipcMain.handle(IPC.pricingCnyRate, (_e, currency: unknown = 'USD') => {
+    if (typeof currency !== 'string' || !/^[A-Za-z]{3}$/.test(currency.trim())) {
+      throw new Error('pricing currency must be a three-letter code')
+    }
+    return getCnyRateQuote(currency)
+  })
 
   // settings
   ipcMain.handle(IPC.settingsGet, () => getAllSettings())

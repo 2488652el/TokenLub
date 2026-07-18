@@ -3,12 +3,12 @@
  * 支持添加、编辑、删除与恢复官方价,以及按供应商和币种筛选。
  * (glm-5.2)
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { Modal } from '../components/Modal'
-import { fmtMoney, toDecimal } from '../../shared/utils/money'
+import { convertPriceCurrency, fmtMoney, normalizeCurrency } from '../../shared/utils/money'
 import type {
   CnyRateQuote,
   PricingCatalogStatus,
@@ -22,6 +22,7 @@ import type { ProviderManifest } from '../../shared/types/provider'
 const CURRENCIES = ['USD', 'CNY', 'EUR'] as const
 const BILLING_SCOPES = ['default', 'cn', 'global'] as const
 type Currency = (typeof CURRENCIES)[number]
+type DisplayCurrency = 'CNY' | 'USD'
 
 /** 筛选状态:按供应商与币种过滤 */
 type FilterState = {
@@ -53,11 +54,39 @@ export default function PricingConfig() {
     policy: 'realtime',
     fixedRates: {}
   })
-  const [cnyRate, setCnyRate] = useState<CnyRateQuote | null>(null)
+  const [cnyRates, setCnyRates] = useState<Record<string, CnyRateQuote>>({})
+  const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('CNY')
   const [syncingCatalog, setSyncingCatalog] = useState(false)
 
+  /** 加载价格表中所有非人民币币种的 CNY 汇率。 */
+  const refreshCnyRates = useCallback(async (list: PricingEntry[]) => {
+    const currencies = [
+      ...new Set(
+        ['USD', ...list.map((entry) => normalizeCurrency(entry.currency))].filter(
+          (currency) => currency !== 'CNY' && currency !== 'RMB'
+        )
+      )
+    ]
+    const quotes = await Promise.all(
+      currencies.map(async (currency) => {
+        try {
+          return await window.api.pricing.cnyRate(currency)
+        } catch {
+          return null
+        }
+      })
+    )
+    setCnyRates(
+      Object.fromEntries(
+        quotes
+          .filter((quote): quote is CnyRateQuote => quote !== null)
+          .map((quote) => [normalizeCurrency(quote.currency), quote])
+      )
+    )
+  }, [])
+
   /** 刷新价格条目与供应商列表 */
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setLoading(true)
     try {
       const [list, p, status, recentHistory, policy] = await Promise.all([
@@ -68,6 +97,7 @@ export default function PricingConfig() {
         window.api.pricing.exchangePolicy()
       ])
       setEntries(list)
+      await refreshCnyRates(list)
       setProviders(p)
       setCatalogStatus(status)
       setHistory(recentHistory)
@@ -75,14 +105,10 @@ export default function PricingConfig() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [refreshCnyRates])
 
   useEffect(() => {
     void refresh()
-    void window.api.pricing
-      .cnyRate()
-      .then(setCnyRate)
-      .catch(() => undefined)
     const timer = window.setInterval(() => {
       void Promise.all([
         window.api.pricing.catalogStatus(),
@@ -93,11 +119,12 @@ export default function PricingConfig() {
           setCatalogStatus(status)
           setEntries(list)
           setHistory(recentHistory)
+          void refreshCnyRates(list)
         })
         .catch(() => undefined)
     }, 3_000)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [refresh, refreshCnyRates])
 
   /** 按供应商与模型名排序后的条目 */
   const sorted = useMemo(
@@ -121,6 +148,14 @@ export default function PricingConfig() {
       return true
     })
   }, [sorted, filter])
+
+  const ratesToCny = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(cnyRates).map(([currency, quote]) => [currency, quote.rateToCny])
+      ),
+    [cnyRates]
+  )
 
   /** 打开新增价格弹窗 */
   function openCreate() {
@@ -229,8 +264,7 @@ export default function PricingConfig() {
   async function handleExchangePolicyChange(config: PricingExchangePolicyConfig) {
     const saved = await window.api.pricing.setExchangePolicy(config)
     setExchangePolicy(saved)
-    const quote = await window.api.pricing.cnyRate()
-    setCnyRate(quote)
+    await refreshCnyRates(entries)
   }
 
   async function handleApplyPreview() {
@@ -252,9 +286,25 @@ export default function PricingConfig() {
     <div className="page-content animate-in">
       <PageHeader
         title="价格配置"
-        desc="覆盖各模型每百万 token 价格,支持添加、编辑、删除与恢复官方价"
+        desc="同步 models.dev 官方价格并统一折算为人民币展示；编辑时仍保留原始计价币种"
         action={
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1" role="group" aria-label="价格显示币种">
+              <button
+                type="button"
+                className={`btn btn-sm ${displayCurrency === 'CNY' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setDisplayCurrency('CNY')}
+              >
+                ¥ 人民币
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${displayCurrency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setDisplayCurrency('USD')}
+              >
+                $ 美元
+              </button>
+            </div>
             <button
               className="btn btn-outline btn-sm"
               onClick={() => void handleCatalogSync()}
@@ -275,7 +325,7 @@ export default function PricingConfig() {
 
       <CatalogStatusCard
         status={catalogStatus}
-        cnyRate={cnyRate}
+        cnyRate={cnyRates.USD ?? null}
         onAutoUpdate={(enabled) => void handleAutoUpdate(enabled)}
         onApprovalRequired={(enabled) => void handleApprovalRequired(enabled)}
         onApplyPreview={() => void handleApplyPreview()}
@@ -320,11 +370,11 @@ export default function PricingConfig() {
                     <th>Provider</th>
                     <th>Model</th>
                     <th>Scope</th>
-                    <th className="text-right">Prompt (/Mtok)</th>
-                    <th className="text-right">Completion (/Mtok)</th>
-                    <th className="text-right">Cache Read</th>
-                    <th className="text-right">Cache Creation</th>
-                    <th>Currency</th>
+                    <th className="text-right">Prompt ({displayCurrency}/Mtok)</th>
+                    <th className="text-right">Completion ({displayCurrency}/Mtok)</th>
+                    <th className="text-right">Cache Read ({displayCurrency}/Mtok)</th>
+                    <th className="text-right">Cache Creation ({displayCurrency}/Mtok)</th>
+                    <th>原始币种</th>
                     <th>Source</th>
                     <th>Status</th>
                     <th>Updated</th>
@@ -348,14 +398,16 @@ export default function PricingConfig() {
                           <PriceCell
                             value={e.promptPricePerMtok}
                             currency={e.currency}
-                            rate={cnyRate}
+                            displayCurrency={displayCurrency}
+                            ratesToCny={ratesToCny}
                           />
                         </td>
                         <td className="text-right mono">
                           <PriceCell
                             value={e.completionPricePerMtok}
                             currency={e.currency}
-                            rate={cnyRate}
+                            displayCurrency={displayCurrency}
+                            ratesToCny={ratesToCny}
                           />
                         </td>
                         <td className="text-right mono text-secondary">
@@ -363,7 +415,8 @@ export default function PricingConfig() {
                             <PriceCell
                               value={e.cacheReadPricePerMtok}
                               currency={e.currency}
-                              rate={cnyRate}
+                              displayCurrency={displayCurrency}
+                              ratesToCny={ratesToCny}
                             />
                           ) : (
                             '—'
@@ -374,7 +427,8 @@ export default function PricingConfig() {
                             <PriceCell
                               value={e.cacheCreationPricePerMtok}
                               currency={e.currency}
-                              rate={cnyRate}
+                              displayCurrency={displayCurrency}
+                              ratesToCny={ratesToCny}
                             />
                           ) : (
                             '—'
@@ -578,19 +632,28 @@ function PricingHistoryCard({ history }: { history: PricingHistoryEntry[] }) {
 function PriceCell({
   value,
   currency,
-  rate
+  displayCurrency,
+  ratesToCny
 }: {
   value: number
   currency: string
-  rate: CnyRateQuote | null
+  displayCurrency: DisplayCurrency
+  ratesToCny: Record<string, number | undefined>
 }) {
-  const showCny = currency === 'USD' && rate !== null
-  const cny = showCny ? toDecimal(value).mul(rate.rateToCny).toNumber() : null
+  const normalizedCurrency = normalizeCurrency(currency)
+  const converted = convertPriceCurrency(value, normalizedCurrency, displayCurrency, ratesToCny)
+  const title =
+    converted !== null && normalizedCurrency !== displayCurrency
+      ? `原价 ${fmtMoney(value, normalizedCurrency)}`
+      : undefined
   return (
-    <>
-      <div>{fmtMoney(value, currency)}</div>
-      {cny !== null && <div className="text-[11px] text-text-muted">约 {fmtMoney(cny, 'CNY')}</div>}
-    </>
+    <div title={title}>
+      {converted === null ? (
+        <span className="text-text-muted">汇率不可用</span>
+      ) : (
+        fmtMoney(converted, displayCurrency)
+      )}
+    </div>
   )
 }
 
@@ -637,7 +700,7 @@ function FilterBar({
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2 min-w-0">
-        <span className="text-text-muted">Currency</span>
+        <span className="text-text-muted">原始币种</span>
         <Chip active={!filter.currency} onClick={() => onChange({ ...filter, currency: null })}>
           全部
         </Chip>

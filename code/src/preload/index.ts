@@ -173,7 +173,8 @@ const api = {
       ipcRenderer.invoke(IPC.pricingCatalogAutoUpdate, enabled),
     setCatalogApprovalRequired: (enabled: boolean): Promise<PricingCatalogStatus> =>
       ipcRenderer.invoke(IPC.pricingCatalogApprovalRequired, enabled),
-    cnyRate: (): Promise<CnyRateQuote> => ipcRenderer.invoke(IPC.pricingCnyRate)
+    cnyRate: (currency = 'USD'): Promise<CnyRateQuote> =>
+      ipcRenderer.invoke(IPC.pricingCnyRate, currency)
   },
 
   appUpdate: {

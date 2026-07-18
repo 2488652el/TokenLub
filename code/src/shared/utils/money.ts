@@ -59,6 +59,49 @@ export function normalizeCurrency(currency: string | null | undefined): string {
   return (currency ?? 'CNY').trim().toUpperCase() || 'CNY'
 }
 
+/**
+ * 将单项价格按指定汇率折算为人民币。
+ * CNY/RMB 直接返回原值；非人民币缺少有效汇率时返回 null。
+ */
+export function convertPriceToCny(
+  amount: number | string,
+  currencyInput: string,
+  rateToCny?: number
+): number | null {
+  return convertPriceCurrency(amount, currencyInput, 'CNY', {
+    [normalizeCurrency(currencyInput)]: rateToCny
+  })
+}
+
+/**
+ * 通过“兑人民币汇率”在任意两个币种之间换算单项价格。
+ * CNY/RMB 的汇率固定为 1；源币种或目标币种缺少有效汇率时返回 null。
+ */
+export function convertPriceCurrency(
+  amount: number | string,
+  sourceCurrencyInput: string,
+  targetCurrencyInput: string,
+  ratesToCny: Record<string, number | undefined>
+): number | null {
+  const sourceCurrency = normalizeCurrency(sourceCurrencyInput)
+  const targetCurrency = normalizeCurrency(targetCurrencyInput)
+  const sourceRate =
+    sourceCurrency === 'CNY' || sourceCurrency === 'RMB' ? 1 : ratesToCny[sourceCurrency]
+  const targetRate =
+    targetCurrency === 'CNY' || targetCurrency === 'RMB' ? 1 : ratesToCny[targetCurrency]
+  const value = toDecimal(amount)
+  if (
+    !value.isFinite() ||
+    !Number.isFinite(sourceRate) ||
+    sourceRate! <= 0 ||
+    !Number.isFinite(targetRate) ||
+    targetRate! <= 0
+  ) {
+    return null
+  }
+  return value.mul(sourceRate!).div(targetRate!).toDecimalPlaces(8).toNumber()
+}
+
 /** 把多币种花费按汇率统一换算为 CNY,返回汇总与明细。 */
 export function convertSpendToCny(input: CnyConversionInput): CnyConversionResult {
   const rates = input.ratesToCny ?? DEFAULT_CNY_RATES

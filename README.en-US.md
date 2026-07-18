@@ -35,7 +35,10 @@ Current formal build: **TokenLub 1.0.9**
 This release redesigns API Key cards with provider colors, credential types,
 sources, key tails, and query status in a clearer two-column layout. The ChatGPT
 subscription card now highlights the active plan, next reset, five-hour quota,
-and weekly quota.
+and weekly quota. Model pricing can now be displayed consistently in CNY or USD:
+TokenLub loads rates for each original currency, converts prices with decimal
+precision, preserves the source currency for verification, and reports missing
+rates explicitly.
 
 | Artifact     | Path                                                               |
 | ------------ | ------------------------------------------------------------------ |
