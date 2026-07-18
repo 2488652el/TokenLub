@@ -85,6 +85,8 @@ test.describe.serial('TokenLub web console', () => {
     await page.goto(`${baseUrl}/console`)
 
     await expect(page.locator('#login-tab')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#email')).toHaveValue('admin')
+    await expect(page.locator('#password')).toHaveValue('password')
     await expect(page.locator('#device-id-field')).toBeVisible()
     await expect(page.locator('#device-name-field')).toBeHidden()
 
@@ -108,6 +110,18 @@ test.describe.serial('TokenLub web console', () => {
       }
     })
     await expect(page.locator('#password')).toHaveValue('')
+
+    const stored = await page.evaluate(() => ({
+      session: localStorage.getItem('tokenlub.console.session.v1'),
+      account: localStorage.getItem('tokenlub.console.account.v1')
+    }))
+    expect(stored.session).not.toBeNull()
+    expect(stored.account).not.toBeNull()
+    expect(JSON.stringify(stored)).not.toContain('register-password')
+
+    await page.reload()
+    await expect(page.locator('#app')).toBeVisible()
+    await expect(page.locator('#email')).toHaveValue('console-register@example.com')
   })
 
   test('reports login errors through the live status region', async ({ page }) => {
@@ -146,6 +160,33 @@ test.describe.serial('TokenLub web console', () => {
     await expect(page.locator('#devices')).toContainText(maliciousDeviceName)
     await expect(page.locator('#devices img')).toHaveCount(0)
     expect(await page.evaluate(() => (window as Window & { __xss?: number }).__xss)).toBeUndefined()
+  })
+
+  test('changes the password, clears the saved session, and keeps the account binding', async ({
+    page
+  }) => {
+    await page.goto(`${baseUrl}/console`)
+    await page.locator('#email').fill('console-login@example.com')
+    await page.locator('#password').fill('password')
+    await page.locator('#device-id').fill(loginDeviceId)
+    await page.locator('#auth-submit').click()
+
+    await expect(page.locator('#password-form')).toBeVisible()
+    await page.locator('#current-password').fill('password')
+    await page.locator('#new-password').fill('new-console-password')
+    await page.locator('#password-form button[type="submit"]').click()
+
+    await expect(page.locator('#auth')).toBeVisible()
+    await expect(page.locator('#message')).toContainText('密码已修改')
+    await expect(page.locator('#password')).toHaveValue('')
+    const stored = await page.evaluate(() => ({
+      session: localStorage.getItem('tokenlub.console.session.v1'),
+      account: localStorage.getItem('tokenlub.console.account.v1')
+    }))
+    expect(stored.session).toBeNull()
+    expect(stored.account).toContain('console-login@example.com')
+    expect(stored.account).toContain(loginDeviceId)
+    expect(stored.account).not.toContain('new-console-password')
   })
 
   for (const viewport of [

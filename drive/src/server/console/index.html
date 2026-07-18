@@ -442,8 +442,15 @@
         </div>
         <form id="auth-form" aria-busy="false">
           <label for="email"
-            >邮箱
-            <input id="email" name="email" type="email" autocomplete="email" required />
+            >账号 / 邮箱
+            <input
+              id="email"
+              name="email"
+              type="text"
+              value="admin"
+              autocomplete="username"
+              required
+            />
           </label>
           <label for="password"
             >密码
@@ -451,9 +458,11 @@
               id="password"
               name="password"
               type="password"
+              value="password"
               autocomplete="current-password"
               required
             />
+            <span class="field-help">默认账户首次登录后请立即修改密码</span>
           </label>
           <label id="device-id-field" for="device-id"
             >设备 ID
@@ -528,10 +537,46 @@
       </section>
     </main>
     <script>
+      const SESSION_STORAGE_KEY = 'tokenlub.console.session.v1'
+      const ACCOUNT_STORAGE_KEY = 'tokenlub.console.account.v1'
+      const DEFAULT_ACCOUNT = 'admin'
+      const DEFAULT_PASSWORD = 'password'
       let session = null
       let authMode = 'login'
       let authBusy = false
       const $ = (id) => document.getElementById(id)
+      const storage = {
+        get(key) {
+          try {
+            return localStorage.getItem(key)
+          } catch {
+            return null
+          }
+        },
+        set(key, value) {
+          try {
+            localStorage.setItem(key, value)
+          } catch {
+            // Private browsing or a restrictive storage policy should not block login.
+          }
+        },
+        remove(key) {
+          try {
+            localStorage.removeItem(key)
+          } catch {
+            // Private browsing or a restrictive storage policy should not block logout.
+          }
+        }
+      }
+      const parseStored = (key) => {
+        try {
+          const value = storage.get(key)
+          return value ? JSON.parse(value) : null
+        } catch {
+          storage.remove(key)
+          return null
+        }
+      }
       const message = (text, tone = 'notice') => {
         const target = $('message')
         target.textContent = text
@@ -552,6 +597,81 @@
       }
       const json = (value) => ({ method: 'POST', body: JSON.stringify(value) })
       const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+      const saveAccountBinding = (binding) => {
+        if (!binding?.account || !binding?.deviceId) return
+        storage.set(
+          ACCOUNT_STORAGE_KEY,
+          JSON.stringify({
+            account: binding.account,
+            deviceId: binding.deviceId,
+            baseUrl: binding.baseUrl || base()
+          })
+        )
+      }
+      const persistSession = () => {
+        if (!session?.refreshToken || !session?.deviceId) {
+          storage.remove(SESSION_STORAGE_KEY)
+          return
+        }
+        storage.set(
+          SESSION_STORAGE_KEY,
+          JSON.stringify({
+            baseUrl: session.baseUrl,
+            userId: session.userId,
+            deviceId: session.deviceId,
+            sessionId: session.sessionId,
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+            expiresAt: session.expiresAt
+          })
+        )
+        saveAccountBinding({
+          account: $('email').value.trim(),
+          deviceId: session.deviceId,
+          baseUrl: session.baseUrl
+        })
+      }
+      const setSession = (next) => {
+        session = next
+        persistSession()
+      }
+      const clearSession = () => {
+        session = null
+        storage.remove(SESSION_STORAGE_KEY)
+      }
+      const showAuth = () => {
+        $('app').style.display = 'none'
+        $('auth').style.display = 'block'
+        $('logout').hidden = true
+      }
+      const openApp = async () => {
+        await load()
+        $('auth').style.display = 'none'
+        $('app').style.display = 'grid'
+        $('logout').hidden = false
+      }
+      const restoreSession = async () => {
+        const stored = parseStored(SESSION_STORAGE_KEY)
+        if (!stored?.refreshToken || !stored?.deviceId || !stored?.baseUrl) return false
+        try {
+          const response = await fetch(`${stored.baseUrl}/v1/auth/refresh`, {
+            ...json({ refreshToken: stored.refreshToken, deviceId: stored.deviceId }),
+            headers: { 'content-type': 'application/json' }
+          })
+          const result = await response.json().catch(() => ({}))
+          if (!response.ok) throw new Error(result.message || 'session refresh failed')
+          setSession({
+            baseUrl: stored.baseUrl,
+            userId: stored.userId,
+            deviceId: stored.deviceId,
+            ...result
+          })
+          return true
+        } catch {
+          clearSession()
+          return false
+        }
+      }
       const makeText = (tag, text, className) => {
         const node = document.createElement(tag)
         node.textContent = String(text ?? '')
@@ -712,20 +832,23 @@
         $('password').value = ''
         if (result.verificationRequired) {
           if (result.deviceId) $('device-id').value = result.deviceId
+          saveAccountBinding({
+            account: $('email').value.trim(),
+            deviceId: result.deviceId,
+            baseUrl: base()
+          })
+          setAuthMode('login')
           message('注册成功，请查收验证邮件后再登录', 'success')
           return
         }
-        session = { baseUrl: base(), ...result }
-        $('auth').style.display = 'none'
-        $('app').style.display = 'grid'
-        $('logout').hidden = false
+        setSession({ baseUrl: base(), ...result })
         message(
           session.securityNotice === 'new_device_login'
             ? '检测到新设备登录，请确认这是你的操作'
             : '',
           'notice'
         )
-        await load()
+        await openApp()
       }
       $('login-tab').addEventListener('click', () => setAuthMode('login'))
       $('register-tab').addEventListener('click', () => setAuthMode('register'))
@@ -742,9 +865,18 @@
           setAuthBusy(false)
         }
       })
-      $('logout').addEventListener('click', () => {
-        session = null
-        location.reload()
+      $('logout').addEventListener('click', async () => {
+        try {
+          if (session) {
+            await request('/v1/auth/logout', json({ deviceId: session.deviceId }))
+          }
+        } catch {
+          // The local session is cleared even if the server is temporarily unavailable.
+        } finally {
+          clearSession()
+          showAuth()
+          setAuthMode('login')
+        }
       })
       $('bind-app').addEventListener('click', async (event) => {
         const button = event.currentTarget
@@ -801,11 +933,11 @@
             )
             $('current-password').value = ''
             $('new-password').value = ''
-            session = null
+            clearSession()
+            showAuth()
+            $('password').value = ''
+            setAuthMode('login')
             message('密码已修改，请使用新密码重新登录', 'success')
-            $('app').style.display = 'none'
-            $('auth').style.display = 'block'
-            $('logout').hidden = true
           })
         } catch (error) {
           message(error instanceof Error ? error.message : '请求失败', 'error')
@@ -814,7 +946,7 @@
       $('app').addEventListener('click', async (event) => {
         if (!(event.target instanceof Element)) return
         const button = event.target.closest('button')
-        if (!button || button.disabled) return
+        if (!button || button.disabled || button.closest('#password-form')) return
         try {
           await withBusyButton(button, '处理中…', async () => {
             if (button.dataset.revoke && confirm('确认撤销此设备？'))
@@ -835,8 +967,9 @@
                 { method: 'DELETE' }
               )
               if (button.dataset.sessionRevoke === session.sessionId) {
-                session = null
-                location.reload()
+                clearSession()
+                showAuth()
+                setAuthMode('login')
                 return
               }
             }
@@ -846,7 +979,25 @@
           message(error instanceof Error ? error.message : '请求失败', 'error')
         }
       })
-      setAuthMode('login')
+      async function boot() {
+        const binding = parseStored(ACCOUNT_STORAGE_KEY)
+        $('email').value = binding?.account || DEFAULT_ACCOUNT
+        $('device-id').value = binding?.deviceId || ''
+        if (binding?.baseUrl && binding.baseUrl !== location.origin) {
+          $('base-url').value = binding.baseUrl
+        }
+        $('password').value = DEFAULT_PASSWORD
+        setAuthMode('login')
+        if (!(await restoreSession())) return
+        try {
+          await openApp()
+        } catch {
+          clearSession()
+          showAuth()
+          message('登录状态已失效，请重新登录', 'error')
+        }
+      }
+      void boot()
     </script>
   </body>
 </html>

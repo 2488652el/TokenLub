@@ -1,9 +1,9 @@
 /**
  * 请求日志页面:展示所有 API Key 与本地 CLI 会话的 Token 用量明细,
- * 支持按供应商/来源/日期/模型筛选、排序、分页、跳转日期与导出 CSV。
+ * 支持按供应商/来源/日期/模型筛选、排序、分页与导出 CSV。
  * (glm-5.2)
  */
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
@@ -92,7 +92,7 @@ function downloadCsv(rows: UsageRecord[]) {
 
 /**
  * 请求日志页面组件。
- * 拉取供应商与分页日志,提供筛选、排序、分页、跳转、导出与详情查看。
+ * 拉取供应商与分页日志,提供筛选、排序、分页、导出与详情查看。
  */
 export default function RequestLogs() {
   const [providers, setProviders] = useState<ProviderManifest[]>([])
@@ -108,7 +108,6 @@ export default function RequestLogs() {
   const [sourceFilter, setSourceFilter] = useState<UsageSource | 'all'>('all')
   const [fromDate, setFromDate] = useState<string>(init.from)
   const [toDate, setToDate] = useState<string>(init.to)
-  const [jumpDate, setJumpDate] = useState<string>(init.to)
   const [search, setSearch] = useState<string>('')
   // ponytail: server-side model filter is debounced so we don't hammer the
   // main process on every keystroke. The local `search` still drives the
@@ -219,7 +218,6 @@ export default function RequestLogs() {
     const d = defaultDates()
     setFromDate(d.from)
     setToDate(d.to)
-    setJumpDate(d.to)
     setSearch('')
     setCommittedSearch('')
     setPage(1)
@@ -235,16 +233,6 @@ export default function RequestLogs() {
       // defaults desc (newest first) — only flip direction on re-click.
       setSortDesc(key === 'cost')
     }
-  }
-
-  /** 跳转到指定日期 */
-  function handleJumpToDate() {
-    if (!jumpDate) return
-    setFromDate(jumpDate)
-    setToDate(jumpDate)
-    setSortKey('time')
-    setSortDesc(true)
-    setPage(1)
   }
 
   // ponytail: filter by model is purely client-side (cheap substring match).
@@ -275,6 +263,11 @@ export default function RequestLogs() {
     }
     return [...map.entries()].map(([id, label]) => ({ id, label }))
   }, [logs, providers])
+
+  const providerLabels = useMemo(
+    () => new Map(providerOptions.map((provider) => [provider.id, provider.label])),
+    [providerOptions]
+  )
 
   const isEmpty = !loading && totalCount === 0
   const showing = visible.length
@@ -327,37 +320,39 @@ export default function RequestLogs() {
       />
 
       {/* Filter bar */}
-      <Card className="mb-4" bodyClassName="">
-        <div className="px-5 py-4 space-y-3">
-          {/* Provider chips */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[12px] text-text-muted mr-1">Provider:</span>
-            <FilterChip
-              label="全部"
-              active={providerFilter === 'all'}
-              onClick={() => {
-                setProviderFilter('all')
+      <Card
+        className="mb-4"
+        title="筛选条件"
+        subtitle="按供应商、来源、日期或模型快速定位日志"
+        action={
+          <button className="btn btn-outline btn-sm" onClick={handleReset}>
+            <i className="fa-solid fa-rotate-left" /> 重置
+          </button>
+        }
+        bodyClassName="pt-1"
+      >
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          <FilterField label="供应商" className="lg:col-span-4">
+            <select
+              value={providerFilter}
+              onChange={(event) => {
+                setProviderFilter(event.target.value)
                 setPage(1)
               }}
-            />
-            {providerOptions.map((p) => (
-              <FilterChip
-                key={p.id}
-                label={p.label}
-                active={providerFilter === p.id}
-                onClick={() => {
-                  setProviderFilter(p.id)
-                  setPage(1)
-                }}
-              />
-            ))}
-          </div>
+              className="select h-9 w-full text-text-primary [background-size:10px_6px]"
+            >
+              <option value="all">全部供应商</option>
+              {providerOptions.map((provider) => (
+                <option key={provider.id} value={provider.id}>
+                  {provider.label}
+                </option>
+              ))}
+            </select>
+          </FilterField>
 
-          {/* Source chips + dates + search */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] text-text-muted">来源:</span>
-              <FilterChip
+          <FilterField label="日志来源" className="lg:col-span-4">
+            <div className="flex h-9 rounded-md border border-border-light bg-bg-base p-1">
+              <SourceFilterButton
                 label="全部"
                 active={sourceFilter === 'all'}
                 onClick={() => {
@@ -365,16 +360,16 @@ export default function RequestLogs() {
                   setPage(1)
                 }}
               />
-              <FilterChip
-                label="vendor-api"
+              <SourceFilterButton
+                label="API 调用"
                 active={sourceFilter === 'vendor-api'}
                 onClick={() => {
                   setSourceFilter('vendor-api')
                   setPage(1)
                 }}
               />
-              <FilterChip
-                label="session-log"
+              <SourceFilterButton
+                label="CLI 会话"
                 active={sourceFilter === 'session-log'}
                 onClick={() => {
                   setSourceFilter('session-log')
@@ -382,63 +377,52 @@ export default function RequestLogs() {
                 }}
               />
             </div>
+          </FilterField>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-[12px] text-text-muted">从</span>
-              <input
-                type="date"
-                value={fromDate}
-                max={toDate}
-                onChange={(e) => {
-                  setFromDate(e.target.value)
-                  setPage(1)
-                }}
-                className="border border-border-light rounded px-2 py-1 text-[12.5px] text-text-primary bg-bg-input focus:outline-none focus:border-border-focus"
-              />
-              <span className="text-[12px] text-text-muted">到</span>
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate}
-                onChange={(e) => {
-                  setToDate(e.target.value)
-                  setPage(1)
-                }}
-                className="border border-border-light rounded px-2 py-1 text-[12.5px] text-text-primary bg-bg-input focus:outline-none focus:border-border-focus"
-              />
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-[12px] text-text-muted">跳转日期</span>
-              <input
-                type="date"
-                value={jumpDate}
-                onChange={(e) => setJumpDate(e.target.value)}
-                className="border border-border-light rounded px-2 py-1 text-[12.5px] text-text-primary bg-bg-input focus:outline-none focus:border-border-focus"
-              />
-              <button className="btn btn-outline btn-sm" onClick={handleJumpToDate}>
-                <i className="fa-regular fa-calendar-check" /> 跳转
-              </button>
-            </div>
-
-            <div className="flex-1 min-w-[160px] max-w-[280px]">
+          <FilterField label="模型名称" className="lg:col-span-4">
+            <div className="relative">
+              <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted" />
               <input
                 type="search"
-                placeholder="搜索 Model…"
+                placeholder="搜索模型名称"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onBlur={commitSearch}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') commitSearch()
                 }}
-                className="w-full border border-border-light rounded px-3 py-1.5 text-[12.5px] text-text-primary bg-bg-input focus:outline-none focus:border-border-focus"
+                className="h-9 w-full rounded-md border border-border-light bg-bg-input py-1.5 pl-9 pr-3 text-[12.5px] text-text-primary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-accent-dim"
               />
             </div>
+          </FilterField>
 
-            <button className="btn btn-outline btn-sm" onClick={handleReset}>
-              <i className="fa-solid fa-rotate-left" /> 清空筛选
-            </button>
-          </div>
+          <FilterField label="日期范围" className="lg:col-span-8">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+              <input
+                type="date"
+                aria-label="开始日期"
+                value={fromDate}
+                max={toDate}
+                onChange={(e) => {
+                  setFromDate(e.target.value)
+                  setPage(1)
+                }}
+                className="h-9 w-full rounded-md border border-border-light bg-bg-input px-3 py-1.5 text-[12.5px] text-text-primary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-accent-dim"
+              />
+              <span className="text-[12px] text-text-muted">至</span>
+              <input
+                type="date"
+                aria-label="结束日期"
+                value={toDate}
+                min={fromDate}
+                onChange={(e) => {
+                  setToDate(e.target.value)
+                  setPage(1)
+                }}
+                className="h-9 w-full rounded-md border border-border-light bg-bg-input px-3 py-1.5 text-[12.5px] text-text-primary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-accent-dim"
+              />
+            </div>
+          </FilterField>
         </div>
       </Card>
 
@@ -456,31 +440,45 @@ export default function RequestLogs() {
           />
         </Card>
       ) : (
-        <Card bodyClassName="">
-          <div className="px-5 py-4 overflow-x-auto">
-            <table className="w-full text-[12.5px]">
-              <thead className="text-text-muted text-left">
+        <Card
+          title="日志明细"
+          subtitle={`共 ${totalCount.toLocaleString('zh-CN')} 条记录`}
+          bodyClassName="!p-0"
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] table-fixed text-[12.5px]">
+              <colgroup>
+                <col className="w-[164px]" />
+                <col className="w-[92px]" />
+                <col className="w-[132px]" />
+                <col className="w-[92px]" />
+                <col className="w-[76px]" />
+                <col className="w-[76px]" />
+                <col className="w-[86px]" />
+                <col className="w-[86px]" />
+                <col className="w-[96px]" />
+              </colgroup>
+              <thead className="bg-bg-base text-left text-text-secondary">
                 <tr>
                   <th
-                    className="py-2 font-medium cursor-pointer select-none"
+                    className="cursor-pointer select-none px-4 py-3 font-medium"
                     onClick={() => handleSort('time')}
                   >
-                    Time{arrow('time')}
+                    时间{arrow('time')}
                   </th>
-                  <th className="py-2 font-medium">Provider</th>
-                  <th className="py-2 font-medium">Model</th>
-                  <th className="py-2 font-medium">Source</th>
-                  <th className="py-2 font-medium text-right">Prompt</th>
-                  <th className="py-2 font-medium text-right">Completion</th>
-                  <th className="py-2 font-medium text-right">Cache Read</th>
-                  <th className="py-2 font-medium text-right">Cache Create</th>
+                  <th className="px-3 py-3 font-medium">供应商</th>
+                  <th className="px-3 py-3 font-medium">模型</th>
+                  <th className="px-3 py-3 font-medium">来源</th>
+                  <th className="px-3 py-3 text-right font-medium">输入量</th>
+                  <th className="px-3 py-3 text-right font-medium">输出量</th>
+                  <th className="px-3 py-3 text-right font-medium">缓存读取</th>
+                  <th className="px-3 py-3 text-right font-medium">缓存写入</th>
                   <th
-                    className="py-2 font-medium text-right cursor-pointer select-none"
+                    className="cursor-pointer select-none px-4 py-3 text-right font-medium"
                     onClick={() => handleSort('cost')}
                   >
-                    Cost{arrow('cost')}
+                    费用{arrow('cost')}
                   </th>
-                  <th className="py-2 font-medium">Currency</th>
                 </tr>
               </thead>
               <tbody className="text-text-primary">
@@ -488,49 +486,50 @@ export default function RequestLogs() {
                   <tr
                     key={r.id ?? `${r.capturedAt}-${i}`}
                     onClick={() => setDetail(r)}
-                    className="border-t border-border-light cursor-pointer hover:bg-bg-hover transition-colors"
+                    className="cursor-pointer border-t border-border-light transition-colors hover:bg-bg-hover"
                   >
-                    <td className="py-2 whitespace-nowrap text-text-secondary font-mono text-[11.5px]">
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-[11.5px] tabular-nums text-text-secondary">
                       {r.capturedAt ? r.capturedAt.replace('T', ' ').slice(0, 19) : '—'}
                     </td>
-                    <td className="py-2">{r.providerId}</td>
-                    <td className="py-2 font-mono max-w-[220px] truncate" title={r.model}>
+                    <td className="truncate px-3 py-3" title={providerLabels.get(r.providerId)}>
+                      {providerLabels.get(r.providerId) ?? r.providerId}
+                    </td>
+                    <td className="truncate px-3 py-3 font-mono" title={r.model}>
                       {r.model || '—'}
                     </td>
-                    <td className="py-2">
+                    <td className="px-3 py-3">
                       <span
                         className={
                           r.source === 'vendor-api'
-                            ? 'px-1.5 py-[1px] rounded text-[11px] bg-status-blue-dim text-status-blue'
-                            : 'px-1.5 py-[1px] rounded text-[11px] bg-status-amber-dim text-status-amber'
+                            ? 'inline-flex whitespace-nowrap rounded px-2 py-0.5 text-[11px] bg-status-blue-dim text-status-blue'
+                            : 'inline-flex whitespace-nowrap rounded px-2 py-0.5 text-[11px] bg-status-amber-dim text-status-amber'
                         }
                       >
-                        {r.source}
+                        {sourceLabel(r.source)}
                       </span>
                     </td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="px-3 py-3 text-right font-mono tabular-nums">
                       {r.promptTokens !== undefined ? fmtCount(r.promptTokens) : '—'}
                     </td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="px-3 py-3 text-right font-mono tabular-nums">
                       {r.completionTokens !== undefined ? fmtCount(r.completionTokens) : '—'}
                     </td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="px-3 py-3 text-right font-mono tabular-nums">
                       {r.cacheReadTokens !== undefined ? fmtCount(r.cacheReadTokens) : '—'}
                     </td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="px-3 py-3 text-right font-mono tabular-nums">
                       {r.cacheCreationTokens !== undefined ? fmtCount(r.cacheCreationTokens) : '—'}
                     </td>
-                    <td className="py-2 text-right font-mono">
+                    <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-medium tabular-nums">
                       {r.cost !== undefined ? fmtMoney(r.cost, r.currency ?? 'CNY') : '—'}
                     </td>
-                    <td className="py-2 text-text-muted">{r.currency ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {/* Footer */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-light">
+            <div className="flex items-center justify-between gap-4 border-t border-border-light px-5 py-4">
               <span className="text-[12px] text-text-muted">
                 第 {page.toLocaleString('en-US')} / {totalPages.toLocaleString('en-US')} 页， 显示{' '}
                 {firstItem.toLocaleString('en-US')}-{lastItem.toLocaleString('en-US')} /{' '}
@@ -631,8 +630,26 @@ export default function RequestLogs() {
   )
 }
 
-/** 筛选胶囊按钮:高亮当前选中项 */
-function FilterChip({
+/** 筛选字段:统一标签和控件的垂直节奏 */
+function FilterField({
+  label,
+  className,
+  children
+}: {
+  label: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div className={className}>
+      <span className="mb-1.5 block text-[11.5px] font-medium text-text-secondary">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+/** 来源分段按钮:在紧凑空间内保持清晰的选中状态 */
+function SourceFilterButton({
   label,
   active,
   onClick
@@ -645,15 +662,21 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={
         active
-          ? 'px-2.5 py-[3px] rounded-full text-[11.5px] font-medium bg-accent-dim text-accent-text border border-accent-border'
-          : 'px-2.5 py-[3px] rounded-full text-[11.5px] text-text-secondary bg-bg-base border border-border-light hover:border-border-default'
+          ? 'flex-1 rounded-sm bg-bg-card px-2 text-[11.5px] font-medium text-accent-text shadow-sm'
+          : 'flex-1 rounded-sm px-2 text-[11.5px] text-text-secondary transition-colors hover:text-text-primary'
       }
     >
       {label}
     </button>
   )
+}
+
+/** 将内部来源枚举转换为用户可读中文 */
+function sourceLabel(source: UsageSource): string {
+  return source === 'vendor-api' ? 'API 调用' : 'CLI 会话'
 }
 
 /** 详情行:标签 + 值,可选等宽字体 */
