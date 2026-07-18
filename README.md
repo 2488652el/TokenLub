@@ -38,17 +38,17 @@
 | -------------------------------------------------- | ------------------------------------------------------- |
 | ![请求日志](./design/screenshots/request-logs.png) | ![云端同步设置](./design/screenshots/settings-sync.png) |
 
-## 1.0.8 最新版本
+## 1.0.9 最新版本
 
-本次版本简化项目用量热力图，并新增按项目着色、带入场动画的 Token 趋势曲线。
-余额查询卡片也完成差异化重构，明确区分 API 余额、Coding Plan、Token 资源包、
-组织用量、聚合网关和手动额度，并根据不同供应商突出最关键的额度信息。
+本次版本重构 API Keys 卡片，使用不同供应商品牌色区分 API 余额、Coding Plan、
+Token 资源包、组织用量和聚合网关，并直观展示凭据来源、Key 末位与查询状态。
+ChatGPT 订阅额度卡片同步升级，突出当前计划、下次重置时间、5 小时额度和周额度。
 
 ### Windows 下载
 
-- [安装版 TokenLub-1.0.8-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.8/TokenLub-1.0.8-x64.exe)
-- [便携版 TokenLub-1.0.8-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.8/TokenLub-1.0.8-portable.exe)
-- [GitHub Release v1.0.8](https://github.com/2488652el/TokenLub/releases/tag/v1.0.8)
+- [安装版 TokenLub-1.0.9-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.9/TokenLub-1.0.9-x64.exe)
+- [便携版 TokenLub-1.0.9-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.0.9/TokenLub-1.0.9-portable.exe)
+- [GitHub Release v1.0.9](https://github.com/2488652el/TokenLub/releases/tag/v1.0.9)
 
 安装包统一输出到 `demo/tokenlub-<版本号>-<修改说明>-<执行模型>/`。正式
 Windows 构建命令为：
@@ -110,7 +110,7 @@ npm run build
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.8 \
+  --ref v1.0.9 \
   --domain sync.example.com \
   --email admin@example.com
 ```
@@ -120,7 +120,7 @@ sudo bash drive/ops/one-click/install.sh \
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.0.8 \
+  --ref v1.0.9 \
   --ssh-only
 ```
 

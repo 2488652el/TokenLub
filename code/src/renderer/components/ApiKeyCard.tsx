@@ -5,7 +5,6 @@
  * (glm-5.2)
  */
 import { useEffect, useState } from 'react'
-import { Card } from './Card'
 import { ProviderIcon } from './ProviderIcon'
 import { fmtMoney, fmtCount } from '../../shared/utils/money'
 import { extractCodingPlanQuotas, type CodingPlanQuota } from '../../shared/utils/minimax-quota'
@@ -24,6 +23,37 @@ type ApiKeyCardProps = {
   onDelete: (k: ApiKeyRecord) => void
   onRefreshOne: (k: ApiKeyRecord) => void
   onToggleUsage: (id: string, enabled: boolean) => Promise<void>
+}
+
+type ApiKeyVisual = {
+  accent: string
+  tint: string
+}
+
+const DEFAULT_VISUAL: ApiKeyVisual = {
+  accent: '#64748B',
+  tint: 'rgba(100, 116, 139, 0.08)'
+}
+
+const API_KEY_VISUALS: Record<string, ApiKeyVisual> = {
+  deepseek: { accent: '#4D6BFE', tint: 'rgba(77, 107, 254, 0.09)' },
+  zhipu: { accent: '#635BFF', tint: 'rgba(99, 91, 255, 0.09)' },
+  'kimi-coding': { accent: '#1783FF', tint: 'rgba(23, 131, 255, 0.09)' },
+  longcat: { accent: '#22C55E', tint: 'rgba(34, 197, 94, 0.09)' },
+  minimax: { accent: '#F43F5E', tint: 'rgba(244, 63, 94, 0.09)' },
+  openrouter: { accent: '#111827', tint: 'rgba(17, 24, 39, 0.07)' },
+  'newapi-generic': { accent: '#0EA5E9', tint: 'rgba(14, 165, 233, 0.09)' },
+  'openai-admin': { accent: '#10A37F', tint: 'rgba(16, 163, 127, 0.09)' },
+  'anthropic-admin': { accent: '#B2774A', tint: 'rgba(178, 119, 74, 0.09)' }
+}
+
+const CARD_PROFILE_META: Record<CardProfile, { label: string; icon: string }> = {
+  'cash-balance': { label: 'API 余额', icon: 'fa-cloud' },
+  'token-pack': { label: 'Token 资源包', icon: 'fa-cubes-stacked' },
+  'coding-plan': { label: 'Coding Plan', icon: 'fa-code' },
+  'kimi-coding-plan': { label: 'Coding Plan', icon: 'fa-code' },
+  'admin-usage': { label: '组织用量', icon: 'fa-building' },
+  gateway: { label: '聚合网关', icon: 'fa-server' }
 }
 
 // ponytail: single-key card. Mirrors BalanceQuery's grid card layout but adds
@@ -47,48 +77,97 @@ export function ApiKeyCard({
   const usageEnabled = keyRecord.usageQueryEnabled !== false
   const isManual = keyRecord.queryMode === 'manual'
   const profile = getCardProfile(keyRecord, balance)
-
-  const subtitle = `${providerDisplayName} / ${keyRecord.providerId}`
+  const profileMeta = CARD_PROFILE_META[profile]
+  const visual = API_KEY_VISUALS[keyRecord.providerId] ?? DEFAULT_VISUAL
 
   return (
-    <Card
-      title={keyRecord.alias}
-      subtitle={subtitle}
-      iconNode={
-        <ProviderIcon
-          providerId={keyRecord.providerId}
-          title={providerDisplayName}
-          size={18}
-          className="shrink-0"
-        />
-      }
-      action={
-        <div className="flex items-center gap-2">
-          {!usageEnabled && (
-            <span className="inline-block px-2 py-[2px] rounded text-[11.5px] font-medium bg-neutral-100 text-neutral-600">
-              用量查询已关闭
+    <article className="group relative flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
+      <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: visual.accent }} />
+      <header
+        className="relative px-5 pb-4 pt-5"
+        style={{ background: `linear-gradient(135deg, ${visual.tint}, transparent 64%)` }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl"
+              style={{ backgroundColor: visual.tint }}
+            >
+              <ProviderIcon
+                providerId={keyRecord.providerId}
+                title={providerDisplayName}
+                size={23}
+                className="shrink-0"
+              />
             </span>
-          )}
-          <SourceBadge source={keyRecord.source} />
-          <button className="btn btn-ghost btn-xs" onClick={() => onEdit(keyRecord)} title="编辑">
+            <div className="min-w-0">
+              <h2
+                className="truncate text-[14px] font-semibold text-text-primary"
+                title={keyRecord.alias}
+              >
+                {keyRecord.alias}
+              </h2>
+              <p
+                className="mt-0.5 truncate text-[12px] text-text-secondary"
+                title={providerDisplayName}
+              >
+                {providerDisplayName}
+                <span className="mx-1 text-text-muted">·</span>
+                {keyRecord.providerId}
+              </p>
+            </div>
+          </div>
+          <button
+            className="btn btn-ghost btn-xs"
+            onClick={() => onEdit(keyRecord)}
+            title="编辑 Key"
+            aria-label={`编辑 ${keyRecord.alias}`}
+          >
             <i className="fa-solid fa-pen-to-square" />
           </button>
         </div>
-      }
-    >
-      <div className="space-y-2 text-[13px]">
-        {profile === 'coding-plan' && <CodingPlanQuotaBlock balance={balance} />}
-        {profile === 'kimi-coding-plan' && <KimiCodingPlanQuotaBlock balance={balance} />}
-        {profile === 'token-pack' && <TokenPackBalanceBlock balance={balance} />}
-        {profile === 'cash-balance' && <CashBalanceBlock balance={balance} />}
-        {profile === 'admin-usage' && <AdminUsageBlock balance={balance} keyRecord={keyRecord} />}
-        {profile === 'gateway' && <GatewayBalanceBlock balance={balance} keyRecord={keyRecord} />}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+            style={{ color: visual.accent, backgroundColor: visual.tint, borderColor: visual.tint }}
+          >
+            <i className={`fa-solid ${profileMeta.icon} text-[10px]`} />
+            {profileMeta.label}
+          </span>
+          <SourceBadge source={keyRecord.source} />
+          <span className="inline-flex items-center gap-1 rounded-full border border-border-light bg-bg-card/70 px-2.5 py-1 font-mono text-[11px] text-text-muted">
+            <i className="fa-solid fa-key text-[9px]" />…{keyRecord.keyTail}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+              usageEnabled
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-neutral-200 bg-neutral-100 text-neutral-600'
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${usageEnabled ? 'bg-emerald-500' : 'bg-neutral-400'}`}
+            />
+            用量查询 {usageEnabled ? '开启' : '关闭'}
+          </span>
+        </div>
+      </header>
 
-        <KeySpendLine keyRecord={keyRecord} compact={profile === 'cash-balance'} />
+      <div className="flex flex-1 flex-col px-5 pb-5">
+        <div className="flex-1 space-y-2 pt-1 text-[13px]">
+          {profile === 'coding-plan' && <CodingPlanQuotaBlock balance={balance} />}
+          {profile === 'kimi-coding-plan' && <KimiCodingPlanQuotaBlock balance={balance} />}
+          {profile === 'token-pack' && <TokenPackBalanceBlock balance={balance} />}
+          {profile === 'cash-balance' && <CashBalanceBlock balance={balance} />}
+          {profile === 'admin-usage' && <AdminUsageBlock balance={balance} keyRecord={keyRecord} />}
+          {profile === 'gateway' && <GatewayBalanceBlock balance={balance} keyRecord={keyRecord} />}
 
-        <CreatedAtLine createdAt={keyRecord.createdAt} />
+          <KeySpendLine keyRecord={keyRecord} compact={profile === 'cash-balance'} />
 
-        <div className="pt-2 border-t border-border-light flex items-center justify-between gap-2 flex-wrap">
+          <CreatedAtLine createdAt={keyRecord.createdAt} />
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-border-light pt-3">
           <UsageToggle
             enabled={usageEnabled}
             disabled={toggling}
@@ -130,7 +209,7 @@ export function ApiKeyCard({
           </div>
         </div>
       </div>
-    </Card>
+    </article>
   )
 }
 

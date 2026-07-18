@@ -25,32 +25,65 @@ function nextResetAt(usage: CodexUsageSnapshot | null): string | null {
   return timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null
 }
 
-function QuotaRow({ label, window }: { label: string; window: CodexUsageWindow | null }) {
+function quotaColor(remaining: number | undefined): string {
+  if (remaining === undefined) return '#D4D4D2'
+  if (remaining <= 10) return '#EF4444'
+  if (remaining <= 30) return '#F59E0B'
+  return '#10A37F'
+}
+
+function QuotaRow({
+  label,
+  description,
+  icon,
+  window
+}: {
+  label: string
+  description: string
+  icon: string
+  window: CodexUsageWindow | null
+}) {
   const remaining = window?.remainingPercent
-  const barColor =
-    remaining === undefined
-      ? 'bg-neutral-200'
-      : remaining <= 10
-        ? 'bg-red-500'
-        : remaining <= 30
-          ? 'bg-amber-400'
-          : 'bg-emerald-500'
   const width = remaining === undefined ? 0 : Math.max(0, Math.min(100, remaining))
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-text-muted">{label}</span>
-        <span className="font-mono font-medium text-text-primary">
-          {remaining === undefined ? '—' : `剩余 ${formatPercent(remaining)}`}
+    <div className="rounded-xl border border-border-light bg-bg-base/40 px-3.5 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+            <i className={`fa-solid ${icon} text-[11px]`} />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[12.5px] font-medium text-text-primary">{label}</div>
+            <div className="mt-0.5 truncate text-[10.5px] text-text-muted">{description}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-[15px] font-semibold text-text-primary">
+            {remaining === undefined ? '—' : formatPercent(remaining)}
+          </div>
+          <div className="text-[10px] text-text-muted">剩余</div>
+        </div>
+      </div>
+      <div
+        className="mt-3 h-2 overflow-hidden rounded-full bg-bg-hover"
+        role="progressbar"
+        aria-label={`${label}剩余额度`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={width}
+      >
+        <div
+          className="h-full rounded-full transition-all duration-700 ease-out"
+          style={{ width: `${width}%`, backgroundColor: quotaColor(remaining) }}
+        />
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[10.5px] text-text-muted">
+        <span>已使用 {remaining === undefined ? '—' : formatPercent(100 - remaining)}</span>
+        <span className="inline-flex items-center gap-1 font-mono text-text-secondary">
+          <i className="fa-regular fa-clock text-[9px]" />
+          {formatResetAt(window?.resetAt ?? null)}
         </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${width}%` }} />
-      </div>
-      <div className="flex justify-between text-[11px] text-text-muted">
-        <span>周期重置</span>
-        <span>{formatResetAt(window?.resetAt ?? null)}</span>
       </div>
     </div>
   )
@@ -66,22 +99,55 @@ export function CodexQuotaPanel({
   loading: boolean
   error: string | null
 }) {
+  const resetAt = formatResetAt(nextResetAt(usage))
+
   return (
-    <div className="space-y-3 text-[13px]">
-      <QuotaRow label="5 小时额度" window={usage?.fiveHour ?? null} />
-      <QuotaRow label="周额度" window={usage?.oneWeek ?? null} />
-      <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 flex justify-between gap-3">
-        <span className="text-text-muted">下一个周期刷新时间</span>
-        <span className="font-mono text-text-secondary text-right">
-          {formatResetAt(nextResetAt(usage))}
-        </span>
+    <div className="flex flex-1 flex-col pt-1 text-[13px]">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <div>
+          <div className="text-[11px] text-text-muted">当前计划</div>
+          <div className="mt-0.5 text-[15px] font-semibold text-text-primary">
+            {usage?.planType || (loading ? '正在读取…' : 'ChatGPT')}
+          </div>
+        </div>
+        <div className="rounded-lg bg-emerald-50 px-3 py-2 text-right">
+          <div className="text-[10px] text-emerald-700/70">下次重置</div>
+          <div className="mt-0.5 font-mono text-[11px] font-medium text-emerald-800">{resetAt}</div>
+        </div>
       </div>
-      {loading && !usage && <p className="text-[12px] text-text-muted">正在读取 Codex 登录额度…</p>}
-      {error && <p className="text-[12px] text-status-red break-words">{error}</p>}
+
+      <div className="grid grid-cols-2 gap-3 max-xl:grid-cols-1">
+        <QuotaRow
+          label="5 小时额度"
+          description="短周期交互与编程任务"
+          icon="fa-gauge-high"
+          window={usage?.fiveHour ?? null}
+        />
+        <QuotaRow
+          label="周额度"
+          description="本周累计订阅配额"
+          icon="fa-calendar-week"
+          window={usage?.oneWeek ?? null}
+        />
+      </div>
+
+      {loading && !usage && (
+        <p className="mt-3 text-[11.5px] text-text-muted">正在读取 Codex 登录额度…</p>
+      )}
+      {error && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-[11.5px] text-status-red">
+          <i className="fa-solid fa-circle-exclamation mt-0.5" />
+          <p className="break-words">{error}</p>
+        </div>
+      )}
       {!loading && !error && usage && (
-        <p className="text-[11px] text-text-muted">
-          {usage.planType ? `${usage.planType} 计划 · ` : ''}内部接口数据，每 30 秒自动刷新
-        </p>
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border-light pt-3 text-[10.5px] text-text-muted">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            Codex 登录状态正常
+          </span>
+          <span>每 30 秒自动刷新</span>
+        </div>
       )}
     </div>
   )

@@ -1,6 +1,6 @@
 {
   "name": "tokenlub",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "TokenLub - unified LLM token usage & cost aggregator for Windows and macOS",
   "main": "demo/out/main/index.js",
   "author": "bestzuge@gmail.com",

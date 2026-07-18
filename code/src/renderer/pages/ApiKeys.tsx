@@ -658,7 +658,7 @@ export default function ApiKeys() {
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-3 gap-4 max-xl:grid-cols-2 max-md:grid-cols-1">
+            <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
               {filtered.map((k) => (
                 <ApiKeyCard
                   key={k.id}
