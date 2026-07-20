@@ -8,7 +8,8 @@ import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { CodexQuotaPanel } from '../components/CodexQuotaPanel'
-import { AnimatedNumber, MotionGroup, ProgressBar } from '../components/motion'
+import { AnimatedNumber, MotionGroup, ProgressBar, SortableCardGrid } from '../components/motion'
+import { useCardOrder } from '../hooks/useCardOrder'
 import { useCodexUsage } from '../hooks/useCodexUsage'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
@@ -25,9 +26,13 @@ import type { BalanceSnapshot } from '../../shared/types/provider'
 type StoredBalance = BalanceSnapshot & { id: number; apiKeyId?: string }
 
 type BalanceCard = {
+  id: string
+  kind: 'provider'
   key: ApiKeyRecord
   balance: StoredBalance | undefined
 }
+
+type BalanceCardItem = BalanceCard | { id: 'codex'; kind: 'codex' }
 
 type ProviderTheme = {
   accent: string
@@ -61,6 +66,17 @@ const PROFILE_META: Record<BalanceCardProfile, { label: string; icon: string }> 
   'admin-usage': { label: '组织用量', icon: 'fa-building' },
   gateway: { label: '聚合网关', icon: 'fa-server' },
   manual: { label: '手动额度', icon: 'fa-pen-to-square' }
+}
+
+const BALANCE_CARD_ORDER_KEY = 'tokenlub.balance-card-order.v1'
+const CODEX_CARD: BalanceCardItem = { id: 'codex', kind: 'codex' }
+
+function balanceCardId(card: BalanceCardItem): string {
+  return card.id
+}
+
+function balanceCardLabel(card: BalanceCardItem): string {
+  return card.kind === 'codex' ? 'ChatGPT' : card.key.alias
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -165,8 +181,62 @@ export default function BalanceQuery() {
         latestByKey.set(balance.apiKeyId, balance)
       }
     }
-    return keys.map((key) => ({ key, balance: latestByKey.get(key.id) }))
+    return keys.map((key) => ({
+      id: `key:${key.id}`,
+      kind: 'provider' as const,
+      key,
+      balance: latestByKey.get(key.id)
+    }))
   }, [keys, balances])
+
+  const sortableCards = useMemo<BalanceCardItem[]>(() => [CODEX_CARD, ...cards], [cards])
+  const { orderedItems: orderedCards, reorderVisible } = useCardOrder(
+    BALANCE_CARD_ORDER_KEY,
+    sortableCards,
+    balanceCardId
+  )
+
+  const codexCard = (
+    <article
+      className={`motion-card-interactive group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${
+        codex.loading && !reducedMotion ? 'motion-data-flash' : ''
+      }`}
+    >
+      <div className="absolute inset-x-0 top-0 h-1 bg-[#10A37F]" />
+      <header className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,rgba(16,163,127,0.1),transparent_62%)] px-5 pb-4 pt-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-[rgba(16,163,127,0.1)]">
+            <ProviderIcon providerId="openai-admin" title="ChatGPT" size={23} />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[14px] font-semibold text-text-primary">ChatGPT</h2>
+            <p className="mt-0.5 text-[12px] text-text-secondary">Codex 订阅额度</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+            <i className="fa-solid fa-bolt text-[9px]" />
+            订阅计划
+          </span>
+          <button
+            className="btn btn-ghost btn-xs"
+            onClick={() => void codex.refresh()}
+            disabled={codex.loading}
+            title="刷新 ChatGPT 额度"
+          >
+            <i
+              className={`fa-solid fa-arrows-rotate ${
+                codex.loading && !reducedMotion ? 'animate-spin' : ''
+              }`}
+            />
+          </button>
+        </div>
+      </header>
+      <div className="flex flex-1 flex-col px-5 pb-5">
+        <CodexQuotaPanel usage={codex.usage} loading={codex.loading} error={codex.error} />
+      </div>
+    </article>
+  )
 
   return (
     <div className="page-content">
@@ -189,61 +259,45 @@ export default function BalanceQuery() {
         }
       />
 
-      <MotionGroup className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-        <article
-          className={`motion-card-interactive group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${
-            codex.loading && !reducedMotion ? 'motion-data-flash' : ''
-          }`}
-        >
-          <div className="absolute inset-x-0 top-0 h-1 bg-[#10A37F]" />
-          <header className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,rgba(16,163,127,0.1),transparent_62%)] px-5 pb-4 pt-5">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-[rgba(16,163,127,0.1)]">
-                <ProviderIcon providerId="openai-admin" title="ChatGPT" size={23} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-[14px] font-semibold text-text-primary">ChatGPT</h2>
-                <p className="mt-0.5 text-[12px] text-text-secondary">Codex 订阅额度</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-                <i className="fa-solid fa-bolt text-[9px]" />
-                订阅计划
-              </span>
-              <button
-                className="btn btn-ghost btn-xs"
-                onClick={() => void codex.refresh()}
-                disabled={codex.loading}
-                title="刷新 ChatGPT 额度"
-              >
-                <i
-                  className={`fa-solid fa-arrows-rotate ${
-                    codex.loading && !reducedMotion ? 'animate-spin' : ''
-                  }`}
-                />
-              </button>
-            </div>
-          </header>
-          <div className="flex flex-1 flex-col px-5 pb-5">
-            <CodexQuotaPanel usage={codex.usage} loading={codex.loading} error={codex.error} />
-          </div>
-        </article>
-
-        {loading ? (
+      {loading ? (
+        <MotionGroup className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+          {codexCard}
           <Card>
             <EmptyState icon="fa-spinner" title="加载中…" hint="读取本地加密数据库" />
           </Card>
-        ) : keys.length === 0 ? (
+        </MotionGroup>
+      ) : keys.length === 0 ? (
+        <MotionGroup className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+          {codexCard}
           <Card>
             <EmptyState icon="fa-wallet" title="尚未添加任何 Key" hint="前往 API Keys 添加" />
           </Card>
-        ) : (
-          cards.map(({ key, balance }) => (
-            <ProviderBalanceCard key={key.id} keyRecord={key} balance={balance} />
-          ))
-        )}
-      </MotionGroup>
+        </MotionGroup>
+      ) : (
+        <>
+          <SortableCardGrid
+            items={orderedCards}
+            getId={balanceCardId}
+            getLabel={balanceCardLabel}
+            onReorder={reorderVisible}
+            className="grid grid-cols-2 gap-4 max-lg:grid-cols-1"
+            ariaLabel="余额卡片顺序"
+            renderItem={(card) =>
+              card.kind === 'codex' ? (
+                codexCard
+              ) : (
+                <ProviderBalanceCard keyRecord={card.key} balance={card.balance} />
+              )
+            }
+          />
+          <div className="mt-3 flex justify-end text-[12px] text-text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <i className="fa-solid fa-grip-lines text-[10px]" />
+              拖动卡片调整顺序
+            </span>
+          </div>
+        </>
+      )}
     </div>
   )
 }

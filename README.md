@@ -21,7 +21,7 @@
 | 用量概览                | 查看 Token、请求数、成本、缓存命中率和按日/小时趋势                                        |
 | Provider 余额           | 查询 DeepSeek、智谱、Moonshot、MiniMax、LongCat、OpenRouter、NewAPI 兼容服务等余额或资源包 |
 | API Key 管理            | 本地加密保存 Key，按 Provider 查看状态并安全编辑                                           |
-| Claude Code / Codex CLI | 按需解析本机会话 JSONL 日志；自动解析由开关控制，打开 API Keys 页面不会触发解析       |
+| Claude Code / Codex CLI | 按需解析本机会话 JSONL 日志；自动解析由开关控制，打开 API Keys 页面不会触发解析            |
 | 请求日志                | 筛选、分页、查看请求详情并导出 CSV                                                         |
 | 模型定价                | 配置模型价格，用高精度 decimal 估算人民币成本                                              |
 | 告警                    | 按余额或剩余百分比设置低额度提醒                                                           |
@@ -38,17 +38,17 @@
 | -------------------------------------------------- | ------------------------------------------------------- |
 | ![请求日志](./design/screenshots/request-logs.png) | ![云端同步设置](./design/screenshots/settings-sync.png) |
 
-## 1.1.1 最新版本
+## 1.1.2 最新版本
 
-本次版本为全部桌面端页面加入与现有视觉风格一致的语义化动效，覆盖数字、图表、
-进度、卡片、表格、状态和弹窗反馈；同时支持 reduced motion、弹窗焦点恢复和真实
-Electron 动画收敛测试。动画位移与时长保持克制，不改变现有布局和信息密度。
+API Keys 与余额查询卡片现可拖动排序，并提供克制的抬升、占位、让位和落位反馈；
+顺序会按页面保存，同时支持筛选、方向键和 reduced motion。本版还修复了带供应商
+前缀、大小写或 Kimi K3 别名的模型价格匹配，并在项目用量聚合前统一折算多币种成本。
 
 ### Windows 下载
 
-- [安装版 TokenLub-1.1.1-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-x64.exe)
-- [便携版 TokenLub-1.1.1-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-portable.exe)
-- [GitHub Release v1.1.1](https://github.com/2488652el/TokenLub/releases/tag/v1.1.1)
+- [安装版 TokenLub-1.1.2-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-x64.exe)
+- [便携版 TokenLub-1.1.2-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-portable.exe)
+- [GitHub Release v1.1.2](https://github.com/2488652el/TokenLub/releases/tag/v1.1.2)
 
 安装包统一输出到 `demo/tokenlub-<版本号>-<修改说明>-<执行模型>/`。正式
 Windows 构建命令为：
@@ -110,7 +110,7 @@ npm run build
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.1.1 \
+  --ref v1.1.2 \
   --domain sync.example.com \
   --email admin@example.com
 ```
@@ -120,7 +120,7 @@ sudo bash drive/ops/one-click/install.sh \
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.1.1 \
+  --ref v1.1.2 \
   --ssh-only
 ```
 

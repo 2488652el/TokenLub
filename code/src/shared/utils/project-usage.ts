@@ -1,4 +1,5 @@
 import type { UsageRecord } from '../types/usage'
+import { convertPriceCurrency, DEFAULT_CNY_RATES } from './money'
 
 export type ProjectUsageRangeDays = 7 | 30 | 90
 
@@ -72,10 +73,15 @@ function tokensFor(record: UsageRecord): number {
 }
 
 /** 按项目与本地日期聚合 session-log，并补齐所选周期内的空日期。 */
+function costInCny(record: UsageRecord, ratesToCny: Record<string, number | undefined>): number {
+  return convertPriceCurrency(record.cost ?? 0, record.currency ?? 'CNY', 'CNY', ratesToCny) ?? 0
+}
+
 export function buildProjectUsage(
   logs: UsageRecord[],
   rangeDays: ProjectUsageRangeDays,
-  now = new Date()
+  now = new Date(),
+  ratesToCny: Record<string, number | undefined> = DEFAULT_CNY_RATES
 ): ProjectUsageReport {
   const dates = buildDateKeys(rangeDays, now)
   const visibleDates = new Set(dates)
@@ -103,9 +109,10 @@ export function buildProjectUsage(
       days: new Map<string, ProjectUsageDay>()
     }
     const tokens = tokensFor(record)
+    const cost = costInCny(record, ratesToCny)
     const day = project.days.get(date) ?? { date, tokens: 0, requests: 0, cost: 0 }
 
-    project.cost += record.cost ?? 0
+    project.cost += cost
     project.inputTokens += record.promptTokens ?? 0
     project.outputTokens += record.completionTokens ?? 0
     project.cacheReadTokens += record.cacheReadTokens ?? 0
@@ -113,7 +120,7 @@ export function buildProjectUsage(
     project.requests += 1
     day.tokens += tokens
     day.requests += 1
-    day.cost += record.cost ?? 0
+    day.cost += cost
     project.days.set(date, day)
     projects.set(key, project)
   }

@@ -12,7 +12,8 @@ import { CreateKeyModal } from '../components/CreateKeyModal'
 import { EditKeyModal } from '../components/EditKeyModal'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { CodexQuotaPanel } from '../components/CodexQuotaPanel'
-import { AnimatedNumber, MotionGroup } from '../components/motion'
+import { AnimatedNumber, MotionGroup, SortableCardGrid } from '../components/motion'
+import { useCardOrder } from '../hooks/useCardOrder'
 import { useCodexUsage } from '../hooks/useCodexUsage'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount } from '../../shared/utils/money'
@@ -53,6 +54,15 @@ type SessionStats = Record<
 
 /** localStorage/settings 中控制自动解析的 key */
 const SESSION_AUTO_SYNC_KEY = 'session_auto_parse_enabled'
+const API_KEY_CARD_ORDER_KEY = 'tokenlub.api-key-card-order.v1'
+
+function apiKeyId(key: ApiKeyRecord): string {
+  return key.id
+}
+
+function apiKeyLabel(key: ApiKeyRecord): string {
+  return key.alias
+}
 
 /** 来源显示名映射 */
 const SESSION_LABEL: Record<SessionSource, string> = {
@@ -139,6 +149,11 @@ export default function ApiKeys() {
   const [providerFilter, setProviderFilter] = useState<string | null>(null)
   const codexUsage = useCodexUsage()
   const reducedMotion = useReducedMotion()
+  const { orderedItems: orderedKeys, reorderVisible } = useCardOrder(
+    API_KEY_CARD_ORDER_KEY,
+    keys,
+    apiKeyId
+  )
 
   /** 刷新密钥、供应商目录与余额列表 */
   const refresh = useCallback(async () => {
@@ -315,13 +330,13 @@ export default function ApiKeys() {
   /** 按搜索词与供应商筛选后的密钥列表 */
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return keys.filter((k) => {
+    return orderedKeys.filter((k) => {
       if (providerFilter && k.providerId !== providerFilter) return false
       if (q && !k.alias.toLowerCase().includes(q) && !k.providerId.toLowerCase().includes(q))
         return false
       return true
     })
-  }, [keys, search, providerFilter])
+  }, [orderedKeys, search, providerFilter])
 
   /** 创建新 Key 的保存回调 */
   async function handleSave(
@@ -668,10 +683,15 @@ export default function ApiKeys() {
               </div>
             </Card>
           ) : (
-            <MotionGroup className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-              {filtered.map((k) => (
+            <SortableCardGrid
+              items={filtered}
+              getId={apiKeyId}
+              getLabel={apiKeyLabel}
+              onReorder={reorderVisible}
+              className="grid grid-cols-2 gap-4 max-lg:grid-cols-1"
+              ariaLabel="API Key 卡片顺序"
+              renderItem={(k) => (
                 <ApiKeyCard
-                  key={k.id}
                   keyRecord={k}
                   balance={latestByKey.get(k.id)}
                   providerDisplayName={providerLabel(k.providerId, providers)}
@@ -681,8 +701,8 @@ export default function ApiKeys() {
                   onRefreshOne={handleRefreshOne}
                   onToggleUsage={handleToggleUsage}
                 />
-              ))}
-            </MotionGroup>
+              )}
+            />
           )}
           {keys.length > 0 && (
             <div className="pt-3 mt-2 text-[12px] text-text-muted flex items-center justify-between">
@@ -693,6 +713,10 @@ export default function ApiKeys() {
                     · 显示 <AnimatedNumber value={filtered.length} /> 条
                   </>
                 )}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <i className="fa-solid fa-grip-lines text-[10px]" />
+                拖动卡片调整顺序
               </span>
             </div>
           )}

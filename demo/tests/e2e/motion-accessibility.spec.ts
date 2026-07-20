@@ -230,6 +230,51 @@ async function expectSettled(page: Page): Promise<void> {
     .toEqual([])
 }
 
+async function dragFirstCardToSecond(page: Page): Promise<string[]> {
+  const grid = page.locator('[data-sortable-grid]')
+  const items = grid.locator('[data-sortable-id]')
+  await expect(items).toHaveCount(3)
+  const before = await items.evaluateAll((elements) =>
+    elements.map((element) => (element as HTMLElement).dataset.sortableId ?? '')
+  )
+  const firstHandle = items.nth(0).locator('[data-drag-handle]')
+  await firstHandle.scrollIntoViewIfNeeded()
+  const handleBox = await firstHandle.boundingBox()
+  const targetBox = await items.nth(1).boundingBox()
+  if (!handleBox || !targetBox) throw new Error('sortable card bounds were unavailable')
+
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(
+    handleBox.x + handleBox.width / 2 + 8,
+    handleBox.y + handleBox.height / 2 + 8,
+    {
+      steps: 3
+    }
+  )
+  await expect(items.nth(0)).toHaveClass(/is-dragging/)
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, {
+    steps: 8
+  })
+  await expect(grid.locator('.is-sort-target')).toHaveCount(1)
+  await expect
+    .poll(() =>
+      grid.locator('.is-sort-target').evaluate((element) => getComputedStyle(element).transform)
+    )
+    .not.toBe('none')
+  await page.mouse.up()
+
+  const expected = [before[1], before[0], ...before.slice(2)]
+  await expect
+    .poll(() =>
+      items.evaluateAll((elements) =>
+        elements.map((element) => (element as HTMLElement).dataset.sortableId ?? '')
+      )
+    )
+    .toEqual(expected)
+  return expected
+}
+
 test.describe.serial('Electron motion and accessibility', () => {
   test.describe.configure({ timeout: 90_000 })
 
@@ -261,6 +306,16 @@ test.describe.serial('Electron motion and accessibility', () => {
     page.setDefaultTimeout(8_000)
     await expect(page).toHaveTitle('TokenLub')
     await expect(page.locator('#root')).not.toBeEmpty({ timeout: 15_000 })
+    await page.evaluate(async () => {
+      for (const alias of ['拖拽测试 Alpha', '拖拽测试 Beta', '拖拽测试 Gamma']) {
+        await window.api.keys.add({
+          providerId: 'manual',
+          alias,
+          apiKey: `sk-tokenlub-${alias}`,
+          usageQueryEnabled: false
+        })
+      }
+    })
   })
 
   test.afterAll(async () => {
@@ -315,5 +370,62 @@ test.describe.serial('Electron motion and accessibility', () => {
     await expect(dialog).toBeHidden({ timeout: 2_000 })
     await expect(createButton).toBeFocused()
     await expectSettled(window)
+  })
+
+  test('drags and persists API key and balance card order with visible feedback', async () => {
+    const window = page
+    if (!window) throw new Error('Electron window was not created')
+
+    await navigateTo(
+      window,
+      ROUTES.find((item) => item.path === '/apikeys')!
+    )
+    const apiKeyOrder = await dragFirstCardToSecond(window)
+    await expect
+      .poll(() =>
+        window.evaluate(() =>
+          JSON.parse(localStorage.getItem('tokenlub.api-key-card-order.v1') ?? '[]')
+        )
+      )
+      .toEqual(apiKeyOrder)
+
+    await window.reload()
+    await expect(window.locator('#root')).not.toBeEmpty({ timeout: 15_000 })
+    await navigateTo(
+      window,
+      ROUTES.find((item) => item.path === '/apikeys')!
+    )
+    await expect
+      .poll(() =>
+        window
+          .locator('[data-sortable-grid] [data-sortable-id]')
+          .evaluateAll((elements) =>
+            elements.map((element) => (element as HTMLElement).dataset.sortableId ?? '')
+          )
+      )
+      .toEqual(apiKeyOrder)
+
+    await navigateTo(
+      window,
+      ROUTES.find((item) => item.path === '/balance')!
+    )
+    const balanceGrid = window.locator('[data-sortable-grid]')
+    await expect(balanceGrid.locator('[data-sortable-id]')).toHaveCount(4)
+    const firstBalanceHandle = balanceGrid.locator('[data-drag-handle]').first()
+    await firstBalanceHandle.focus()
+    await firstBalanceHandle.press('ArrowRight')
+    const balanceOrder = await balanceGrid
+      .locator('[data-sortable-id]')
+      .evaluateAll((elements) =>
+        elements.map((element) => (element as HTMLElement).dataset.sortableId ?? '')
+      )
+    await expect
+      .poll(() =>
+        window.evaluate(() =>
+          JSON.parse(localStorage.getItem('tokenlub.balance-card-order.v1') ?? '[]')
+        )
+      )
+      .toEqual(balanceOrder)
+    await expect(window.locator('[aria-live="polite"]')).toContainText('已移动到第 2 位')
   })
 })

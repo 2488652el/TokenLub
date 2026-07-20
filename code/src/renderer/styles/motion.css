@@ -98,6 +98,18 @@
   }
 }
 
+@keyframes motion-card-drop {
+  0% {
+    transform: scale(0.99);
+  }
+  60% {
+    transform: scale(1.006);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 .motion-route {
   animation: motion-route-enter var(--motion-control) var(--motion-ease-out) both;
 }
@@ -183,6 +195,89 @@
     transform var(--motion-fast) var(--motion-ease-standard),
     border-color var(--motion-control) var(--motion-ease-standard),
     box-shadow var(--motion-control) var(--motion-ease-standard);
+}
+
+.motion-sortable-item {
+  position: relative;
+  min-width: 0;
+  cursor: grab;
+  transition: transform var(--motion-control) var(--motion-ease-out);
+}
+
+.motion-sortable-item > article,
+.motion-sortable-item > .motion-card {
+  height: 100%;
+}
+
+.motion-sortable-item.is-dragging {
+  z-index: 30;
+  cursor: grabbing;
+  transition: none;
+  will-change: transform;
+}
+
+.motion-sortable-item.is-dragging > .motion-card-interactive {
+  transform: none;
+  border-color: rgba(16, 185, 129, 0.42);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.16),
+    0 0 0 2px rgba(16, 185, 129, 0.12);
+}
+
+.motion-sortable-item.is-sort-target::after {
+  position: absolute;
+  inset: -3px;
+  z-index: 22;
+  border: 2px dashed rgba(16, 185, 129, 0.58);
+  border-radius: 14px;
+  pointer-events: none;
+  content: '';
+}
+
+.motion-sortable-item.is-dropped {
+  animation: motion-card-drop var(--motion-enter) var(--motion-ease-out) both !important;
+}
+
+.motion-sortable-grip {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  z-index: 24;
+  display: inline-flex;
+  width: 28px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #a3a3a3);
+  cursor: grab;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(212, 212, 210, 0.82);
+  border-radius: 999px;
+  opacity: 0.56;
+  transform: translateX(-50%);
+  transition:
+    color var(--motion-fast) var(--motion-ease-standard),
+    opacity var(--motion-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-fast) var(--motion-ease-standard);
+  backdrop-filter: blur(5px);
+}
+
+.motion-sortable-grip:hover,
+.motion-sortable-grip:focus-visible,
+.motion-sortable-item.is-dragging .motion-sortable-grip {
+  color: var(--color-accent, #10b981);
+  opacity: 1;
+  outline: none;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.motion-sortable-grip:active {
+  cursor: grabbing;
+}
+
+body.is-card-sorting {
+  cursor: grabbing;
+  user-select: none;
 }
 
 @media (hover: hover) and (pointer: fine) {

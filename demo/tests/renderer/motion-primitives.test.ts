@@ -6,6 +6,7 @@ import { EmptyState } from '../../../code/src/renderer/components/EmptyState'
 import {
   AnimatedNumber,
   ProgressBar,
+  SortableCardGrid,
   clampProgress
 } from '../../../code/src/renderer/components/motion'
 
@@ -57,5 +58,27 @@ describe('renderer motion primitives', () => {
     expect(html).toContain('data-state="loading"')
     expect(html).toContain('aria-busy="true"')
     expect(html).toContain('motion-empty-loading')
+  })
+
+  it('exposes sortable cards as an accessible list with keyboard handles', () => {
+    const items = [
+      { id: 'alpha', label: 'Alpha' },
+      { id: 'beta', label: 'Beta' }
+    ]
+    const html = renderToStaticMarkup(
+      createElement(SortableCardGrid, {
+        items,
+        getId: (item: (typeof items)[number]) => item.id,
+        getLabel: (item: (typeof items)[number]) => item.label,
+        onReorder: () => undefined,
+        renderItem: (item: (typeof items)[number]) => createElement('article', null, item.label),
+        ariaLabel: '测试卡片顺序'
+      })
+    )
+
+    expect(html).toContain('role="list"')
+    expect(html.match(/role="listitem"/g)).toHaveLength(2)
+    expect(html).toContain('aria-label="拖动Alpha调整顺序"')
+    expect(html).toContain('aria-live="polite"')
   })
 })

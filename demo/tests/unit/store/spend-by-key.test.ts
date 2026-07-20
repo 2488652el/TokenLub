@@ -96,14 +96,28 @@ function fakeQuery(sql: string, args: unknown[]) {
     return Array.from(groups.values())
   }
   if (sql.includes('FROM pricing_entries')) {
-    const modelOnly = sql.includes('WHERE model = ?')
-    const requestedScope = String(modelOnly ? args[1] : args[2])
-    const preferredCurrency = String(modelOnly ? args[3] : args[4])
+    const modelOnly = !sql.includes('provider_id = ?')
+    const requestedScope = String(modelOnly ? args[0] : args[2])
+    const preferredCurrency = String(modelOnly ? args[9] : args[4])
+    const requestedModel = String(args[1])
+    const normalizedModel = String(modelOnly ? args[2] : args[1]).toLowerCase()
+    const canonicalModel = String(modelOnly ? args[3] : args[1]).toLowerCase()
+    const suffixPattern = String(modelOnly ? args[4] : '')
+      .slice(1)
+      .toLowerCase()
     const rows = pricing
       .filter((p) => {
         const scope = p.billing_scope ?? 'default'
         if (scope !== requestedScope && scope !== 'default') return false
-        if (modelOnly) return p.model === args[0]
+        if (modelOnly) {
+          const candidate = p.model.toLowerCase()
+          return (
+            p.model === requestedModel ||
+            candidate === normalizedModel ||
+            candidate === canonicalModel ||
+            candidate.endsWith(suffixPattern)
+          )
+        }
         return p.provider_id === args[0] && p.model === args[1]
       })
       .sort((a, b) => {

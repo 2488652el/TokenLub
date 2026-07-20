@@ -20,7 +20,7 @@ money are going.
 | Area                  | What it does                                                                                                                         |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Provider balances     | Query balances and token plans across DeepSeek, Zhipu, Moonshot, MiniMax, LongCat, OpenRouter, NewAPI-compatible services, and more. |
-| Local session parsing | Parse Claude Code and Codex CLI JSONL logs on demand; background parsing follows the toggle and page open never triggers it.              |
+| Local session parsing | Parse Claude Code and Codex CLI JSONL logs on demand; background parsing follows the toggle and page open never triggers it.         |
 | Cost accounting       | Estimate spend with high-precision decimal math and configurable per-model pricing.                                                  |
 | API key management    | Store API keys locally with Electron `safeStorage`; the renderer never receives raw secrets.                                         |
 | Request logs          | Browse, filter, inspect, and export request-level token usage as CSV.                                                                |
@@ -30,24 +30,25 @@ money are going.
 
 ## Latest Release
 
-Current formal build: **TokenLub 1.1.1**
+Current formal build: **TokenLub 1.1.2**
 
-This release adds restrained, semantic motion to all ten desktop pages for
-metrics, charts, progress, cards, tables, status changes, and dialogs. It also
-supports reduced motion, dialog focus restoration, and real Electron tests that
-verify route animations settle without changing the existing layout density.
+API Keys and Balance Query cards can now be reordered with restrained lift,
+target, displacement, and drop feedback. Ordering persists per page and remains
+accessible through keyboard controls and reduced motion. This release also fixes
+catalog price matching for provider-prefixed, case-varied, and Kimi K3 model names,
+and converts mixed-currency project costs to CNY before aggregation.
 
 | Artifact     | Path                                                               |
 | ------------ | ------------------------------------------------------------------ |
-| Installer    | `demo/tokenlub-1.1.1-<change>-<model>/TokenLub-1.1.1-x64.exe`      |
-| Portable app | `demo/tokenlub-1.1.1-<change>-<model>/TokenLub-1.1.1-portable.exe` |
-| Unpacked app | `demo/tokenlub-1.1.1-<change>-<model>/win-unpacked/`               |
+| Installer    | `demo/tokenlub-1.1.2-<change>-<model>/TokenLub-1.1.2-x64.exe`      |
+| Portable app | `demo/tokenlub-1.1.2-<change>-<model>/TokenLub-1.1.2-portable.exe` |
+| Unpacked app | `demo/tokenlub-1.1.2-<change>-<model>/win-unpacked/`               |
 
 ### Windows downloads
 
-- [TokenLub-1.1.1-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-x64.exe)
-- [TokenLub-1.1.1-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-portable.exe)
-- [GitHub Release v1.1.1](https://github.com/2488652el/TokenLub/releases/tag/v1.1.1)
+- [TokenLub-1.1.2-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-x64.exe)
+- [TokenLub-1.1.2-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-portable.exe)
+- [GitHub Release v1.1.2](https://github.com/2488652el/TokenLub/releases/tag/v1.1.2)
 
 The app icon is bundled through `design/assets/icon.ico` on Windows,
 `design/assets/icon.icns` on macOS, and `design/assets/icon.png` for local

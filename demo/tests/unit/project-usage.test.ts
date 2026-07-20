@@ -75,6 +75,21 @@ describe('buildProjectUsage', () => {
     expect(report.projects[0]!.color).not.toBe(report.projects[1]!.color)
   })
 
+  it('converts project costs to CNY before aggregation', () => {
+    const report = buildProjectUsage(
+      [
+        record({ agentLabel: 'mixed', cost: 2, currency: 'USD' }),
+        record({ agentLabel: 'mixed', cost: 3, currency: 'CNY' })
+      ],
+      7,
+      new Date('2026-07-17T18:00:00'),
+      { USD: 7.2 }
+    )
+
+    expect(report.projects[0]?.cost).toBe(17.4)
+    expect(report.projects[0]?.days.at(-1)?.cost).toBe(17.4)
+  })
+
   it('falls back to a shortened session id when no project label exists', () => {
     const report = buildProjectUsage(
       [record({ sessionId: '1234567890abcdef', totalTokens: 42 })],

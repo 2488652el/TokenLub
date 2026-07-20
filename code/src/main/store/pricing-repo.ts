@@ -145,12 +145,28 @@ export function findPricingByModel(
 ): PricingEntry | null {
   const db = getDb()
   const normalizedScope = normalizeBillingScope(billingScope)
+  const normalizedModel = model.trim().toLowerCase()
+  const modelLeaf = normalizedModel.split('/').at(-1) ?? normalizedModel
+  const canonicalModel = modelLeaf === 'k3' ? 'kimi-k3' : modelLeaf
+  const prefixedCanonicalModel = `%/${canonicalModel}`
   const rows = db
     .prepare(
       `
       SELECT * FROM pricing_entries
-      WHERE model = ? AND billing_scope IN (?, 'default')
+      WHERE billing_scope IN (?, 'default')
+        AND (
+          model = ?
+          OR LOWER(model) = ?
+          OR LOWER(model) = ?
+          OR LOWER(model) LIKE ?
+        )
       ORDER BY
+        CASE
+          WHEN model = ? THEN 0
+          WHEN LOWER(model) = ? THEN 1
+          WHEN LOWER(model) = ? THEN 2
+          ELSE 3
+        END,
         CASE WHEN billing_scope = ? THEN 0 ELSE 1 END,
         CASE WHEN currency = ? THEN 0 ELSE 1 END,
         CASE WHEN source = 'user' THEN 0 ELSE 1 END,
@@ -159,7 +175,18 @@ export function findPricingByModel(
       LIMIT 1
     `
     )
-    .all(model, normalizedScope, normalizedScope, preferredCurrency ?? '') as DbRow[]
+    .all(
+      normalizedScope,
+      model,
+      normalizedModel,
+      canonicalModel,
+      prefixedCanonicalModel,
+      model,
+      normalizedModel,
+      canonicalModel,
+      normalizedScope,
+      preferredCurrency ?? ''
+    ) as DbRow[]
   return rows[0] ? rowToEntry(rows[0]) : null
 }
 
