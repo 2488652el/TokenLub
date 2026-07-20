@@ -8,10 +8,12 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { Modal } from '../components/Modal'
+import { AnimatedNumber, ProgressBar } from '../components/motion'
 import { fmtMoney } from '../../shared/utils/money'
 import type { AlertRule, AlertMetric, AlertScope } from '../../shared/types/alert'
 import type { ProviderManifest, BalanceSnapshot } from '../../shared/types/provider'
 import { alertAddInputSchema } from '../../shared/ipc-schemas'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 
 /** 告警指标到中文标签的映射 */
 const METRIC_LABEL: Record<AlertMetric, string> = {
@@ -53,6 +55,7 @@ export default function UsageAlerts() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const reducedMotion = useReducedMotion()
 
   /** 刷新告警规则、供应商与余额列表 */
   async function refresh() {
@@ -192,7 +195,7 @@ export default function UsageAlerts() {
   const showTable = !loading && rules.length > 0
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       <PageHeader
         title="用量告警"
         desc="阈值规则触发时写入告警事件"
@@ -209,7 +212,7 @@ export default function UsageAlerts() {
       />
 
       {loading ? (
-        <Card>
+        <Card motion="status" className={busy ? 'motion-data-flash' : ''}>
           <EmptyState icon="fa-spinner" title="加载中…" hint="读取告警规则" />
         </Card>
       ) : !showTable ? (
@@ -241,7 +244,7 @@ export default function UsageAlerts() {
                   <th>操作</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="motion-table-rows">
                 {rules.map((r) => (
                   <tr key={r.id}>
                     <td>
@@ -255,9 +258,15 @@ export default function UsageAlerts() {
                       )}
                     </td>
                     <td className="text-[12.5px]">{METRIC_LABEL[r.metric]}</td>
-                    <td className="mono text-[12.5px]">{formatThreshold(r)}</td>
+                    <td className="mono text-[12.5px]">
+                      <ThresholdCell rule={r} value={formatThreshold(r)} />
+                    </td>
                     <td>
-                      <Toggle checked={r.enabled} onChange={() => handleToggle(r)} />
+                      <Toggle
+                        checked={r.enabled}
+                        onChange={() => handleToggle(r)}
+                        reducedMotion={reducedMotion}
+                      />
                     </td>
                     <td className="text-secondary text-[12px]">
                       {formatRelative(r.lastTriggeredAt)}
@@ -281,7 +290,7 @@ export default function UsageAlerts() {
             </table>
           </div>
           <div className="pt-3 mt-2 border-t border-border-light text-[12px] text-text-muted">
-            共 {rules.length} 条规则{busy && ' · 保存中…'}
+            共 <AnimatedNumber value={rules.length} /> 条规则{busy && ' · 保存中…'}
           </div>
         </Card>
       )}
@@ -304,8 +313,35 @@ function ScopeBadge({ scope }: { scope: AlertScope }) {
   )
 }
 
+function ThresholdCell({ rule, value }: { rule: AlertRule; value: string }) {
+  if (rule.metric !== 'remaining_pct') return <span>{value}</span>
+  const threshold = Math.max(0, Math.min(100, rule.threshold))
+  return (
+    <div className="min-w-[78px]">
+      <AnimatedNumber
+        value={threshold}
+        format={(next) => `${Number.isInteger(next) ? next.toFixed(0) : next.toFixed(1)}%`}
+      />
+      <ProgressBar
+        value={threshold / 100}
+        label="剩余百分比告警阈值"
+        tone="amber"
+        trackClassName="mt-1 h-1 w-16"
+      />
+    </div>
+  )
+}
+
 /** 开关组件:可点击或键盘切换的 switch */
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+function Toggle({
+  checked,
+  onChange,
+  reducedMotion
+}: {
+  checked: boolean
+  onChange: () => void
+  reducedMotion: boolean
+}) {
   return (
     <span
       role="switch"
@@ -318,14 +354,14 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
         }
       }}
       tabIndex={0}
-      className={`relative inline-block w-9 h-5 rounded-full cursor-pointer transition-colors ${
-        checked ? 'bg-accent' : 'bg-[#D4D4D2]'
-      }`}
+      className={`relative inline-block w-9 h-5 rounded-full cursor-pointer ${
+        !reducedMotion ? 'transition-colors' : ''
+      } ${checked ? 'bg-accent' : 'bg-[#D4D4D2]'}`}
     >
       <span
-        className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow transition-transform ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
+        className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow ${
+          !reducedMotion ? 'transition-transform' : ''
+        } ${checked ? 'translate-x-4' : 'translate-x-0'}`}
       />
     </span>
   )
@@ -489,7 +525,11 @@ function RuleModal({
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
             取消
           </button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <button
+            type="submit"
+            className={`btn btn-primary ${saving ? 'motion-data-flash' : ''}`}
+            disabled={saving}
+          >
             {saving ? '保存中…' : '保存'}
           </button>
         </div>

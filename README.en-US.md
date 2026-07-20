@@ -30,25 +30,24 @@ money are going.
 
 ## Latest Release
 
-Current formal build: **TokenLub 1.1.0**
+Current formal build: **TokenLub 1.1.1**
 
-This release redesigns request-log filtering with provider, source, date-range,
-and model controls, while localizing table labels and improving provider, cost,
-and pagination display. The web console now remembers account and device
-bindings, restores sessions after reload, revokes sessions on logout, and clears
-the local session after a password change without storing passwords.
+This release adds restrained, semantic motion to all ten desktop pages for
+metrics, charts, progress, cards, tables, status changes, and dialogs. It also
+supports reduced motion, dialog focus restoration, and real Electron tests that
+verify route animations settle without changing the existing layout density.
 
 | Artifact     | Path                                                               |
 | ------------ | ------------------------------------------------------------------ |
-| Installer    | `demo/tokenlub-1.1.0-<change>-<model>/TokenLub-1.1.0-x64.exe`      |
-| Portable app | `demo/tokenlub-1.1.0-<change>-<model>/TokenLub-1.1.0-portable.exe` |
-| Unpacked app | `demo/tokenlub-1.1.0-<change>-<model>/win-unpacked/`               |
+| Installer    | `demo/tokenlub-1.1.1-<change>-<model>/TokenLub-1.1.1-x64.exe`      |
+| Portable app | `demo/tokenlub-1.1.1-<change>-<model>/TokenLub-1.1.1-portable.exe` |
+| Unpacked app | `demo/tokenlub-1.1.1-<change>-<model>/win-unpacked/`               |
 
 ### Windows downloads
 
-- [TokenLub-1.1.0-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.1.0/TokenLub-1.1.0-x64.exe)
-- [TokenLub-1.1.0-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.0/TokenLub-1.1.0-portable.exe)
-- [GitHub Release v1.1.0](https://github.com/2488652el/TokenLub/releases/tag/v1.1.0)
+- [TokenLub-1.1.1-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-x64.exe)
+- [TokenLub-1.1.1-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-portable.exe)
+- [GitHub Release v1.1.1](https://github.com/2488652el/TokenLub/releases/tag/v1.1.1)
 
 The app icon is bundled through `design/assets/icon.ico` on Windows,
 `design/assets/icon.icns` on macOS, and `design/assets/icon.png` for local

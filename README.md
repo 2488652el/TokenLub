@@ -38,18 +38,17 @@
 | -------------------------------------------------- | ------------------------------------------------------- |
 | ![请求日志](./design/screenshots/request-logs.png) | ![云端同步设置](./design/screenshots/settings-sync.png) |
 
-## 1.1.0 最新版本
+## 1.1.1 最新版本
 
-本次版本重构请求日志页面，提供供应商下拉、中文来源切换、日期范围和模型搜索，
-并统一中文表头、供应商名称、费用币种与分页展示。Web 控制台新增账号和设备绑定
-记忆、登录会话恢复与显式退出，密码修改后会清除旧会话并要求重新登录，且不会把
-密码写入浏览器存储。
+本次版本为全部桌面端页面加入与现有视觉风格一致的语义化动效，覆盖数字、图表、
+进度、卡片、表格、状态和弹窗反馈；同时支持 reduced motion、弹窗焦点恢复和真实
+Electron 动画收敛测试。动画位移与时长保持克制，不改变现有布局和信息密度。
 
 ### Windows 下载
 
-- [安装版 TokenLub-1.1.0-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.0/TokenLub-1.1.0-x64.exe)
-- [便携版 TokenLub-1.1.0-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.0/TokenLub-1.1.0-portable.exe)
-- [GitHub Release v1.1.0](https://github.com/2488652el/TokenLub/releases/tag/v1.1.0)
+- [安装版 TokenLub-1.1.1-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-x64.exe)
+- [便携版 TokenLub-1.1.1-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.1/TokenLub-1.1.1-portable.exe)
+- [GitHub Release v1.1.1](https://github.com/2488652el/TokenLub/releases/tag/v1.1.1)
 
 安装包统一输出到 `demo/tokenlub-<版本号>-<修改说明>-<执行模型>/`。正式
 Windows 构建命令为：
@@ -111,7 +110,7 @@ npm run build
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.1.0 \
+  --ref v1.1.1 \
   --domain sync.example.com \
   --email admin@example.com
 ```
@@ -121,7 +120,7 @@ sudo bash drive/ops/one-click/install.sh \
 ```bash
 sudo bash drive/ops/one-click/install.sh \
   --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.1.0 \
+  --ref v1.1.1 \
   --ssh-only
 ```
 

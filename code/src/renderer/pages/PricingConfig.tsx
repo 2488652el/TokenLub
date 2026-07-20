@@ -8,6 +8,8 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { Modal } from '../components/Modal'
+import { AnimatedNumber, MotionGroup } from '../components/motion'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { convertPriceCurrency, fmtMoney, normalizeCurrency } from '../../shared/utils/money'
 import type {
   CnyRateQuote,
@@ -57,6 +59,7 @@ export default function PricingConfig() {
   const [cnyRates, setCnyRates] = useState<Record<string, CnyRateQuote>>({})
   const [displayCurrency, setDisplayCurrency] = useState<DisplayCurrency>('CNY')
   const [syncingCatalog, setSyncingCatalog] = useState(false)
+  const reducedMotion = useReducedMotion()
 
   /** 加载价格表中所有非人民币币种的 CNY 汇率。 */
   const refreshCnyRates = useCallback(async (list: PricingEntry[]) => {
@@ -283,7 +286,7 @@ export default function PricingConfig() {
   }
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content" data-motion-group>
       <PageHeader
         title="价格配置"
         desc="同步 models.dev 官方价格并统一折算为人民币展示；编辑时仍保留原始计价币种"
@@ -310,7 +313,11 @@ export default function PricingConfig() {
               onClick={() => void handleCatalogSync()}
               disabled={syncingCatalog}
             >
-              <i className={`fa-solid fa-arrows-rotate ${syncingCatalog ? 'fa-spin' : ''}`} />
+              <i
+                className={`fa-solid fa-arrows-rotate ${
+                  syncingCatalog && !reducedMotion ? 'fa-spin' : ''
+                }`}
+              />
               {syncingCatalog ? '同步中…' : '同步官方价格'}
             </button>
             <button className="btn btn-outline btn-sm" onClick={handleRestoreAll}>
@@ -360,6 +367,8 @@ export default function PricingConfig() {
               filter={filter}
               onChange={setFilter}
               onReset={resetFilter}
+              resultCount={filtered.length}
+              totalCount={entries.length}
             />
           </Card>
           <Card>
@@ -381,7 +390,7 @@ export default function PricingConfig() {
                     <th>操作</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="motion-table-rows">
                   {filtered.length === 0 ? (
                     <tr>
                       <td colSpan={12} className="text-center text-text-muted py-8 text-[13px]">
@@ -512,7 +521,11 @@ function CatalogStatusCard({
 }) {
   const result = status?.lastResult
   return (
-    <Card className="mb-4" bodyClassName="py-3">
+    <Card
+      className={`mb-4 ${status?.state === 'syncing' ? 'motion-data-flash' : ''}`}
+      bodyClassName="py-3"
+      motion="status"
+    >
       <div className="flex items-center justify-between gap-4 flex-wrap text-[12.5px]">
         <div>
           <div className="fw-600">Models.dev 官方价格</div>
@@ -612,7 +625,7 @@ function PricingHistoryCard({ history }: { history: PricingHistoryEntry[] }) {
   return (
     <Card className="mb-4" bodyClassName="py-3">
       <div className="fw-600 text-[13px] mb-2">最近价格变更</div>
-      <div className="space-y-1 text-[12px]">
+      <MotionGroup className="space-y-1 text-[12px]">
         {history.map((item) => (
           <div key={item.id} className="flex items-center justify-between gap-3">
             <span className="mono">
@@ -624,7 +637,7 @@ function PricingHistoryCard({ history }: { history: PricingHistoryEntry[] }) {
             </span>
           </div>
         ))}
-      </div>
+      </MotionGroup>
     </Card>
   )
 }
@@ -667,12 +680,16 @@ function FilterBar({
   providers,
   filter,
   onChange,
-  onReset
+  onReset,
+  resultCount,
+  totalCount
 }: {
   providers: ProviderManifest[]
   filter: FilterState
   onChange: (f: FilterState) => void
   onReset: () => void
+  resultCount: number
+  totalCount: number
 }) {
   const anyFilter =
     !!filter.providerId || !!filter.currency || !!filter.billingScope || !!filter.query.trim()
@@ -737,6 +754,9 @@ function FilterBar({
           <i className="fa-solid fa-xmark" /> 清空筛选
         </button>
       )}
+      <span className="ml-auto font-mono text-[11.5px] text-text-muted" aria-live="polite">
+        <AnimatedNumber value={resultCount} /> / <AnimatedNumber value={totalCount} /> 条
+      </span>
     </div>
   )
 }
@@ -977,7 +997,11 @@ function PricingEntryModal({
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
             取消
           </button>
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <button
+            type="submit"
+            className={`btn btn-primary ${saving ? 'motion-data-flash' : ''}`}
+            disabled={saving}
+          >
             {saving ? '保存中…' : '保存'}
           </button>
         </div>

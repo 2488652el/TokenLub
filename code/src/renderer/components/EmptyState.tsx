@@ -15,16 +15,24 @@ export function EmptyState({
   icon,
   title,
   hint,
-  action
+  action,
+  variant
 }: {
   icon: string
   title: string
   hint?: string
   action?: ReactNode
+  variant?: 'empty' | 'loading' | 'error'
 }) {
+  const resolvedVariant = variant ?? (icon.includes('spinner') ? 'loading' : 'empty')
+
   return (
-    <div className="flex flex-col items-center py-12 px-6 text-text-muted gap-[10px]">
-      <i className={`${icon} text-[32px] opacity-35`} />
+    <div
+      data-state={resolvedVariant}
+      aria-busy={resolvedVariant === 'loading'}
+      className={`motion-empty-${resolvedVariant} flex flex-col items-center py-12 px-6 text-text-muted gap-[10px]`}
+    >
+      <i className={`fa-solid ${icon} motion-empty-icon text-[32px] opacity-35`} />
       <p className="text-[13.5px]">{title}</p>
       {hint && <p className="text-[12px]">{hint}</p>}
       {action}

@@ -2,7 +2,7 @@
  * 统计瓷砖组件:展示单个指标(label + value + 副标题),常用于仪表盘的概览区。
  * (glm-5.2)
  */
-import { type ReactNode } from 'react'
+import { type CSSProperties, type ReactNode } from 'react'
 import clsx from 'clsx'
 
 /**
@@ -18,13 +18,15 @@ export function StatTile({
   icon,
   value,
   sub,
-  accent = 'accent'
+  accent = 'accent',
+  motionOrder = 0
 }: {
   label: string
   icon?: string
   value: ReactNode
   sub?: string
   accent?: 'accent' | 'amber' | 'blue' | 'purple' | 'red'
+  motionOrder?: number
 }) {
   // 按 accent 主题映射图标颜色
   const iconColor = {
@@ -35,7 +37,10 @@ export function StatTile({
     red: 'text-status-red'
   }[accent]
   return (
-    <div className="p-4 border border-border-light rounded-md bg-bg-card">
+    <div
+      className="motion-card p-4 border border-border-light rounded-md bg-bg-card"
+      style={{ '--motion-order': motionOrder } as CSSProperties}
+    >
       <div
         className={clsx(
           'text-[12px] text-text-muted mb-[6px] flex items-center gap-[5px]',

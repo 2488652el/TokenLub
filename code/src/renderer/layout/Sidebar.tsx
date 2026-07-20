@@ -125,7 +125,7 @@ export function Sidebar() {
                 end={item.to === '/'}
                 className={({ isActive }) =>
                   clsx(
-                    'grid grid-cols-[18px_minmax(0,1fr)_36px] items-center gap-2.5 w-full min-h-[36px] px-3 py-2 mb-[1px] rounded-md cursor-pointer transition-colors duration-150 text-[13.5px] relative select-none',
+                    'motion-nav-item grid grid-cols-[18px_minmax(0,1fr)_36px] items-center gap-2.5 w-full min-h-[36px] px-3 py-2 mb-[1px] rounded-md cursor-pointer text-[13.5px] relative select-none',
                     isActive
                       ? 'bg-bg-active text-accent-text font-medium'
                       : 'text-text-secondary hover:bg-bg-hover/70 hover:text-text-primary'

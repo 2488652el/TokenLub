@@ -10,6 +10,7 @@ import { HashRouter } from 'react-router-dom'
 import App from './App'
 import './styles/tailwind.css'
 import './styles/tokens.css'
+import './styles/motion.css'
 
 // 获取根挂载节点(由 index.html 中的 #root 提供)
 const root = createRoot(document.getElementById('root')!)

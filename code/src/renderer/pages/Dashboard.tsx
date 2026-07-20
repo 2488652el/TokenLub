@@ -16,6 +16,8 @@ import {
 } from 'recharts'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
+import { AnimatedNumber, MotionGroup, ProgressBar } from '../components/motion'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
 import type { DashboardSummary, TotalSpendSummary } from '../../shared/types/usage'
 import type { BalanceSnapshot } from '../../shared/types/provider'
@@ -102,6 +104,7 @@ function rangeSince(range: RangeKey): string | undefined {
 
 /** 按模型分组的用量趋势折线图组件 */
 function ModelUsageLineChart({ series }: { series: UsageTrendSeries }) {
+  const reducedMotion = useReducedMotion()
   if (!series.points.length || !series.models.length) return null
   return (
     <div className="h-[360px] min-w-0">
@@ -143,7 +146,9 @@ function ModelUsageLineChart({ series }: { series: UsageTrendSeries }) {
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
-              isAnimationActive={false}
+              isAnimationActive={!reducedMotion}
+              animationDuration={640}
+              animationEasing="ease-out"
               connectNulls
             />
           ))}
@@ -274,13 +279,11 @@ export default function Dashboard() {
     return [...(summary?.providers ?? [])].sort((a, b) => b.tokens - a.tokens).slice(0, 4)
   }, [summary])
   const activeRangeLabel = RANGE_OPTIONS.find((r) => r.key === range)?.label ?? '30 天'
-  const estimatedCost =
-    spend && spend.totalRequests > 0
-      ? fmtMoney(spend.cnyTotal, 'CNY')
-      : fmtMoney(summary?.totalCost ?? 0)
+  const hasCnySpend = Boolean(spend && spend.totalRequests > 0)
+  const estimatedCostValue = hasCnySpend ? (spend?.cnyTotal ?? 0) : (summary?.totalCost ?? 0)
 
   return (
-    <div className="page-content animate-in overflow-x-auto bg-[#fafafa] text-[#09090b]">
+    <div className="page-content overflow-x-auto bg-[#fafafa] text-[#09090b]">
       {isEmpty ? (
         <Card className="border-[#e5e7eb] bg-white shadow-sm">
           <EmptyState
@@ -299,7 +302,7 @@ export default function Dashboard() {
           />
         </Card>
       ) : (
-        <div className="mx-auto flex min-w-[760px] max-w-[1440px] flex-col gap-6">
+        <MotionGroup className="mx-auto flex min-w-[760px] max-w-[1440px] flex-col gap-6">
           <section className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-[13px] font-medium text-[#71717a]">TokenLub</p>
@@ -352,7 +355,11 @@ export default function Dashboard() {
                   <p className="text-[14px] font-semibold text-[#71717a]">真实消耗 Tokens</p>
                   <div className="mt-1 flex flex-wrap items-end gap-3">
                     <div className="max-w-full break-words text-[44px] font-bold leading-none tracking-normal text-[#09090b]">
-                      {heroNumber !== null ? fmtCount(heroNumber) : '—'}
+                      {heroNumber !== null ? (
+                        <AnimatedNumber value={heroNumber} format={fmtCount} durationMs={520} />
+                      ) : (
+                        '—'
+                      )}
                     </div>
                     {heroNumber && heroNumber >= 1e8 ? (
                       <span className="mb-1 rounded-md bg-[#f3f4f6] px-2 py-1 text-[12px] font-semibold text-[#71717a]">
@@ -374,45 +381,57 @@ export default function Dashboard() {
                 <div>
                   <p className="text-[12px] font-semibold text-[#71717a]">总请求数</p>
                   <p className="mt-1 font-mono text-[20px] font-bold text-[#09090b]">
-                    {summary?.totalRequests.toLocaleString('en-US') ?? '0'}
+                    <AnimatedNumber
+                      value={summary?.totalRequests ?? 0}
+                      format={(value) => Math.round(value).toLocaleString('en-US')}
+                      durationMs={480}
+                    />
                   </p>
                 </div>
                 <div className="border-l border-[#e5e7eb] pl-4">
                   <p className="text-[12px] font-semibold text-[#71717a]">总成本</p>
                   <p className="mt-1 font-mono text-[20px] font-bold text-[#12c99b]">
-                    {estimatedCost}
+                    <AnimatedNumber
+                      value={estimatedCostValue}
+                      format={(value) => (hasCnySpend ? fmtMoney(value, 'CNY') : fmtMoney(value))}
+                      durationMs={520}
+                    />
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+            <MotionGroup className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
               <MetricBox
                 icon="fa-arrow-down"
                 iconClass="text-[#60a5fa]"
                 label="新增输入"
-                value={fmtCount(summary?.totalInputTokens ?? 0)}
+                value={summary?.totalInputTokens ?? 0}
+                format={fmtCount}
               />
               <MetricBox
                 icon="fa-arrow-up"
                 iconClass="text-[#c084fc]"
                 label="Output"
-                value={fmtCount(summary?.totalOutputTokens ?? 0)}
+                value={summary?.totalOutputTokens ?? 0}
+                format={fmtCount}
               />
               <MetricBox
                 icon="fa-database"
                 iconClass="text-[#71717a]"
                 label="缓存命中"
-                value={fmtCount(summary?.totalCacheReadTokens ?? 0)}
+                value={summary?.totalCacheReadTokens ?? 0}
+                format={fmtCount}
               />
               <MetricBox
                 icon="fa-chart-line"
                 iconClass="text-[#12c99b]"
                 label="缓存命中率"
-                value={`${(cacheHitRate * 100).toFixed(1)}%`}
+                value={cacheHitRate * 100}
+                format={(value) => `${value.toFixed(1)}%`}
                 progress={cacheHitRate}
               />
-            </div>
+            </MotionGroup>
 
             {topProviders.length > 0 ? (
               <div className="mt-5 flex flex-wrap items-center gap-2 text-[12px] text-[#71717a]">
@@ -463,7 +482,11 @@ export default function Dashboard() {
                 <div className="space-y-4">
                   <div>
                     <div className="font-mono text-[34px] font-bold leading-none text-[#09090b]">
-                      {fmtMoney(spend.cnyTotal, 'CNY')}
+                      <AnimatedNumber
+                        value={spend.cnyTotal}
+                        format={(value) => fmtMoney(value, 'CNY')}
+                        durationMs={520}
+                      />
                     </div>
                     <p className="mt-2 text-[12.5px] text-[#71717a]">
                       按请求日志 × 价格配置估算（{activeRangeLabel}，已折算人民币）
@@ -546,7 +569,7 @@ export default function Dashboard() {
               )}
             </div>
           </section>
-        </div>
+        </MotionGroup>
       )}
     </div>
   )
@@ -558,12 +581,14 @@ function MetricBox({
   iconClass,
   label,
   value,
+  format,
   progress
 }: {
   icon: string
   iconClass: string
   label: string
-  value: string
+  value: number
+  format: (value: number) => string
   progress?: number
 }) {
   return (
@@ -572,14 +597,17 @@ function MetricBox({
         <i className={`fa-solid ${icon} ${iconClass}`} />
         <span>{label}</span>
       </div>
-      <div className="mt-2 font-mono text-[22px] font-bold text-[#09090b]">{value}</div>
+      <div className="mt-2 font-mono text-[22px] font-bold text-[#09090b]">
+        <AnimatedNumber value={value} format={format} durationMs={480} />
+      </div>
       {progress !== undefined ? (
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e5e7eb]">
-          <div
-            className="h-full rounded-full bg-[#12c99b]"
-            style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={progress}
+          label={`缓存命中率 ${format(value)}`}
+          className="mt-3"
+          trackClassName="bg-[#e5e7eb]"
+          fillClassName="bg-[#12c99b]"
+        />
       ) : null}
     </div>
   )

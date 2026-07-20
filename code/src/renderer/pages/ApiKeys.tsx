@@ -12,7 +12,9 @@ import { CreateKeyModal } from '../components/CreateKeyModal'
 import { EditKeyModal } from '../components/EditKeyModal'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { CodexQuotaPanel } from '../components/CodexQuotaPanel'
+import { AnimatedNumber, MotionGroup } from '../components/motion'
 import { useCodexUsage } from '../hooks/useCodexUsage'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount } from '../../shared/utils/money'
 import type { ApiKeyCreateInput, ApiKeyRecord, ApiKeyUpdateInput } from '../../shared/types/api-key'
 import type { UsageRecord } from '../../shared/types/usage'
@@ -136,6 +138,7 @@ export default function ApiKeys() {
   const [search, setSearch] = useState('')
   const [providerFilter, setProviderFilter] = useState<string | null>(null)
   const codexUsage = useCodexUsage()
+  const reducedMotion = useReducedMotion()
 
   /** 刷新密钥、供应商目录与余额列表 */
   const refresh = useCallback(async () => {
@@ -471,7 +474,7 @@ export default function ApiKeys() {
   const anyFilter = !!providerFilter || search.trim() !== ''
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       <PageHeader
         title="API Keys"
         desc="管理你的 API 密钥,Windows DPAPI 加密存储"
@@ -535,7 +538,7 @@ export default function ApiKeys() {
         </Card>
       ) : (
         <>
-          <Card className="mb-3" bodyClassName="py-3">
+          <Card className="mb-3" bodyClassName="py-3" motion="status">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <div className="text-[13px] font-medium text-text-primary">本机 Session 解析</div>
@@ -567,12 +570,19 @@ export default function ApiKeys() {
                   onClick={() => void syncAllSessions()}
                   disabled={sessionSyncing.size > 0}
                 >
-                  <i className="fa-solid fa-code-branch" /> 解析全部
+                  <i
+                    className={`fa-solid ${
+                      sessionSyncing.size > 0
+                        ? `fa-arrows-rotate ${!reducedMotion ? 'fa-spin' : ''}`
+                        : 'fa-code-branch'
+                    }`}
+                  />{' '}
+                  解析全部
                 </button>
               </div>
             </div>
           </Card>
-          <div className="grid grid-cols-2 gap-4 mb-3 max-md:grid-cols-1">
+          <MotionGroup className="grid grid-cols-2 gap-4 mb-3 max-md:grid-cols-1">
             <SessionUsageCard
               source="claude-code"
               counts={sessionCounts}
@@ -610,7 +620,7 @@ export default function ApiKeys() {
               pathError={sessionPathsError}
               onSync={syncSessionSource}
             />
-          </div>
+          </MotionGroup>
           <Card className="mb-3" bodyClassName="py-3">
             <div className="flex items-center gap-4 flex-wrap text-[12.5px]">
               <div className="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -658,7 +668,7 @@ export default function ApiKeys() {
               </div>
             </Card>
           ) : (
-            <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+            <MotionGroup className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
               {filtered.map((k) => (
                 <ApiKeyCard
                   key={k.id}
@@ -672,12 +682,17 @@ export default function ApiKeys() {
                   onToggleUsage={handleToggleUsage}
                 />
               ))}
-            </div>
+            </MotionGroup>
           )}
           {keys.length > 0 && (
             <div className="pt-3 mt-2 text-[12px] text-text-muted flex items-center justify-between">
               <span>
-                共 {keys.length} 条 {anyFilter && `· 显示 ${filtered.length} 条`}
+                共 <AnimatedNumber value={keys.length} /> 条{' '}
+                {anyFilter && (
+                  <>
+                    · 显示 <AnimatedNumber value={filtered.length} /> 条
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -787,6 +802,7 @@ function SessionUsageCard({
     <Card
       title={SESSION_LABEL[source]}
       subtitle={pathLabel}
+      motionOrder={source === 'claude-code' ? 0 : source === 'codex' ? 1 : 2}
       iconNode={
         <ProviderIcon
           providerId={source === 'kimi-code' ? 'kimi-coding' : source}
@@ -813,9 +829,9 @@ function SessionUsageCard({
           />
         )}
         <div className="grid grid-cols-3 gap-2">
-          <MiniMetric label="会话文件" value={counts === null ? '—' : fmtCount(fileCount)} />
-          <MiniMetric label="请求记录" value={fmtCount(stats.requests)} />
-          <MiniMetric label="Tokens" value={fmtCount(stats.tokens)} />
+          <MiniMetric label="会话文件" value={counts === null ? '—' : fileCount} />
+          <MiniMetric label="请求记录" value={stats.requests} />
+          <MiniMetric label="Tokens" value={stats.tokens} />
         </div>
         <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
           <StatRow
@@ -849,11 +865,17 @@ function SessionUsageCard({
 }
 
 /** 小型指标块:标签 + 等宽数值 */
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function MiniMetric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded border border-border-light bg-bg-base/40 px-2 py-2 min-w-0">
       <div className="text-[11px] text-text-muted">{label}</div>
-      <div className="font-mono text-[13px] font-medium text-text-primary truncate">{value}</div>
+      <div className="font-mono text-[13px] font-medium text-text-primary truncate">
+        {typeof value === 'number' ? (
+          <AnimatedNumber value={value} format={(next) => fmtCount(next)} />
+        ) : (
+          value
+        )}
+      </div>
     </div>
   )
 }

@@ -43,7 +43,7 @@ export function Tabs<T extends string>({
             aria-selected={selected}
             onClick={() => onChange(t.key)}
             className={clsx(
-              'px-3 py-2 text-[13px] flex items-center gap-2 border-b-2 -mb-px transition-colors',
+              'motion-tab px-3 py-2 text-[13px] flex items-center gap-2 border-b-2 -mb-px',
               selected
                 ? 'border-accent text-text-primary font-medium'
                 : 'border-transparent text-text-muted hover:text-text-secondary'

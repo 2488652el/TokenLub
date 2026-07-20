@@ -16,6 +16,8 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { StatTile } from '../components/StatTile'
 import { EmptyState } from '../components/EmptyState'
+import { AnimatedNumber, MotionGroup } from '../components/motion'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
 import {
   buildProjectUsage,
@@ -87,6 +89,7 @@ function ProjectTokenHeatmap({
   projects: ProjectUsageRow[]
   dates: string[]
 }) {
+  const reducedMotion = useReducedMotion()
   const [activeDate, setActiveDate] = useState<string | null>(null)
   const daily = dates.map<DailyHeatmapCell>((date) => {
     const dayRows = projects.flatMap((project) => {
@@ -123,7 +126,10 @@ function ProjectTokenHeatmap({
     >
       <div className="mb-3 flex min-h-10 items-center rounded-md border border-border-light bg-bg-base px-3 py-2">
         {activeCell ? (
-          <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px]">
+          <div
+            key={activeCell.date}
+            className="motion-data-flash flex w-full flex-wrap items-center gap-x-5 gap-y-1 text-[12.5px]"
+          >
             <span className="text-text-secondary">{formatHeatmapDate(activeCell.date)}</span>
             <span className="font-mono font-semibold text-text-primary">
               {fmtCount(activeCell.tokens)} Tokens
@@ -157,7 +163,7 @@ function ProjectTokenHeatmap({
         <span>多</span>
       </div>
 
-      <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+      <MotionGroup className="grid grid-cols-7 gap-1.5 sm:gap-2">
         {daily.map((day) => {
           const intensity =
             day.tokens === 0 ? 0.08 : 0.14 + 0.76 * Math.sqrt(day.tokens / maxTokens)
@@ -168,7 +174,9 @@ function ProjectTokenHeatmap({
               type="button"
               aria-label={detail}
               title={detail}
-              className="group relative h-8 rounded-md border border-black/5 transition-transform hover:-translate-y-0.5 hover:shadow-sm focus:z-10 focus:outline-none focus:ring-2 focus:ring-accent/40 sm:h-9"
+              className={`group relative h-8 rounded-md border border-black/5 focus:z-10 focus:outline-none focus:ring-2 focus:ring-accent/40 sm:h-9 ${
+                reducedMotion ? '' : 'transition-transform hover:-translate-y-0.5 hover:shadow-sm'
+              }`}
               style={{ backgroundColor: `rgba(15, 159, 110, ${intensity})` }}
               onMouseEnter={() => setActiveDate(day.date)}
               onFocus={() => setActiveDate(day.date)}
@@ -181,7 +189,7 @@ function ProjectTokenHeatmap({
             </button>
           )
         })}
-      </div>
+      </MotionGroup>
     </Card>
   )
 }
@@ -239,6 +247,7 @@ function ProjectTokenTrendChart({
   projects: ProjectUsageRow[]
   dates: string[]
 }) {
+  const reducedMotion = useReducedMotion()
   const data = dates.map((date) => {
     const point: Record<string, string | number> = { date, label: date.slice(5) }
     projects.forEach((project, index) => {
@@ -299,9 +308,9 @@ function ProjectTokenTrendChart({
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
-                isAnimationActive
-                animationBegin={index * 80}
-                animationDuration={850}
+                isAnimationActive={!reducedMotion}
+                animationBegin={reducedMotion ? 0 : Math.min(index * 36, 144)}
+                animationDuration={560}
                 animationEasing="ease-out"
                 connectNulls
               />
@@ -352,7 +361,7 @@ export default function AgentDetail() {
 
   if (logs === null) {
     return (
-      <div className="page-content animate-in">
+      <div className="page-content">
         {header}
         <Card>
           <p className="py-6 text-center text-[13px] text-text-muted">加载中…</p>
@@ -368,38 +377,47 @@ export default function AgentDetail() {
   const avgTokensPerRequest = totalRequests > 0 ? totalTokens / totalRequests : 0
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       {header}
 
-      <div className="mb-5 grid grid-cols-4 gap-4 max-md:grid-cols-2">
+      <MotionGroup className="mb-5 grid grid-cols-4 gap-4 max-md:grid-cols-2">
         <StatTile
           label="项目数"
           icon="fa-folder-tree"
-          value={report.projects.length}
+          value={
+            <AnimatedNumber
+              value={report.projects.length}
+              format={(value) => Math.round(value).toLocaleString('en-US')}
+            />
+          }
           sub={`最近 ${rangeDays} 天 · ${totalRequests.toLocaleString('en-US')} 次请求`}
+          motionOrder={0}
         />
         <StatTile
           label="总费用"
           icon="fa-coins"
-          value={fmtMoney(totalCost)}
+          value={<AnimatedNumber value={totalCost} format={fmtMoney} />}
           sub={`覆盖 ${logs.length.toLocaleString('en-US')} 条 session-log 记录`}
           accent="amber"
+          motionOrder={1}
         />
         <StatTile
           label="总 Tokens"
           icon="fa-arrow-right-to-line"
-          value={fmtCount(totalTokens)}
+          value={<AnimatedNumber value={totalTokens} format={fmtCount} />}
           sub={`最近 ${rangeDays} 天的项目 Token 用量`}
           accent="blue"
+          motionOrder={2}
         />
         <StatTile
           label="平均每次请求 Tokens"
           icon="fa-scale-balanced"
-          value={fmtCount(Math.round(avgTokensPerRequest))}
+          value={<AnimatedNumber value={avgTokensPerRequest} format={fmtCount} />}
           sub={`基于 ${totalRequests.toLocaleString('en-US')} 次请求`}
           accent="purple"
+          motionOrder={3}
         />
-      </div>
+      </MotionGroup>
 
       {report.projects.length === 0 ? (
         <Card>
@@ -431,7 +449,7 @@ export default function AgentDetail() {
                     <th className="py-2 text-right font-medium">费用</th>
                   </tr>
                 </thead>
-                <tbody className="text-text-primary">
+                <tbody className="motion-table-rows text-text-primary">
                   {report.projects.map((project) => (
                     <tr key={project.key} className="border-t border-border-light">
                       <td className="py-2.5">

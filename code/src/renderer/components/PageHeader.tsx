@@ -20,7 +20,7 @@ export function PageHeader({
   action?: ReactNode
 }) {
   return (
-    <div className="mb-5 flex items-center justify-between">
+    <div className="motion-page-header mb-5 flex items-center justify-between">
       <div>
         <h1 className="text-[20px] font-semibold text-text-primary tracking-[-0.02em] leading-[1.25]">
           {title}

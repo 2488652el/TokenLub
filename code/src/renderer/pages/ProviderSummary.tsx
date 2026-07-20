@@ -18,6 +18,8 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { Tabs, type TabDef } from '../components/Tabs'
+import { AnimatedNumber, MotionGroup, ProgressBar } from '../components/motion'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount, fmtMoney, formatPct } from '../../shared/utils/money'
 import {
   computeTrend,
@@ -80,22 +82,60 @@ function trendClass(t: number | null): string {
  *
  * 供应商费用占比环形图:纯 CSS conic-gradient 实现,无需图表库。 (glm-5.2) */
 function DonutChart({ providers }: { providers: DashboardSummary['providers'] }) {
-  const stops: string[] = []
+  const reducedMotion = useReducedMotion()
+  const [ready, setReady] = useState(reducedMotion)
+  const circumference = 2 * Math.PI * 55
   let cursor = 0
-  providers.forEach((p, i) => {
-    const color = PROVIDER_PALETTE[i % PROVIDER_PALETTE.length] ?? '#10B981'
-    stops.push(`${color} ${cursor}%`, `${color} ${cursor + p.pct * 100}%`)
-    cursor += p.pct * 100
-  })
-  const gradient = `conic-gradient(${stops.join(', ')})`
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setReady(true)
+      return
+    }
+    setReady(false)
+    const frame = requestAnimationFrame(() => setReady(true))
+    return () => cancelAnimationFrame(frame)
+  }, [providers, reducedMotion])
+
   return (
     <div className="flex items-center gap-6">
-      <div
-        className="w-[140px] h-[140px] rounded-full relative flex-shrink-0"
-        style={{ background: gradient }}
-      >
+      <div className="w-[140px] h-[140px] rounded-full relative flex-shrink-0">
+        <svg
+          className="absolute inset-0 -rotate-90"
+          viewBox="0 0 140 140"
+          aria-label={`${providers.length} 个 Provider 的费用占比`}
+          role="img"
+        >
+          <circle cx="70" cy="70" r="55" fill="none" stroke="#F3F4F6" strokeWidth="18" />
+          {providers.map((provider, index) => {
+            const start = cursor
+            cursor += provider.pct
+            return (
+              <circle
+                key={provider.providerId}
+                cx="70"
+                cy="70"
+                r="55"
+                fill="none"
+                stroke={PROVIDER_PALETTE[index % PROVIDER_PALETTE.length] ?? '#10B981'}
+                strokeWidth="18"
+                strokeDasharray={`${ready ? provider.pct * circumference : 0} ${circumference}`}
+                strokeDashoffset={-start * circumference}
+                style={{
+                  transition: reducedMotion
+                    ? 'none'
+                    : 'stroke-dasharray 560ms cubic-bezier(0.22, 1, 0.36, 1)'
+                }}
+              />
+            )
+          })}
+        </svg>
         <div className="absolute inset-[18px] bg-bg-card rounded-full flex items-center justify-center">
-          <span className="text-[18px] font-semibold text-text-primary">{providers.length}</span>
+          <AnimatedNumber
+            value={providers.length}
+            format={(value) => Math.round(value).toLocaleString('en-US')}
+            className="text-[18px] font-semibold text-text-primary"
+          />
         </div>
       </div>
       <ul className="flex-1 space-y-1.5 min-w-0">
@@ -124,6 +164,7 @@ function DailyCostLineChart({
   days: number
   now: Date
 }) {
+  const reducedMotion = useReducedMotion()
   const points = buildDailyCostSeries(daily, days, now)
   if (!points.length) return null
 
@@ -169,7 +210,9 @@ function DailyCostLineChart({
               strokeWidth={2.5}
               dot={false}
               activeDot={{ r: 4 }}
-              isAnimationActive={false}
+              isAnimationActive={!reducedMotion}
+              animationDuration={640}
+              animationEasing="ease-out"
               connectNulls
             />
           </LineChart>
@@ -293,7 +336,7 @@ export default function ProviderSummary() {
 
   if (loading) {
     return (
-      <div className="page-content animate-in">
+      <div className="page-content">
         <PageHeader title="Provider 汇总" desc="按供应商维度聚合费用与用量数据" />
         <Card>
           <p className="text-text-muted text-[13px] py-6 text-center">加载中…</p>
@@ -313,7 +356,7 @@ export default function ProviderSummary() {
   const trendDays = range === 'month' ? 30 : range === 'week' ? 7 : 1
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       <PageHeader
         title="Provider 汇总"
         desc="按供应商维度聚合费用与用量数据"
@@ -366,17 +409,28 @@ export default function ProviderSummary() {
               <DonutChart providers={providers} />
             </Card>
             <Card title="费用 Top 5" icon="fa-fire" subtitle={`${subtitleFor(range)} — 按费用降序`}>
-              <ul className="space-y-2">
+              <MotionGroup className="space-y-2">
                 {topProviders.map((p, i) => (
-                  <li key={p.providerId} className="flex items-center gap-3 text-[13px]">
-                    <span className="w-5 h-5 rounded-full bg-accent-dim text-accent-text text-[11px] font-semibold flex items-center justify-center">
-                      {i + 1}
-                    </span>
-                    <span className="text-text-primary flex-1 truncate">{p.providerId}</span>
-                    <span className="text-text-secondary font-mono">{fmtMoney(p.cost)}</span>
+                  <li key={p.providerId} className="text-[13px]">
+                    <div className="flex items-center gap-3">
+                      <span className="w-5 h-5 rounded-full bg-accent-dim text-accent-text text-[11px] font-semibold flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      <span className="text-text-primary flex-1 truncate">{p.providerId}</span>
+                      <AnimatedNumber
+                        value={p.cost}
+                        format={fmtMoney}
+                        className="text-text-secondary font-mono"
+                      />
+                    </div>
+                    <ProgressBar
+                      value={topProviders[0]?.cost ? p.cost / topProviders[0].cost : 0}
+                      label={`${p.providerId} 费用排行`}
+                      className="ml-8 mt-1"
+                    />
                   </li>
                 ))}
-              </ul>
+              </MotionGroup>
             </Card>
           </div>
 
@@ -397,7 +451,7 @@ export default function ProviderSummary() {
                     <th className="py-2 font-medium text-right">趋势</th>
                   </tr>
                 </thead>
-                <tbody className="text-text-primary">
+                <tbody className="motion-table-rows text-text-primary">
                   {providers.map((p) => {
                     const top = topModelsForProvider(logs, p.providerId, 3)
                     const pw = providerWeekWindows(now, logs, p.providerId)
@@ -464,7 +518,7 @@ export default function ProviderSummary() {
                     <th className="py-2 font-medium text-right">请求数</th>
                   </tr>
                 </thead>
-                <tbody className="text-text-primary">
+                <tbody className="motion-table-rows text-text-primary">
                   {modelSpend.map((m) => (
                     <tr key={m.model} className="border-t border-border-light">
                       <td className="py-2 font-mono" title={m.model}>

@@ -3,11 +3,11 @@
  * 被各业务页面复用以保持一致的卡片视觉风格。
  * (glm-5.2)
  */
-import { type ReactNode } from 'react'
+import { type CSSProperties, type ReactNode } from 'react'
 import clsx from 'clsx'
 
 /** Card 组件的 props 配置 */
-interface CardProps {
+export interface CardProps {
   title?: string
   subtitle?: string
   icon?: string
@@ -16,6 +16,8 @@ interface CardProps {
   className?: string
   bodyClassName?: string
   children?: ReactNode
+  motion?: 'none' | 'reveal' | 'interactive' | 'status'
+  motionOrder?: number
 }
 
 /**
@@ -37,15 +39,22 @@ export function Card({
   action,
   className,
   bodyClassName,
-  children
+  children,
+  motion = 'reveal',
+  motionOrder = 0
 }: CardProps) {
   const hasHeader = !!title || !!action
   return (
     <div
+      data-motion={motion}
       className={clsx(
         'bg-bg-card border border-border-light rounded-lg overflow-hidden',
+        motion !== 'none' && 'motion-card',
+        motion === 'interactive' && 'motion-card-interactive',
+        motion === 'status' && 'motion-card-status',
         className
       )}
+      style={{ '--motion-order': motionOrder } as CSSProperties}
     >
       {hasHeader && (
         <div className="px-5 py-4 pb-3 flex items-center justify-between gap-3">

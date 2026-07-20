@@ -8,7 +8,9 @@ import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { CodexQuotaPanel } from '../components/CodexQuotaPanel'
+import { AnimatedNumber, MotionGroup, ProgressBar } from '../components/motion'
 import { useCodexUsage } from '../hooks/useCodexUsage'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
 import { getCatalogEntry } from '../../shared/provider-catalog'
 import {
@@ -104,6 +106,7 @@ export default function BalanceQuery() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const codex = useCodexUsage()
+  const reducedMotion = useReducedMotion()
 
   async function load() {
     setLoading(true)
@@ -166,7 +169,7 @@ export default function BalanceQuery() {
   }, [keys, balances])
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       <PageHeader
         title="余额查询"
         desc="区分 API 余额、Coding Plan 与 Token 套餐，按供应商展示关键额度"
@@ -176,14 +179,22 @@ export default function BalanceQuery() {
             onClick={handleRefreshAll}
             disabled={refreshing}
           >
-            <i className={`fa-solid fa-arrows-rotate ${refreshing ? 'animate-spin' : ''}`} />
+            <i
+              className={`fa-solid fa-arrows-rotate ${
+                refreshing && !reducedMotion ? 'animate-spin' : ''
+              }`}
+            />
             {refreshing ? '刷新中' : '全部刷新'}
           </button>
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-        <article className="group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
+      <MotionGroup className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+        <article
+          className={`motion-card-interactive group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${
+            codex.loading && !reducedMotion ? 'motion-data-flash' : ''
+          }`}
+        >
           <div className="absolute inset-x-0 top-0 h-1 bg-[#10A37F]" />
           <header className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,rgba(16,163,127,0.1),transparent_62%)] px-5 pb-4 pt-5">
             <div className="flex min-w-0 items-center gap-3">
@@ -206,7 +217,11 @@ export default function BalanceQuery() {
                 disabled={codex.loading}
                 title="刷新 ChatGPT 额度"
               >
-                <i className={`fa-solid fa-arrows-rotate ${codex.loading ? 'animate-spin' : ''}`} />
+                <i
+                  className={`fa-solid fa-arrows-rotate ${
+                    codex.loading && !reducedMotion ? 'animate-spin' : ''
+                  }`}
+                />
               </button>
             </div>
           </header>
@@ -228,7 +243,7 @@ export default function BalanceQuery() {
             <ProviderBalanceCard key={key.id} keyRecord={key} balance={balance} />
           ))
         )}
-      </div>
+      </MotionGroup>
     </div>
   )
 }
@@ -247,7 +262,7 @@ function ProviderBalanceCard({
   const providerName = catalog?.displayName ?? keyRecord.providerId
 
   return (
-    <article className="group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-sm">
+    <article className="motion-card-interactive group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card">
       <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: theme.accent }} />
       <header
         className="flex items-start justify-between gap-4 px-5 pb-4 pt-5"
@@ -656,23 +671,30 @@ function PlanQuotaRow({
   color: string
 }) {
   const safeUsed = isFiniteNumber(usedPercent) ? Math.max(0, Math.min(100, usedPercent)) : null
-  const fillColor = safeUsed === null ? '#E5E7EB' : safeUsed >= 90 ? '#EF4444' : color
+  const tone = safeUsed !== null && safeUsed >= 90 ? 'red' : 'blue'
   return (
     <div className="rounded-lg border border-border-light bg-bg-base/50 px-3 py-2.5">
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="text-[12px] font-medium text-text-secondary">{label}</span>
         <span className="font-mono text-[12px] font-medium text-text-primary">{remainingText}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-bg-hover">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${safeUsed ?? 0}%`, backgroundColor: fillColor }}
-        />
-      </div>
+      <ProgressBar
+        value={(safeUsed ?? 0) / 100}
+        label={`${label}已用比例`}
+        tone={tone}
+        trackClassName="h-2 bg-bg-hover"
+        color={safeUsed !== null && safeUsed < 90 ? color : undefined}
+      />
       <div className="mt-1.5 flex justify-between gap-3 text-[10.5px] text-text-muted">
         <span>{resetText ?? '按供应商周期自动重置'}</span>
         <span className="font-mono">
-          {safeUsed === null ? '—' : `已用 ${safeUsed.toFixed(0)}%`}
+          {safeUsed === null ? (
+            '—'
+          ) : (
+            <>
+              已用 <AnimatedNumber value={safeUsed} format={(value) => `${value.toFixed(0)}%`} />
+            </>
+          )}
         </span>
       </div>
     </div>
@@ -691,25 +713,20 @@ function UsageProgress({
   color: string
 }) {
   const safeValue = Math.max(0, Math.min(100, value))
-  const fillColor = safeValue <= 15 ? '#EF4444' : safeValue <= 35 ? '#F59E0B' : color
+  const tone = safeValue <= 15 ? 'red' : safeValue <= 35 ? 'amber' : 'accent'
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between text-[11.5px]">
         <span className="text-text-muted">{label}</span>
         <span className="font-mono text-text-secondary">{valueLabel}</span>
       </div>
-      <div
-        className="h-2 overflow-hidden rounded-full bg-bg-hover"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={safeValue}
-      >
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${safeValue}%`, backgroundColor: fillColor }}
-        />
-      </div>
+      <ProgressBar
+        value={safeValue / 100}
+        label={label}
+        tone={tone}
+        trackClassName="h-2 bg-bg-hover"
+        color={safeValue > 35 ? color : undefined}
+      />
     </div>
   )
 }

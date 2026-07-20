@@ -8,6 +8,7 @@ import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
 import { Modal } from '../components/Modal'
+import { AnimatedNumber, MotionGroup } from '../components/motion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
 import {
   buildRequestLogFilter,
@@ -294,7 +295,7 @@ export default function RequestLogs() {
   }
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       <PageHeader
         title="请求日志"
         desc="所有 API Key / 本地 CLI 会话的 Token 用量明细"
@@ -325,9 +326,24 @@ export default function RequestLogs() {
         title="筛选条件"
         subtitle="按供应商、来源、日期或模型快速定位日志"
         action={
-          <button className="btn btn-outline btn-sm" onClick={handleReset}>
-            <i className="fa-solid fa-rotate-left" /> 重置
-          </button>
+          <div className="flex items-center gap-3">
+            <span
+              key={`${providerFilter}-${sourceFilter}-${fromDate}-${toDate}-${committedSearch}-${totalCount}`}
+              className="motion-data-flash text-[11.5px] text-text-muted"
+              aria-live="polite"
+            >
+              匹配{' '}
+              <AnimatedNumber
+                value={loading ? 0 : totalCount}
+                format={(value) => Math.round(value).toLocaleString('zh-CN')}
+                className="font-mono font-medium text-text-primary"
+              />{' '}
+              条
+            </span>
+            <button className="btn btn-outline btn-sm" onClick={handleReset}>
+              <i className="fa-solid fa-rotate-left" /> 重置
+            </button>
+          </div>
         }
         bodyClassName="pt-1"
       >
@@ -481,7 +497,10 @@ export default function RequestLogs() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="text-text-primary">
+              <tbody
+                key={`${page}-${providerFilter}-${sourceFilter}-${fromDate}-${toDate}-${committedSearch}-${sortKey}-${sortDesc}`}
+                className="motion-table-rows text-text-primary"
+              >
                 {visible.map((r, i) => (
                   <tr
                     key={r.id ?? `${r.capturedAt}-${i}`}
@@ -575,7 +594,7 @@ export default function RequestLogs() {
 
       {detail && (
         <Modal title="请求详情" onClose={() => setDetail(null)}>
-          <div className="space-y-2 text-[12.5px]">
+          <MotionGroup className="space-y-2 text-[12.5px]">
             <DetailRow k="ID" v={detail.id !== undefined ? String(detail.id) : '—'} mono />
             <DetailRow k="Captured" v={detail.capturedAt || '—'} mono />
             <DetailRow k="Provider" v={detail.providerId} />
@@ -617,7 +636,7 @@ export default function RequestLogs() {
               k="Cost"
               v={detail.cost !== undefined ? fmtMoney(detail.cost, detail.currency ?? 'CNY') : '—'}
             />
-          </div>
+          </MotionGroup>
           <div className="mt-4 flex items-center justify-between">
             <span className="text-[11.5px] text-text-muted">{copied ? '已复制' : 'JSON 快照'}</span>
             <button className="btn btn-outline btn-sm" onClick={() => copyRaw(detail)}>
@@ -665,8 +684,8 @@ function SourceFilterButton({
       aria-pressed={active}
       className={
         active
-          ? 'flex-1 rounded-sm bg-bg-card px-2 text-[11.5px] font-medium text-accent-text shadow-sm'
-          : 'flex-1 rounded-sm px-2 text-[11.5px] text-text-secondary transition-colors hover:text-text-primary'
+          ? 'motion-tab flex-1 rounded-sm bg-bg-card px-2 text-[11.5px] font-medium text-accent-text shadow-sm'
+          : 'motion-tab flex-1 rounded-sm px-2 text-[11.5px] text-text-secondary hover:text-text-primary'
       }
     >
       {label}

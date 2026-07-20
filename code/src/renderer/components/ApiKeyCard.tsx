@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { ProviderIcon } from './ProviderIcon'
+import { ProgressBar } from './motion'
 import { fmtMoney, fmtCount } from '../../shared/utils/money'
 import { extractCodingPlanQuotas, type CodingPlanQuota } from '../../shared/utils/minimax-quota'
 import { extractKimiCodingQuotas, type KimiQuotaWindow } from '../../shared/utils/kimi-quota'
@@ -81,7 +82,11 @@ export function ApiKeyCard({
   const visual = API_KEY_VISUALS[keyRecord.providerId] ?? DEFAULT_VISUAL
 
   return (
-    <article className="group relative flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
+    <article
+      className={`motion-card motion-card-interactive group relative flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${
+        toggling ? 'motion-data-flash' : ''
+      }`}
+    >
       <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: visual.accent }} />
       <header
         className="relative px-5 pb-4 pt-5"
@@ -387,7 +392,7 @@ function KimiCodingQuotaRow({ label, quota }: { label: string; quota: KimiQuotaW
   const pct = quota?.usedPercent
   const hasPct = typeof pct === 'number' && Number.isFinite(pct)
   const width = hasPct ? Math.max(0, Math.min(100, pct)) : 100
-  const barColor = !hasPct ? 'bg-neutral-200' : pct >= 90 ? 'bg-red-500' : 'bg-amber-400'
+  const tone = hasPct && pct >= 90 ? 'red' : 'amber'
   return (
     <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
       <div className="flex items-baseline justify-between gap-3">
@@ -396,12 +401,13 @@ function KimiCodingQuotaRow({ label, quota }: { label: string; quota: KimiQuotaW
           {quota?.remainingText ?? '暂无自动读取'}
         </span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-bg-hover overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${barColor}`}
-          style={{ width: `${width}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={width / 100}
+        label={`${label}已用比例`}
+        tone={tone}
+        trackClassName="h-1.5 bg-bg-hover"
+        fillClassName={!hasPct ? 'bg-neutral-200' : ''}
+      />
       <div className="flex justify-between gap-3 text-[11px] text-text-muted leading-snug">
         <span>{quota?.resetText ?? 'Kimi Coding Plan 套餐限额'}</span>
         {hasPct && <span className="font-mono">已用 {pct.toFixed(0)}%</span>}
@@ -450,7 +456,7 @@ function CodingPlanQuotaRow({ label, quota }: { label: string; quota: CodingPlan
   const pct = quota?.usedPercent
   const hasPct = typeof pct === 'number' && Number.isFinite(pct)
   const width = hasPct ? Math.max(0, Math.min(100, pct)) : 100
-  const barColor = !hasPct ? 'bg-neutral-200' : pct >= 90 ? 'bg-red-500' : 'bg-amber-400'
+  const tone = hasPct && pct >= 90 ? 'red' : 'amber'
   const value = quota?.remainingText ?? quota?.usedText ?? '暂未自动读取'
   const detail = quota?.resetText ?? 'MiniMax Coding Plan 控制台限额'
 
@@ -460,12 +466,13 @@ function CodingPlanQuotaRow({ label, quota }: { label: string; quota: CodingPlan
         <span className="text-text-muted text-[12px]">{label}</span>
         <span className="font-mono text-[12px] text-text-primary text-right">{value}</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-bg-hover overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${barColor}`}
-          style={{ width: `${width}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={width / 100}
+        label={`${label}已用比例`}
+        tone={tone}
+        trackClassName="h-1.5 bg-bg-hover"
+        fillClassName={!hasPct ? 'bg-neutral-200' : ''}
+      />
       <div className="flex justify-between gap-3 text-[11px] text-text-muted leading-snug">
         <span>{detail}</span>
         {hasPct && <span className="font-mono">已用 {pct.toFixed(0)}%</span>}
@@ -520,21 +527,16 @@ function UsageBar({
   }
   const showPlaceholder = pct === null
   const width = showPlaceholder ? 100 : pct!
-  const colorCls = showPlaceholder
-    ? 'bg-neutral-200'
-    : pct! >= 90
-      ? 'bg-emerald-500'
-      : pct! >= 70
-        ? 'bg-amber-500'
-        : 'bg-red-500'
+  const tone = pct !== null && pct >= 90 ? 'accent' : pct !== null && pct >= 70 ? 'amber' : 'red'
   return (
     <div className="pt-1" title={showPlaceholder ? '暂无总额数据' : `剩余 ${pct!.toFixed(1)}%`}>
-      <div className="h-1.5 w-full rounded-full bg-bg-hover overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${colorCls}`}
-          style={{ width: `${width}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={width / 100}
+        label={showPlaceholder ? '暂无总额数据' : `剩余额度 ${pct!.toFixed(1)}%`}
+        tone={tone}
+        trackClassName="h-1.5 bg-bg-hover"
+        fillClassName={showPlaceholder ? 'bg-neutral-200' : ''}
+      />
     </div>
   )
 }

@@ -5,6 +5,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
+import { AnimatedNumber, ProgressBar } from '../components/motion'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 import type { SyncMode } from '../../shared/sync-mode'
 import { SYNC_BACKUP_DIRECTORY_SETTING_KEY } from '../../shared/sync-v2'
 import type { AppUpdateStatus } from '../../shared/types/app-update'
@@ -108,6 +110,7 @@ export default function Settings() {
   const [syncStatusInitialized, setSyncStatusInitialized] = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
   const [revokingDeviceId, setRevokingDeviceId] = useState<string | null>(null)
+  const [refreshSaving, setRefreshSaving] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [backupDirectory, setBackupDirectory] = useState<string | null>(null)
@@ -119,6 +122,7 @@ export default function Settings() {
     mode: 'merge'
   })
   const syncBusy = syncing || loggingIn || revokingDeviceId !== null
+  const reducedMotion = useReducedMotion()
 
   useEffect(() => {
     void window.api.settings.get().then((all) => {
@@ -180,11 +184,14 @@ export default function Settings() {
   async function changeRefresh(value: number) {
     const prev = refreshMin
     setRefreshMin(value)
+    setRefreshSaving(true)
     try {
       await window.api.settings.set(REFRESH_KEY, value)
     } catch (e) {
       setRefreshMin(prev)
       window.alert(`设置失败：${(e as Error).message}`)
+    } finally {
+      setRefreshSaving(false)
     }
   }
 
@@ -282,10 +289,10 @@ export default function Settings() {
     appUpdateStatus?.phase === 'downloaded'
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content" data-motion-group>
       <PageHeader title="设置" desc="管理应用更新、自动刷新与 TokenLub 云端同步" />
 
-      <Card title="应用更新" icon="fa-cloud-arrow-down">
+      <Card title="应用更新" icon="fa-cloud-arrow-down" motionOrder={0}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -318,11 +325,19 @@ export default function Settings() {
               </div>
             )}
             {appUpdateStatus?.phase === 'downloading' && (
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border-light">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-[width] duration-300"
-                  style={{ width: `${appUpdateStatus.percent ?? 0}%` }}
+              <div className="mt-3 flex items-center gap-2">
+                <ProgressBar
+                  value={(appUpdateStatus.percent ?? 0) / 100}
+                  label="更新下载进度"
+                  tone="accent"
+                  trackClassName="h-1.5 flex-1"
                 />
+                <span className="w-10 text-right font-mono text-[11px] text-text-muted">
+                  <AnimatedNumber
+                    value={appUpdateStatus.percent ?? 0}
+                    format={(value) => `${Math.round(value)}%`}
+                  />
+                </span>
               </div>
             )}
           </div>
@@ -332,13 +347,22 @@ export default function Settings() {
             onClick={() => void checkForAppUpdate()}
             disabled={updateBusy}
           >
-            <i className={`fa-solid fa-arrows-rotate ${updateBusy ? 'fa-spin' : ''}`} />
+            <i
+              className={`fa-solid fa-arrows-rotate ${
+                updateBusy && !reducedMotion ? 'fa-spin' : ''
+              }`}
+            />
             {appUpdateStatus?.phase === 'checking' ? '检查中…' : '检查更新'}
           </button>
         </div>
       </Card>
 
-      <Card className="mt-4" title="余额自动刷新" icon="fa-arrows-rotate">
+      <Card
+        className={`mt-4 ${refreshSaving ? 'motion-data-flash' : ''}`}
+        title="余额自动刷新"
+        icon="fa-arrows-rotate"
+        motionOrder={1}
+      >
         <div className="flex items-center justify-between gap-3 text-[13px] text-text-secondary">
           <div>
             <div className="text-text-primary">余额自动刷新间隔</div>
@@ -351,6 +375,7 @@ export default function Settings() {
             value={refreshMin}
             onChange={(e) => changeRefresh(Number(e.target.value))}
             aria-label="余额自动刷新间隔"
+            disabled={refreshSaving}
           >
             {REFRESH_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -358,10 +383,17 @@ export default function Settings() {
               </option>
             ))}
           </select>
+          <span className="sr-only" role="status" aria-live="polite">
+            {refreshSaving
+              ? '正在保存自动刷新设置'
+              : refreshMin === 0
+                ? '自动刷新已关闭'
+                : `自动刷新已设置为 ${refreshMin} 分钟`}
+          </span>
         </div>
       </Card>
 
-      <Card className="mt-4" bodyClassName="p-0">
+      <Card className="mt-4" bodyClassName="p-0" motionOrder={2}>
         <div className="border-b border-border-light bg-[#fafaf8] px-5 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
@@ -410,7 +442,11 @@ export default function Settings() {
                   onClick={() => void triggerSync()}
                   disabled={!syncStatus.configured || syncBusy}
                 >
-                  <i className={`fa-solid fa-arrows-rotate ${syncing ? 'fa-spin' : ''}`} />
+                  <i
+                    className={`fa-solid fa-arrows-rotate ${
+                      syncing && !reducedMotion ? 'fa-spin' : ''
+                    }`}
+                  />
                   {syncing ? '同步中…' : '立即同步'}
                 </button>
               </div>
@@ -424,7 +460,11 @@ export default function Settings() {
             role="status"
             aria-live="polite"
           >
-            <i className="fa-solid fa-circle-notch fa-spin text-emerald-600" />
+            <i
+              className={`fa-solid fa-circle-notch ${
+                !reducedMotion ? 'fa-spin' : ''
+              } text-emerald-600`}
+            />
             正在读取同步状态…
           </div>
         ) : showLoginForm ? (
@@ -559,7 +599,11 @@ export default function Settings() {
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button type="submit" className="btn btn-primary" disabled={syncBusy}>
-                <i className={`fa-solid ${loggingIn ? 'fa-circle-notch fa-spin' : 'fa-link'}`} />
+                <i
+                  className={`fa-solid ${
+                    loggingIn ? `fa-circle-notch ${!reducedMotion ? 'fa-spin' : ''}` : 'fa-link'
+                  }`}
+                />
                 {loggingIn ? '连接中…' : '连接并开始同步'}
               </button>
               {syncStatus?.configured && (
@@ -651,7 +695,11 @@ export default function Settings() {
                     title="撤销设备"
                   >
                     <i
-                      className={`fa-solid ${revokingDeviceId === device.id ? 'fa-circle-notch fa-spin' : 'fa-ban'}`}
+                      className={`fa-solid ${
+                        revokingDeviceId === device.id
+                          ? `fa-circle-notch ${!reducedMotion ? 'fa-spin' : ''}`
+                          : 'fa-ban'
+                      }`}
                     />
                     {device.revokedAt
                       ? '已撤销'

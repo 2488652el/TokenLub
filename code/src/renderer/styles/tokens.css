@@ -2,25 +2,21 @@
 /* 根变量:侧栏宽度、过渡时长、卡片/浮层阴影等设计令牌 */
 :root {
   --sidebar-w: 216px;
-  --transition-fast: 0.12s ease;
-  --transition-base: 0.15s ease;
+  --transition-fast: 120ms ease;
+  --transition-base: 160ms ease;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-/* 淡入动画:从下方 4px 透明态过渡到正常显示 */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-in {
-  animation: fadeIn 0.25s ease-out;
+  --motion-fast: 120ms;
+  --motion-control: 160ms;
+  --motion-enter: 240ms;
+  --motion-data: 480ms;
+  --motion-chart: 640ms;
+  --motion-stagger: 36ms;
+  --motion-distance-sm: 2px;
+  --motion-distance-md: 4px;
+  --motion-distance-lg: 6px;
+  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .shadow-popover {
@@ -75,7 +71,12 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition:
+    color var(--motion-control) var(--motion-ease-standard),
+    background-color var(--motion-control) var(--motion-ease-standard),
+    border-color var(--motion-control) var(--motion-ease-standard),
+    box-shadow var(--motion-control) var(--motion-ease-standard),
+    transform var(--motion-fast) var(--motion-ease-standard);
   border: none;
   white-space: nowrap;
   line-height: 1.4;
@@ -83,6 +84,9 @@
 .btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.985);
 }
 .btn-primary {
   background: #10b981;

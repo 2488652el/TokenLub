@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
+import { AnimatedNumber } from '../components/motion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
 import type { ModelSpendAggregate } from '../../shared/types/usage'
 
@@ -33,7 +34,7 @@ export default function ModelCompare() {
   }, [])
 
   return (
-    <div className="page-content animate-in">
+    <div className="page-content">
       <PageHeader
         title="模型对比"
         desc="按模型维度聚合，跨 Provider 对比成本与质量"
@@ -66,7 +67,7 @@ export default function ModelCompare() {
                   <th className="py-2 font-medium text-right">费用</th>
                 </tr>
               </thead>
-              <tbody className="text-text-primary">
+              <tbody className="motion-table-rows text-text-primary">
                 {models.slice(0, 10).map((m, i) => (
                   <tr key={m.model} className="border-t border-border-light">
                     <td className="py-2 text-text-muted w-8">{i + 1}</td>
@@ -82,7 +83,14 @@ export default function ModelCompare() {
                     <td className="py-2 text-right font-mono">{fmtCount(m.inputTokens)}</td>
                     <td className="py-2 text-right font-mono">{fmtCount(m.outputTokens)}</td>
                     <td className="py-2 text-right font-mono">{fmtCount(m.cacheReadTokens)}</td>
-                    <td className="py-2 text-right font-mono">{fmtMoney(m.total, m.currency)}</td>
+                    <td className="py-2 text-right font-mono">
+                      <span key={`${m.model}-${m.total}`} className="motion-data-flash">
+                        <AnimatedNumber
+                          value={m.total}
+                          format={(value) => fmtMoney(value, m.currency)}
+                        />
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

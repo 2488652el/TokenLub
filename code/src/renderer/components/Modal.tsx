@@ -3,7 +3,9 @@
  * 支持 ESC 关闭与点击遮罩关闭。
  * (glm-5.2)
  */
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import clsx from 'clsx'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 
 /**
  * 模态弹窗组件。
@@ -20,33 +22,65 @@ export function Modal({
   onClose: () => void
   children: ReactNode
 }) {
+  const reducedMotion = useReducedMotion()
+  const [closing, setClosing] = useState(false)
+  const closeTimerRef = useRef<number | null>(null)
+  const previousFocusRef = useRef<HTMLElement | null>(null)
+
+  const requestClose = useCallback(() => {
+    if (closing) return
+    if (reducedMotion) {
+      onClose()
+      return
+    }
+
+    setClosing(true)
+    closeTimerRef.current = window.setTimeout(onClose, 140)
+  }, [closing, onClose, reducedMotion])
+
+  useEffect(() => {
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null
+
+    return () => {
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current)
+      previousFocusRef.current?.focus()
+    }
+  }, [])
+
   // 监听 ESC 键以关闭弹窗
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') requestClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [requestClose])
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className={clsx(
+        'motion-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4',
+        closing && 'is-closing'
+      )}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget) requestClose()
       }}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="bg-bg-card border border-border-light rounded-lg shadow-popover w-full max-w-[480px] max-h-[calc(100vh-32px)] animate-in flex flex-col overflow-hidden"
+        className={clsx(
+          'motion-modal-panel bg-bg-card border border-border-light rounded-lg shadow-popover w-full max-w-[480px] max-h-[calc(100vh-32px)] flex flex-col overflow-hidden',
+          closing && 'is-closing'
+        )}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-light flex-shrink-0">
           <h2 className="text-[15px] font-semibold text-text-primary">{title}</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="关闭"
             className="text-text-muted hover:text-text-primary w-7 h-7 flex items-center justify-center rounded"
           >

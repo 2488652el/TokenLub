@@ -1,4 +1,5 @@
 import type { CodexUsageSnapshot, CodexUsageWindow } from '../../shared/types/codex-usage'
+import { AnimatedNumber, ProgressBar } from './motion'
 
 function formatPercent(value: number): string {
   return `${Math.round(value)}%`
@@ -25,13 +26,6 @@ function nextResetAt(usage: CodexUsageSnapshot | null): string | null {
   return timestamps.length > 0 ? new Date(Math.min(...timestamps)).toISOString() : null
 }
 
-function quotaColor(remaining: number | undefined): string {
-  if (remaining === undefined) return '#D4D4D2'
-  if (remaining <= 10) return '#EF4444'
-  if (remaining <= 30) return '#F59E0B'
-  return '#10A37F'
-}
-
 function QuotaRow({
   label,
   description,
@@ -45,6 +39,12 @@ function QuotaRow({
 }) {
   const remaining = window?.remainingPercent
   const width = remaining === undefined ? 0 : Math.max(0, Math.min(100, remaining))
+  const tone =
+    remaining !== undefined && remaining <= 10
+      ? 'red'
+      : remaining !== undefined && remaining <= 30
+        ? 'amber'
+        : 'accent'
 
   return (
     <div className="rounded-xl border border-border-light bg-bg-base/40 px-3.5 py-3">
@@ -60,26 +60,30 @@ function QuotaRow({
         </div>
         <div className="text-right">
           <div className="font-mono text-[15px] font-semibold text-text-primary">
-            {remaining === undefined ? '—' : formatPercent(remaining)}
+            {remaining === undefined ? (
+              '—'
+            ) : (
+              <AnimatedNumber value={remaining} format={formatPercent} />
+            )}
           </div>
           <div className="text-[10px] text-text-muted">剩余</div>
         </div>
       </div>
-      <div
-        className="mt-3 h-2 overflow-hidden rounded-full bg-bg-hover"
-        role="progressbar"
-        aria-label={`${label}剩余额度`}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={width}
-      >
-        <div
-          className="h-full rounded-full transition-all duration-700 ease-out"
-          style={{ width: `${width}%`, backgroundColor: quotaColor(remaining) }}
-        />
-      </div>
+      <ProgressBar
+        value={width / 100}
+        label={`${label}剩余额度`}
+        tone={tone}
+        trackClassName="mt-3 h-2 bg-bg-hover"
+      />
       <div className="mt-2 flex items-center justify-between gap-3 text-[10.5px] text-text-muted">
-        <span>已使用 {remaining === undefined ? '—' : formatPercent(100 - remaining)}</span>
+        <span>
+          已使用{' '}
+          {remaining === undefined ? (
+            '—'
+          ) : (
+            <AnimatedNumber value={100 - remaining} format={formatPercent} />
+          )}
+        </span>
         <span className="inline-flex items-center gap-1 font-mono text-text-secondary">
           <i className="fa-regular fa-clock text-[9px]" />
           {formatResetAt(window?.resetAt ?? null)}
