@@ -5,7 +5,7 @@
   <p>A local-first LLM usage, balance, and cost workspace for multi-model developers.</p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.2.1-151515?style=flat-square" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.2.2-151515?style=flat-square" />
     <img alt="React" src="https://img.shields.io/badge/React-19.2-151515?style=flat-square&logo=react" />
     <img alt="Electron" src="https://img.shields.io/badge/Electron-31-151515?style=flat-square&logo=electron" />
     <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-B59A58?style=flat-square" />
@@ -102,13 +102,13 @@ npm run build
 ### Package for Windows
 
 ```powershell
-npm run dist:win -- --change "MoonMeter-1.2.1" --model "GPT-5"
+npm run dist:win -- --change "MoonMeter-1.2.2" --model "GPT-5"
 ```
 
 Output:
 
 ```text
-demo/moonmeter-1.2.1-MoonMeter-1.2.1-GPT-5/
+demo/moonmeter-1.2.2-MoonMeter-1.2.2-GPT-5/
 ```
 
 For macOS, use `npm run dist:mac:x64`, `npm run dist:mac:arm64`, or `npm run dist:mac`. Formal builds and historical versions are available from [GitHub Releases](https://github.com/2488652el/MoonMeter/releases).
@@ -133,7 +133,7 @@ moonmeter.db
 
 On first launch, it can copy compatible databases and SQLite WAL/SHM sidecars from legacy TokenLub, TokenScope, or tokengirl user-data directories. Legacy files are never moved or deleted, so rollback remains possible.
 
-Compatibility surfaces retained in 1.2.1:
+Compatibility surfaces retained in 1.2.2:
 
 - `moonmeter://sync/bind` is the new default binding protocol.
 - `tokenlub://sync/bind` remains registered and accepted.
@@ -174,4 +174,4 @@ Run at least `typecheck`, `test`, `lint`, and `format:check` before submitting a
 
 ## Version
 
-Current source version: **MoonMeter 1.2.1**. This hotfix restores the original encryption context for TokenLub/TokenScope upgrades and keeps the application launchable when local sync credentials cannot be restored. See [CHANGELOG.md](./CHANGELOG.md).
+Current source version: **MoonMeter 1.2.2**. This release unifies card surfaces, radii, and shadow hierarchy across core views while retaining the encryption-context compatibility fix for upgrades. See [CHANGELOG.md](./CHANGELOG.md).

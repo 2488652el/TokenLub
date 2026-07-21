@@ -1,4 +1,5 @@
 import { Icon } from './Icon'
+import { CARD_SURFACE_CLASS } from './cardStyles'
 import { AnimatedNumber, ProgressBar } from './motion'
 import { ModelLogo } from './ModelLogo'
 import { ProviderIcon } from './ProviderIcon'
@@ -26,17 +27,17 @@ export function ModelUsageCard({ model, rank }: { model: ModelSpendAggregate; ra
   return (
     <article
       data-model-card={model.model}
-      className="motion-card motion-card-interactive group relative flex min-h-[350px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card/60 shadow-card"
+      className={`${CARD_SURFACE_CLASS} motion-card motion-card-interactive group relative flex min-h-[350px] flex-col`}
       style={{ '--motion-order': Math.min(rank - 1, 5) } as React.CSSProperties}
     >
       <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent }} />
-      <header className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,rgb(var(--color-accent)/0.08),transparent_62%)] px-5 pb-4 pt-5">
+      <header className="flex items-start justify-between gap-4 bg-bg-base/30 px-5 pb-4 pt-5">
         <div className="flex min-w-0 items-center gap-3">
           <span
             data-model-logo
             role="img"
             aria-label={`${displayName} 模型 Logo`}
-            className="flex h-12 w-12 flex-none items-center justify-center rounded-2xl border border-border-light bg-bg-card shadow-card"
+            className="flex h-12 w-12 flex-none items-center justify-center rounded-lg border border-border-light bg-bg-card/70"
           >
             <ModelLogo
               model={model.model}

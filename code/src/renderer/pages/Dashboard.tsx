@@ -354,7 +354,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
+          <section className="rounded-lg border border-border-light bg-bg-card/60 p-6 shadow-card backdrop-blur-[2px]">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div className="flex min-w-0 items-start gap-4">
                 <div className="flex h-[60px] w-[60px] flex-none items-center justify-center rounded-lg bg-accent-dim text-accent-text">
@@ -386,7 +386,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid min-w-[280px] grid-cols-2 gap-3 rounded-lg border border-border-light bg-bg-card p-4 shadow-sm max-sm:min-w-0 max-sm:w-full">
+              <div className="grid min-w-[280px] grid-cols-2 gap-3 rounded-md border border-border-light bg-bg-base/40 p-4 max-sm:min-w-0 max-sm:w-full">
                 <div>
                   <p className="text-[12px] font-semibold text-text-secondary">总请求数</p>
                   <p className="mt-1 font-mono text-[20px] font-bold text-text-primary">
@@ -457,7 +457,7 @@ export default function Dashboard() {
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
+          <section className="rounded-lg border border-border-light bg-bg-card/60 p-6 shadow-card backdrop-blur-[2px]">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-[22px] font-bold text-text-primary">使用趋势</h2>
@@ -479,7 +479,7 @@ export default function Dashboard() {
           </section>
 
           <section className="grid grid-cols-[minmax(0,1fr)_minmax(360px,0.6fr)] gap-6 max-xl:grid-cols-1">
-            <div className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
+            <div className="rounded-lg border border-border-light bg-bg-card/60 p-6 shadow-card backdrop-blur-[2px]">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-[20px] font-bold text-text-primary">消费统计</h2>
@@ -536,7 +536,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
+            <div className="rounded-lg border border-border-light bg-bg-card/60 p-6 shadow-card backdrop-blur-[2px]">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-[20px] font-bold text-text-primary">余额快照</h2>
@@ -605,7 +605,7 @@ function MetricBox({
   progress?: number
 }) {
   return (
-    <div className="rounded-lg border border-border-light bg-bg-card p-4 shadow-sm">
+    <div className="rounded-md border border-border-light bg-bg-base/40 p-4">
       <div className="flex items-center gap-2 text-[13px] font-semibold text-text-secondary">
         <Icon name={icon} className={iconClass} />
         <span>{label}</span>
@@ -629,7 +629,7 @@ function MetricBox({
 /** 信息胶囊:标签 + 数值的小型展示块 */
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border-light bg-bg-hover/55 px-4 py-3">
+    <div className="rounded-md border border-border-light bg-bg-hover/55 px-4 py-3">
       <p className="text-[12px] font-semibold text-text-secondary">{label}</p>
       <p className="mt-1 font-mono text-[17px] font-bold text-text-primary">{value}</p>
     </div>

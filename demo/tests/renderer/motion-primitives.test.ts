@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Card } from '../../../code/src/renderer/components/Card'
+import { CARD_SURFACE_CLASS } from '../../../code/src/renderer/components/cardStyles'
 import { EmptyState } from '../../../code/src/renderer/components/EmptyState'
 import {
   AnimatedNumber,
@@ -48,6 +49,10 @@ describe('renderer motion primitives', () => {
     expect(staticCard).toContain('motion-card-status')
     expect(staticCard).not.toContain('motion-card-interactive')
     expect(interactiveCard).toContain('motion-card-interactive')
+    expect(staticCard).toContain(CARD_SURFACE_CLASS)
+    expect(CARD_SURFACE_CLASS).toContain('rounded-lg')
+    expect(CARD_SURFACE_CLASS).toContain('bg-bg-card/60')
+    expect(CARD_SURFACE_CLASS).toContain('shadow-card')
   })
 
   it('infers a restrained loading treatment from spinner empty states', () => {

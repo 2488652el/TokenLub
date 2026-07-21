@@ -48,7 +48,7 @@ function QuotaRow({
         : 'accent'
 
   return (
-    <div className="rounded-xl border border-border-light bg-bg-base/40 px-3.5 py-3">
+    <div className="rounded-md border border-border-light bg-bg-base/40 px-3.5 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">

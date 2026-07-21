@@ -6,6 +6,7 @@
 import { type CSSProperties, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { Icon } from './Icon'
+import { CARD_SURFACE_CLASS } from './cardStyles'
 
 /** Card 组件的 props 配置 */
 export interface CardProps {
@@ -49,7 +50,7 @@ export function Card({
     <div
       data-motion={motion}
       className={clsx(
-        'overflow-hidden rounded-lg border border-border-light bg-bg-card/60 shadow-card backdrop-blur-[2px]',
+        CARD_SURFACE_CLASS,
         motion !== 'none' && 'motion-card',
         motion === 'interactive' && 'motion-card-interactive',
         motion === 'status' && 'motion-card-status',
