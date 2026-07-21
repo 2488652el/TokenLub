@@ -21,7 +21,6 @@ export const IPC = {
   syncDevices: 'sync:devices',
   syncRevokeDevice: 'sync:revoke-device',
   usageGetDashboard: 'usage:get-dashboard',
-  usageGetProviderSummary: 'usage:get-provider-summary',
   usageGetLogs: 'usage:get-logs',
   usageGetLogsPage: 'usage:get-logs-page',
   usageGetTotalSpend: 'usage:get-total-spend',

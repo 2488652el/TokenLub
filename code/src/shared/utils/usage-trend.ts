@@ -59,7 +59,6 @@ function bucketLabel(bucket: string, bucketKind: 'hour' | 'day'): string {
 /** 按时间范围生成连续的空桶(补齐无数据时段),当日按 24 小时,7d/30d 按天。 */
 function buildDenseBuckets(
   range: UsageTrendRange,
-  bucketKind: 'hour' | 'day',
   now: Date
 ): Array<{ bucket: string; label: string }> {
   if (range === 'today') {
@@ -132,7 +131,7 @@ export function buildModelUsageSeries(
     buckets.set(bucket, point)
   }
 
-  const denseBuckets = buildDenseBuckets(range, bucketKind, now)
+  const denseBuckets = buildDenseBuckets(range, now)
   let points: Array<Record<string, string | number>>
   if (denseBuckets.length > 0) {
     points = denseBuckets.map(({ bucket, label }) => ({
