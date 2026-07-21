@@ -131,17 +131,36 @@ export function scheduleSyncAfterChange(): void {
 }
 
 export function initializeSync(): void {
-  const session = loadSyncSession()
-  if (session) configureSyncSession(session)
-  else {
+  try {
+    const session = loadSyncSession()
+    if (session) {
+      configureSyncSession(session)
+      return
+    }
+  } catch {
     sessionGeneration++
     client = null
     currentDeviceId = null
     scheduler?.dispose()
     scheduler = null
     clearSyncTimers()
-    status = { configured: false, state: 'idle', revision: getSyncV2Revision() }
+    status = {
+      configured: false,
+      state: 'needs_login',
+      revision: getSyncV2Revision(),
+      lastError: 'Local sync credentials could not be restored; sign in again'
+    }
+    console.warn('[sync] local credentials could not be restored')
+    return
   }
+
+  sessionGeneration++
+  client = null
+  currentDeviceId = null
+  scheduler?.dispose()
+  scheduler = null
+  clearSyncTimers()
+  status = { configured: false, state: 'idle', revision: getSyncV2Revision() }
 }
 
 function requireClient(): SyncClient {
