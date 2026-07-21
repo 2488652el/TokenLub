@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon'
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
+import { CARD_SURFACE_CLASS } from '../components/cardStyles'
 import { EmptyState } from '../components/EmptyState'
 import { ProviderIcon } from '../components/ProviderIcon'
 import { CodexQuotaPanel } from '../components/CodexQuotaPanel'
@@ -199,14 +200,14 @@ export default function BalanceQuery() {
 
   const codexCard = (
     <article
-      className={`motion-card-interactive group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${
+      className={`${CARD_SURFACE_CLASS} motion-card-interactive group relative flex min-h-[280px] flex-col ${
         codex.loading && !reducedMotion ? 'motion-data-flash' : ''
       }`}
     >
       <div className="absolute inset-x-0 top-0 h-1 bg-[#10A37F]" />
-      <header className="flex items-start justify-between gap-4 bg-[linear-gradient(135deg,rgba(16,163,127,0.1),transparent_62%)] px-5 pb-4 pt-5">
+      <header className="flex items-start justify-between gap-4 bg-bg-base/30 px-5 pb-4 pt-5">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-[rgba(16,163,127,0.1)]">
+          <span className="flex h-11 w-11 flex-none items-center justify-center rounded-lg border border-border-light bg-bg-card/70">
             <ProviderIcon providerId="openai-admin" title="ChatGPT" size={23} />
           </span>
           <div className="min-w-0">
@@ -315,17 +316,13 @@ function ProviderBalanceCard({
   const providerName = catalog?.displayName ?? keyRecord.providerId
 
   return (
-    <article className="motion-card-interactive group relative flex min-h-[280px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card">
+    <article
+      className={`${CARD_SURFACE_CLASS} motion-card-interactive group relative flex min-h-[280px] flex-col`}
+    >
       <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: theme.accent }} />
-      <header
-        className="flex items-start justify-between gap-4 px-5 pb-4 pt-5"
-        style={{ background: `linear-gradient(135deg, ${theme.tint}, transparent 58%)` }}
-      >
+      <header className="flex items-start justify-between gap-4 bg-bg-base/30 px-5 pb-4 pt-5">
         <div className="flex min-w-0 items-center gap-3">
-          <span
-            className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
-            style={{ backgroundColor: theme.tint }}
-          >
+          <span className="flex h-10 w-10 flex-none items-center justify-center rounded-lg border border-border-light bg-bg-card/70">
             <ProviderIcon
               providerId={keyRecord.providerId}
               title={providerName}

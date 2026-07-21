@@ -6,6 +6,7 @@
  */
 import { Icon } from './Icon'
 import { useEffect, useState } from 'react'
+import { CARD_SURFACE_CLASS } from './cardStyles'
 import { ProviderIcon } from './ProviderIcon'
 import { ProgressBar } from './motion'
 import { fmtMoney, fmtCount } from '../../shared/utils/money'
@@ -84,21 +85,15 @@ export function ApiKeyCard({
 
   return (
     <article
-      className={`motion-card motion-card-interactive group relative flex min-h-[320px] flex-col overflow-hidden rounded-xl border border-border-light bg-bg-card shadow-[0_1px_2px_rgba(15,23,42,0.03)] ${
+      className={`${CARD_SURFACE_CLASS} motion-card motion-card-interactive group relative flex min-h-[320px] flex-col ${
         toggling ? 'motion-data-flash' : ''
       }`}
     >
       <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: visual.accent }} />
-      <header
-        className="relative px-5 pb-4 pt-5"
-        style={{ background: `linear-gradient(135deg, ${visual.tint}, transparent 64%)` }}
-      >
+      <header className="relative bg-bg-base/30 px-5 pb-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span
-              className="flex h-11 w-11 flex-none items-center justify-center rounded-2xl"
-              style={{ backgroundColor: visual.tint }}
-            >
+            <span className="flex h-11 w-11 flex-none items-center justify-center rounded-lg border border-border-light bg-bg-card/70">
               <ProviderIcon
                 providerId={keyRecord.providerId}
                 title={providerDisplayName}
@@ -252,7 +247,7 @@ function CashBalanceBlock({
   balance: (BalanceSnapshot & { id: number; apiKeyId?: string }) | undefined
 }) {
   return (
-    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+    <div className="space-y-1 rounded-md border border-border-light bg-bg-base/40 px-2.5 py-2">
       <InfoRow
         label="余额"
         value={
@@ -275,7 +270,7 @@ function AdminUsageBlock({
   keyRecord: ApiKeyRecord
 }) {
   return (
-    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+    <div className="space-y-1 rounded-md border border-border-light bg-bg-base/40 px-2.5 py-2">
       <InfoRow label="获取方式" value="Admin Usage API" />
       <InfoRow
         label="本期已用"
@@ -301,7 +296,7 @@ function GatewayBalanceBlock({
   keyRecord: ApiKeyRecord
 }) {
   return (
-    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+    <div className="space-y-1 rounded-md border border-border-light bg-bg-base/40 px-2.5 py-2">
       <InfoRow
         label={keyRecord.providerId === 'newapi-generic' ? '网关余额' : '额度余额'}
         value={
@@ -395,7 +390,7 @@ function KimiCodingQuotaRow({ label, quota }: { label: string; quota: KimiQuotaW
   const width = hasPct ? Math.max(0, Math.min(100, pct)) : 100
   const tone = hasPct && pct >= 90 ? 'red' : 'amber'
   return (
-    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-1">
+    <div className="space-y-1 rounded-md border border-border-light bg-bg-base/40 px-2.5 py-2">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-text-muted text-[12px]">{label}</span>
         <span className="font-mono text-[12px] text-text-primary text-right">
@@ -638,7 +633,7 @@ function KeySpendLine({
       : `${fmtCount(spend.pricedRequests)} 条已计费 · ${fmtCount(spend.unpricedRequests)} 条未定价`
 
   return (
-    <div className="rounded border border-border-light bg-bg-base/40 px-2 py-1.5 space-y-0.5">
+    <div className="space-y-0.5 rounded-md border border-border-light bg-bg-base/40 px-2.5 py-2">
       <div className="flex items-baseline justify-between">
         <span className="text-text-muted text-[12px]">{compact ? '消费' : '消费估算 (30 天)'}</span>
         <span className="font-mono font-medium text-text-primary">{amount}</span>
