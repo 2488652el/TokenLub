@@ -1,6 +1,6 @@
 {
   "name": "moonmeter",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "MoonMeter - unified LLM token usage & cost aggregator for Windows and macOS",
   "main": "demo/out/main/index.js",
   "author": "bestzuge@gmail.com",

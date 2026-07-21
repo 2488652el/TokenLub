@@ -5,7 +5,7 @@
   <p>面向多模型开发者的本地优先 LLM 用量、余额与成本工作台。</p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.2.2-151515?style=flat-square" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.2.3-151515?style=flat-square" />
     <img alt="React" src="https://img.shields.io/badge/React-19.2-151515?style=flat-square&logo=react" />
     <img alt="Electron" src="https://img.shields.io/badge/Electron-31-151515?style=flat-square&logo=electron" />
     <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-B59A58?style=flat-square" />
@@ -100,13 +100,13 @@ npm run build
 ### Windows 打包
 
 ```powershell
-npm run dist:win -- --change "MoonMeter-1.2.2" --model "release"
+npm run dist:win -- --change "MoonMeter-1.2.3" --model "release"
 ```
 
 输出目录：
 
 ```text
-demo/moonmeter-1.2.2-MoonMeter-1.2.2-release/
+demo/moonmeter-1.2.3-MoonMeter-1.2.3-release/
 ```
 
 macOS 可使用 `npm run dist:mac:x64`、`npm run dist:mac:arm64` 或 `npm run dist:mac`。正式构建与历史版本请前往 [GitHub Releases](https://github.com/2488652el/MoonMeter/releases)。
@@ -171,4 +171,4 @@ Electron 31 · React 19 · TypeScript · Vite · Tailwind CSS · Recharts · Zus
 
 ## 版本
 
-当前源码版本：**MoonMeter 1.2.2**。本版统一核心页面的卡片表面、圆角与阴影层级，并保留升级用户的加密上下文兼容修复。详见 [CHANGELOG.md](./CHANGELOG.md)。
+当前源码版本：**MoonMeter 1.2.3**。本版清理未使用的内部接口与重复样式，统一跨平台源码换行，并修正仓库与打包说明。详见 [CHANGELOG.md](./CHANGELOG.md)。
