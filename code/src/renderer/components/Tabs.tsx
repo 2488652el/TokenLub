@@ -5,6 +5,7 @@
  */
 import { type ReactNode } from 'react'
 import clsx from 'clsx'
+import { Icon } from './Icon'
 
 /** ponytail: minimal tab strip — no UI lib. Highlights the selected tab via
  *  bottom-border accent + bg, consistent with tailwind tokens used by the
@@ -49,7 +50,7 @@ export function Tabs<T extends string>({
                 : 'border-transparent text-text-muted hover:text-text-secondary'
             )}
           >
-            {t.icon && <i className={`fa-solid ${t.icon} text-[12px]`} />}
+            {t.icon && <Icon name={t.icon} className="text-[12px]" />}
             {t.label}
           </button>
         )

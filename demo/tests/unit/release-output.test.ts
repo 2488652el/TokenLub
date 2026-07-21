@@ -32,7 +32,7 @@ describe('release output directory', () => {
         change: '项目目录分类',
         model: 'GPT-5'
       }).replace(/\\/g, '/')
-    ).toBe('demo/tokenlub-1.0.5-项目目录分类-GPT-5')
+    ).toBe('demo/moonmeter-1.0.5-项目目录分类-GPT-5')
   })
 
   it('replaces filesystem-unsafe characters', () => {

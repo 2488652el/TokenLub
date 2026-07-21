@@ -114,9 +114,13 @@ async function route(
   metrics: ReturnType<typeof createServerMetrics>
 ): Promise<Response> {
   if (ctx.request.method === 'OPTIONS') return new Response(null, { status: 204 })
-  if (ctx.request.method === 'GET' && ctx.url.pathname === '/console/tokenlub-mark.png') {
+  if (
+    ctx.request.method === 'GET' &&
+    (ctx.url.pathname === '/console/moonmeter-icon.png' ||
+      ctx.url.pathname === '/console/tokenlub-mark.png')
+  ) {
     return new Response(
-      new Uint8Array(readFileSync(resolve('code/src/renderer/assets/tokenlub-mark.png'))),
+      new Uint8Array(readFileSync(resolve('code/src/renderer/assets/moonmeter-icon.png'))),
       {
         headers: {
           'cache-control': 'public, max-age=86400',

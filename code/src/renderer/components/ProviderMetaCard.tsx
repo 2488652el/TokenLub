@@ -3,6 +3,7 @@
  * Base URL 模板、常用模型、注册链接与区域/币种提示等信息。
  * (glm-5.2)
  */
+import { Icon } from './Icon'
 import { type BaseUrlTemplate, type ProviderCatalogEntry } from '@shared/provider-catalog'
 import { PROTOCOL_LABEL } from '@shared/provider-catalog'
 
@@ -48,7 +49,7 @@ export function ProviderMetaCard({
           className="inline-flex items-center gap-1.5 px-2 py-[2px] rounded-full text-[11.5px] font-medium bg-accent/10 text-accent border border-accent/20"
           title={`Wire protocol: ${entry.protocol}`}
         >
-          <i className="fa-solid fa-plug text-[10px]" />
+          <Icon name="fa-plug" className="text-[10px]" />
           {badge}
         </span>
         <span className="inline-flex items-center px-2 py-[2px] rounded-full text-[11.5px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
@@ -56,17 +57,17 @@ export function ProviderMetaCard({
         </span>
         {entry.category === 'manual' && (
           <span className="inline-flex items-center px-2 py-[2px] rounded-full text-[11.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-            <i className="fa-solid fa-pen-to-square text-[10px] mr-1" /> 手动录入
+            <Icon name="fa-pen-to-square" className="text-[10px] mr-1" /> 手动录入
           </span>
         )}
         {entry.category === 'admin-org' && (
           <span className="inline-flex items-center px-2 py-[2px] rounded-full text-[11.5px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
-            <i className="fa-solid fa-building text-[10px] mr-1" /> 组织管理
+            <Icon name="fa-building" className="text-[10px] mr-1" /> 组织管理
           </span>
         )}
         {entry.category === 'newapi-generic' && (
           <span className="inline-flex items-center px-2 py-[2px] rounded-full text-[11.5px] font-medium bg-sky-50 text-sky-700 border border-sky-200">
-            <i className="fa-solid fa-server text-[10px] mr-1" /> 自建代理
+            <Icon name="fa-server" className="text-[10px] mr-1" /> 自建代理
           </span>
         )}
       </div>
@@ -88,7 +89,7 @@ export function ProviderMetaCard({
                 className="btn btn-ghost btn-xs disabled:opacity-50"
                 title={defaultUrlFilled ? '已是默认地址' : '填入 baseURL 覆盖'}
               >
-                <i className="fa-solid fa-arrow-down" /> 使用默认
+                <Icon name="fa-arrow-down" /> 使用默认
               </button>
             )}
           </div>
@@ -131,7 +132,7 @@ export function ProviderMetaCard({
               className="inline-flex items-center gap-1 text-accent hover:underline truncate max-w-[280px]"
               title={entry.signupUrl}
             >
-              <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
+              <Icon name="fa-arrow-up-right-from-square" className="text-[10px]" />
               <span className="truncate">{prettyUrl(entry.signupUrl)}</span>
             </a>
           </div>
@@ -168,7 +169,7 @@ function BaseUrlTemplateChip({ tpl, onClick }: { tpl: BaseUrlTemplate; onClick: 
         <code className="font-mono text-[11.5px] text-text-secondary truncate flex-1 min-w-0">
           {tpl.url || '（空 — 需自填）'}
         </code>
-        <i className="fa-solid fa-arrow-down text-[10px] text-text-muted flex-shrink-0" />
+        <Icon name="fa-arrow-down" className="text-[10px] text-text-muted flex-shrink-0" />
       </button>
       {tpl.hint && (
         <p className="px-2 pb-1.5 text-[11px] text-text-muted leading-snug">{tpl.hint}</p>

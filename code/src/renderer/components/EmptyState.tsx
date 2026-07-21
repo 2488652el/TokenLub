@@ -3,6 +3,7 @@
  * (glm-5.2)
  */
 import { type ReactNode } from 'react'
+import { Icon } from './Icon'
 
 /**
  * 空状态展示组件。
@@ -32,7 +33,7 @@ export function EmptyState({
       aria-busy={resolvedVariant === 'loading'}
       className={`motion-empty-${resolvedVariant} flex flex-col items-center py-12 px-6 text-text-muted gap-[10px]`}
     >
-      <i className={`fa-solid ${icon} motion-empty-icon text-[32px] opacity-35`} />
+      <Icon name={icon} className="motion-empty-icon text-[32px] opacity-35" />
       <p className="text-[13.5px]">{title}</p>
       {hint && <p className="text-[12px]">{hint}</p>}
       {action}

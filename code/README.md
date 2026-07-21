@@ -1,6 +1,6 @@
 # Code
 
-TokenLub 桌面应用的可执行源码：
+MoonMeter 桌面应用的可执行源码：
 
 - `src/main/`：Electron 主进程、SQLite、Provider、IPC 与调度。
 - `src/preload/`：主进程与渲染层之间的安全桥。

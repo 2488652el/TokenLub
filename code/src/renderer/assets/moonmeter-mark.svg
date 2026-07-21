@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 120">
+  <defs>
+    <mask id="moonmeter-cut">
+      <rect width="220" height="120" fill="white"/>
+      <path d="M110 12L118 60L110 108L102 60Z" fill="black"/>
+    </mask>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round" mask="url(#moonmeter-cut)">
+    <circle cx="62" cy="60" r="46"/>
+    <circle cx="158" cy="60" r="46"/>
+  </g>
+</svg>

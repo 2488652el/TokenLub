@@ -28,7 +28,7 @@ function buildReleaseOutputDirectory({ version, change, model }) {
   const safeVersion = sanitizeSegment(version, '版本号')
   const safeChange = sanitizeSegment(change, '修改说明')
   const safeModel = sanitizeSegment(model, '执行模型')
-  return path.join('demo', `tokenlub-${safeVersion}-${safeChange}-${safeModel}`)
+  return path.join('demo', `moonmeter-${safeVersion}-${safeChange}-${safeModel}`)
 }
 
 function readArgument(args, name) {
@@ -40,8 +40,14 @@ function parseOptions(args) {
   return {
     platform: readArgument(args, '--platform') ?? 'current',
     arch: readArgument(args, '--arch'),
-    change: readArgument(args, '--change') ?? process.env.TOKENLUB_CHANGE,
-    model: readArgument(args, '--model') ?? process.env.TOKENLUB_EXECUTION_MODEL,
+    change:
+      readArgument(args, '--change') ??
+      process.env.MOONMETER_CHANGE ??
+      process.env.TOKENLUB_CHANGE,
+    model:
+      readArgument(args, '--model') ??
+      process.env.MOONMETER_EXECUTION_MODEL ??
+      process.env.TOKENLUB_EXECUTION_MODEL,
     dir: args.includes('--dir'),
     dryRun: args.includes('--dry-run')
   }

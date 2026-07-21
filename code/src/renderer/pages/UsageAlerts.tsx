@@ -3,6 +3,7 @@
  * 支持按全局或指定供应商、按剩余金额或剩余百分比设置阈值。
  * (glm-5.2)
  */
+import { Icon } from '../components/Icon'
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
@@ -206,7 +207,7 @@ export default function UsageAlerts() {
             disabled={busy}
             title="新建告警规则"
           >
-            <i className="fa-solid fa-plus" /> 新建规则
+            <Icon name="fa-plus" /> 新建规则
           </button>
         }
       />
@@ -223,7 +224,7 @@ export default function UsageAlerts() {
             hint="余额低于阈值时通过系统通知提醒"
             action={
               <button className="btn btn-primary btn-sm mt-2" onClick={openCreate} disabled={busy}>
-                <i className="fa-solid fa-plus" /> 创建第一条告警规则
+                <Icon name="fa-plus" /> 创建第一条告警规则
               </button>
             }
           />
@@ -281,7 +282,7 @@ export default function UsageAlerts() {
                         disabled={busy}
                         title="删除"
                       >
-                        <i className="fa-solid fa-trash-can text-red" />
+                        <Icon name="fa-trash-can" className="text-red" />
                       </button>
                     </td>
                   </tr>
@@ -356,7 +357,7 @@ function Toggle({
       tabIndex={0}
       className={`relative inline-block w-9 h-5 rounded-full cursor-pointer ${
         !reducedMotion ? 'transition-colors' : ''
-      } ${checked ? 'bg-accent' : 'bg-[#D4D4D2]'}`}
+      } ${checked ? 'bg-accent' : 'bg-border'}`}
     >
       <span
         className={`absolute top-[2px] left-[2px] w-4 h-4 bg-white rounded-full shadow ${

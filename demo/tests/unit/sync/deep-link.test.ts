@@ -4,12 +4,14 @@ import { parseSyncBindingLink } from '../../../../code/src/main/sync/deep-link'
 describe('sync binding deep link', () => {
   const ticket = 'a'.repeat(43)
 
-  it('accepts the dedicated binding route', () => {
+  it.each(['moonmeter', 'tokenlub'])('accepts the %s binding route', (scheme) => {
     const server = encodeURIComponent('https://sync.example.com')
-    expect(parseSyncBindingLink(`tokenlub://sync/bind?server=${server}&ticket=${ticket}`)).toEqual({
-      baseUrl: 'https://sync.example.com',
-      ticket
-    })
+    expect(parseSyncBindingLink(`${scheme}://sync/bind?server=${server}&ticket=${ticket}`)).toEqual(
+      {
+        baseUrl: 'https://sync.example.com',
+        ticket
+      }
+    )
   })
 
   it.each([

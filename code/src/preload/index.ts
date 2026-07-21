@@ -48,7 +48,7 @@ window.addEventListener('online', () => {
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.1.2',
+  version: '1.2.0',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -256,6 +256,8 @@ const api = {
   }
 } as const
 
-export type TokenLubAPI = typeof api
+export type MoonMeterAPI = typeof api
+/** @deprecated Use MoonMeterAPI. Retained for source compatibility with integrations. */
+export type TokenLubAPI = MoonMeterAPI
 
 contextBridge.exposeInMainWorld('api', api)

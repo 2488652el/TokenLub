@@ -145,7 +145,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
       'glm-image'
     ],
     signupUrl: 'https://bigmodel.cn/',
-    note: 'Coding Plan 用户请把 baseURL 改成 `…/api/coding/paas/v4`,团队 Key 与平台 Key 不通用。/api/biz 余额接口偶发 500,TokenLub 会回退到 chat 探活。',
+    note: 'Coding Plan 用户请把 baseURL 改成 `…/api/coding/paas/v4`,团队 Key 与平台 Key 不通用。/api/biz 余额接口偶发 500,MoonMeter 会回退到 chat 探活。',
     region: 'CN · CNY'
   },
   {
@@ -214,7 +214,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
         label: 'OpenAI 兼容',
         url: 'https://api.longcat.chat',
         protocol: 'openai-compatible',
-        hint: 'OpenAI 兼容根地址。TokenLub 用 `/openai/v1/models` 测试连接。'
+        hint: 'OpenAI 兼容根地址。MoonMeter 用 `/openai/v1/models` 测试连接。'
       },
       {
         id: 'anthropic',
@@ -253,7 +253,7 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     ],
     defaultModels: ['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed', 'MiniMax-M2.5'],
     signupUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
-    note: 'OpenAI 兼容。TokenLub 会自动读取 Token Plan 的 5 小时/周限额;`/v1/models` 仅用于探活,key 0 消耗;按 CNY 计费,M3 永久五折。',
+    note: 'OpenAI 兼容。MoonMeter 会自动读取 Token Plan 的 5 小时/周限额;`/v1/models` 仅用于探活,key 0 消耗;按 CNY 计费,M3 永久五折。',
     region: 'CN · CNY'
   },
   {

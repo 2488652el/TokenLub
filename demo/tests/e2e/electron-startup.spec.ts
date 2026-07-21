@@ -15,7 +15,7 @@ import {
 } from '../../../drive/src/server/snapshot-sync'
 
 const electronPath = createRequire(__filename)('electron') as string
-const packageVersion = (createRequire(__filename)('../../package.json') as { version: string })
+const packageVersion = (createRequire(__filename)('../../../package.json') as { version: string })
   .version
 
 async function holdDatabaseLock(databasePath: string): Promise<ChildProcess> {
@@ -39,7 +39,7 @@ async function holdDatabaseLock(databasePath: string): Promise<ChildProcess> {
 }
 
 test('syncs two isolated Electron profiles and recovers after server restart', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'tokenlub-electron-'))
+  const root = mkdtempSync(join(tmpdir(), 'moonmeter-electron-'))
   const apps: ElectronApplication[] = []
   let server: Server | undefined
 
@@ -96,7 +96,7 @@ test('syncs two isolated Electron profiles and recovers after server restart', a
       [appB, deviceB.id]
     ] as const) {
       const window = await app.firstWindow()
-      await expect(window).toHaveTitle('TokenLub')
+      await expect(window).toHaveTitle('MoonMeter')
       await expect(window.locator('body')).not.toBeEmpty()
       await expect(window.evaluate(() => window.api.version)).resolves.toBe(packageVersion)
       await expect(window.evaluate(() => window.api.log.locations())).resolves.toEqual({
@@ -151,11 +151,15 @@ test('syncs two isolated Electron profiles and recovers after server restart', a
 
     await windowA.evaluate(() => window.api.settings.set('refresh_interval_min', 19))
     await windowA.evaluate(() => window.api.sync.trigger())
-    const locker = await holdDatabaseLock(join(root, 'device-b', 'tokenlub.db'))
+    const locker = await holdDatabaseLock(join(root, 'device-b', 'moonmeter.db'))
     try {
       await expect(windowB.evaluate(() => window.api.sync.trigger())).rejects.toThrow(/locked/i)
     } finally {
-      locker.kill()
+      if (locker.exitCode === null) {
+        const exited = new Promise<void>((resolve) => locker.once('exit', () => resolve()))
+        locker.kill()
+        await exited
+      }
     }
     await windowB.evaluate(() => window.api.sync.trigger())
     await expect(windowB.evaluate(() => window.api.settings.get())).resolves.toMatchObject({
@@ -180,8 +184,8 @@ test('syncs two isolated Electron profiles and recovers after server restart', a
       }
     )
 
-    expect(existsSync(join(root, 'device-a', 'tokenlub.db'))).toBe(true)
-    expect(existsSync(join(root, 'device-b', 'tokenlub.db'))).toBe(true)
+    expect(existsSync(join(root, 'device-a', 'moonmeter.db'))).toBe(true)
+    expect(existsSync(join(root, 'device-b', 'moonmeter.db'))).toBe(true)
   } finally {
     await Promise.all(apps.map((app) => app.close()))
     if (server) await new Promise<void>((resolve) => server?.close(() => resolve()))
@@ -190,7 +194,7 @@ test('syncs two isolated Electron profiles and recovers after server restart', a
 })
 
 test('applies 10,000 remote balance snapshots without freezing Electron', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'tokenlub-electron-load-'))
+  const root = mkdtempSync(join(tmpdir(), 'moonmeter-electron-load-'))
   let app: ElectronApplication | undefined
   let server: Server | undefined
 
@@ -235,7 +239,7 @@ test('applies 10,000 remote balance snapshots without freezing Electron', async 
       cwd: process.cwd()
     })
     const window = await app.firstWindow()
-    await expect(window.locator('body')).toContainText('TokenLub')
+    await expect(window.locator('body')).toContainText('MoonMeter')
     await window.evaluate(
       ({ baseUrl, deviceId }) =>
         window.api.sync.login({
@@ -251,7 +255,7 @@ test('applies 10,000 remote balance snapshots without freezing Electron', async 
     await window.evaluate(() => window.api.sync.trigger())
     expect(performance.now() - startedAt).toBeLessThan(15_000)
     await expect(window.evaluate(() => window.api.balance.latest())).resolves.not.toHaveLength(0)
-    await expect(window.locator('body')).toContainText('TokenLub')
+    await expect(window.locator('body')).toContainText('MoonMeter')
   } finally {
     await app?.close()
     if (server) await new Promise<void>((resolve) => server?.close(() => resolve()))
@@ -260,10 +264,10 @@ test('applies 10,000 remote balance snapshots without freezing Electron', async 
 })
 
 test('stops safely when a local database fails integrity check', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'tokenlub-electron-corrupt-'))
+  const root = mkdtempSync(join(tmpdir(), 'moonmeter-electron-corrupt-'))
   let app: ElectronApplication | undefined
   let brokenApp: ElectronApplication | undefined
-  const databasePath = join(root, 'device', 'tokenlub.db')
+  const databasePath = join(root, 'device', 'moonmeter.db')
 
   try {
     app = await electron.launch({

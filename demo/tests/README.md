@@ -12,12 +12,12 @@ exist; the test creates and removes it, and overrides `HOME` so it never scans
 real Claude or Codex directories.
 
 ```bash
-TOKENLUB_PACKAGED_APP="/path/to/x64/TokenLub.app" \
-TOKENLUB_TEST_USER_DATA="/tmp/tokenlub-e2e-x64" \
+MOONMETER_PACKAGED_APP="/path/to/x64/MoonMeter.app" \
+MOONMETER_TEST_USER_DATA="/tmp/moonmeter-e2e-x64" \
 npm run test:e2e -- demo/tests/e2e/macos-packaged-startup.spec.ts
 
-TOKENLUB_PACKAGED_APP="/path/to/arm64/TokenLub.app" \
-TOKENLUB_TEST_USER_DATA="/tmp/tokenlub-e2e-arm64" \
+MOONMETER_PACKAGED_APP="/path/to/arm64/MoonMeter.app" \
+MOONMETER_TEST_USER_DATA="/tmp/moonmeter-e2e-arm64" \
 npm run test:e2e -- demo/tests/e2e/macos-packaged-startup.spec.ts
 ```
 

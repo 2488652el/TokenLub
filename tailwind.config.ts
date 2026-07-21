@@ -5,10 +5,33 @@ export default {
   theme: {
     extend: {
       colors: {
-        accent: { DEFAULT: '#10B981', hover: '#059669', text: '#059669', dim: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)' },
-        bg: { base: '#FAFAF8', sidebar: '#FFFFFF', card: '#FFFFFF', 'card-hover': '#F9FAFB', input: '#FFFFFF', hover: '#F3F4F6', active: '#ECFDF5' },
-        border: { light: '#E8E8E6', DEFAULT: '#D4D4D2', focus: '#10B981' },
-        text: { primary: '#171717', secondary: '#737373', muted: '#A3A3A3', 'on-accent': '#FFFFFF' },
+        accent: {
+          DEFAULT: 'rgb(var(--color-accent) / <alpha-value>)',
+          hover: 'rgb(var(--color-accent-strong) / <alpha-value>)',
+          text: 'rgb(var(--color-accent-strong) / <alpha-value>)',
+          dim: 'rgb(var(--color-accent) / 0.1)',
+          border: 'rgb(var(--color-accent) / 0.3)'
+        },
+        bg: {
+          base: 'rgb(var(--color-paper) / <alpha-value>)',
+          sidebar: 'rgb(var(--color-paper-strong) / <alpha-value>)',
+          card: 'rgb(var(--color-surface) / <alpha-value>)',
+          'card-hover': 'rgb(var(--color-surface-hover) / <alpha-value>)',
+          input: 'rgb(var(--color-surface) / <alpha-value>)',
+          hover: 'rgb(var(--color-surface-hover) / <alpha-value>)',
+          active: 'rgb(var(--color-surface-active) / <alpha-value>)'
+        },
+        border: {
+          light: 'rgb(var(--color-line) / var(--line-alpha))',
+          DEFAULT: 'rgb(var(--color-line) / var(--line-strong-alpha))',
+          focus: 'rgb(var(--color-accent) / <alpha-value>)'
+        },
+        text: {
+          primary: 'rgb(var(--color-ink) / <alpha-value>)',
+          secondary: 'rgb(var(--color-muted) / <alpha-value>)',
+          muted: 'rgb(var(--color-faint) / <alpha-value>)',
+          'on-accent': 'rgb(var(--color-on-accent) / <alpha-value>)'
+        },
         status: { red: '#EF4444', 'red-dim': 'rgba(239,68,68,0.08)', amber: '#F59E0B', 'amber-dim': 'rgba(245,158,11,0.08)', blue: '#3B82F6', 'blue-dim': 'rgba(59,130,246,0.08)', purple: '#8B5CF6', 'purple-dim': 'rgba(139,92,246,0.08)', pink: '#EC4899', orange: '#F97316' },
         tag: {
           anthropic: { bg: 'rgba(195,154,109,0.1)', fg: '#996B38' },
@@ -23,7 +46,7 @@ export default {
         mono: ['"SF Mono"', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace']
       },
       spacing: { '1': '4px', '2': '8px', '3': '12px', '4': '16px', '5': '20px', '6': '24px', '8': '32px', '10': '40px' },
-      borderRadius: { sm: '6px', md: '8px', lg: '12px', xl: '16px', full: '9999px' }
+      borderRadius: { sm: '8px', md: '10px', lg: '14px', xl: '16px', full: '9999px' }
     }
   },
   plugins: [require('@tailwindcss/forms')]

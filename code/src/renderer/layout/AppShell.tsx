@@ -11,12 +11,13 @@ export function AppShell() {
   const outlet = useOutlet()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg-base">
+    <div className="flex h-screen overflow-hidden bg-bg-base text-text-primary">
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden bg-bg-base">
+      <main className="relative flex flex-1 flex-col overflow-hidden bg-bg-base">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_50%_-40%,rgb(var(--color-ink)/0.055),transparent_68%)]" />
         <div
           key={location.pathname}
-          className="motion-route flex min-h-0 flex-1 flex-col overflow-hidden"
+          className="motion-route relative flex min-h-0 flex-1 flex-col overflow-hidden"
         >
           {outlet}
         </div>

@@ -4,6 +4,7 @@
  * 支持当日/7 天/30 天/全部的时间范围切换、刷新与导出 CSV。
  * (glm-5.2)
  */
+import { Icon } from '../components/Icon'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CartesianGrid,
@@ -57,7 +58,7 @@ function handleExport(d: DashboardSummary | null) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `tokenlub-export-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `moonmeter-export-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -108,7 +109,7 @@ function ModelUsageLineChart({ series }: { series: UsageTrendSeries }) {
   if (!series.points.length || !series.models.length) return null
   return (
     <div className="h-[360px] min-w-0">
-      <div className="mb-3 flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[12px] text-[#71717a]">
+      <div className="mb-3 flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[12px] text-text-secondary">
         {series.models.map((m) => (
           <div key={m.key} className="inline-flex items-center gap-1.5 max-w-[180px] min-w-0">
             <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ background: m.color }} />
@@ -120,17 +121,21 @@ function ModelUsageLineChart({ series }: { series: UsageTrendSeries }) {
       </div>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={series.points} margin={{ top: 10, right: 18, bottom: 12, left: 4 }}>
-          <CartesianGrid stroke="#eef0f4" strokeDasharray="3 3" vertical={false} />
+          <CartesianGrid
+            stroke="rgb(var(--color-line) / 0.1)"
+            strokeDasharray="3 3"
+            vertical={false}
+          />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: '#71717a' }}
+            tick={{ fontSize: 11, fill: 'rgb(var(--color-muted))' }}
             tickLine={false}
             minTickGap={24}
-            axisLine={{ stroke: '#e5e7eb' }}
+            axisLine={{ stroke: 'rgb(var(--color-line) / 0.14)' }}
           />
           <YAxis
             width={52}
-            tick={{ fontSize: 11, fill: '#71717a' }}
+            tick={{ fontSize: 11, fill: 'rgb(var(--color-muted))' }}
             tickFormatter={(v) => fmtCount(Number(v))}
             tickLine={false}
             axisLine={false}
@@ -180,10 +185,10 @@ function ModelTooltip({
     .filter((r) => r.value > 0)
     .sort((a, b) => b.value - a.value)
   return (
-    <div className="min-w-[180px] rounded-md border border-[#e5e7eb] bg-white px-3 py-2 shadow-sm">
-      <div className="mb-1 text-[12px] font-medium text-[#09090b]">{label}</div>
+    <div className="min-w-[180px] rounded-md border border-border-light bg-bg-card px-3 py-2 shadow-sm">
+      <div className="mb-1 text-[12px] font-medium text-text-primary">{label}</div>
       {rows.length === 0 ? (
-        <div className="text-[12px] text-[#9ca3af]">无消耗</div>
+        <div className="text-[12px] text-text-muted">无消耗</div>
       ) : (
         <div className="space-y-1">
           {rows.map((r) => (
@@ -194,7 +199,7 @@ function ModelTooltip({
                   {r.label}
                 </span>
               </span>
-              <span className="font-mono text-[#09090b]">{fmtCount(r.value)}</span>
+              <span className="font-mono text-text-primary">{fmtCount(r.value)}</span>
             </div>
           ))}
         </div>
@@ -283,9 +288,9 @@ export default function Dashboard() {
   const estimatedCostValue = hasCnySpend ? (spend?.cnyTotal ?? 0) : (summary?.totalCost ?? 0)
 
   return (
-    <div className="page-content overflow-x-auto bg-[#fafafa] text-[#09090b]">
+    <div className="page-content overflow-x-hidden bg-bg-base text-text-primary">
       {isEmpty ? (
-        <Card className="border-[#e5e7eb] bg-white shadow-sm">
+        <Card className="border-border-light bg-bg-card shadow-sm">
           <EmptyState
             icon="fa-chart-simple"
             title="暂无用量数据"
@@ -296,29 +301,33 @@ export default function Dashboard() {
                 onClick={handleRefresh}
                 disabled={refreshing}
               >
-                <i className="fa-solid fa-arrows-rotate" /> 立即刷新
+                <Icon name="fa-arrows-rotate" /> 立即刷新
               </button>
             }
           />
         </Card>
       ) : (
-        <MotionGroup className="mx-auto flex min-w-[760px] max-w-[1440px] flex-col gap-6">
+        <MotionGroup className="mx-auto flex min-w-0 max-w-[1440px] flex-col gap-6">
           <section className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-[13px] font-medium text-[#71717a]">TokenLub</p>
-              <h1 className="mt-1 text-[34px] font-bold leading-tight text-[#09090b]">使用统计</h1>
-              <p className="mt-1 text-[14px] text-[#71717a]">查看 AI 模型用量、成本和资源包消耗</p>
+              <p className="text-[13px] font-medium text-text-secondary">MoonMeter</p>
+              <h1 className="mt-1 text-[34px] font-bold leading-tight text-text-primary">
+                使用统计
+              </h1>
+              <p className="mt-1 text-[14px] text-text-secondary">
+                查看 AI 模型用量、成本和资源包消耗
+              </p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <div className="inline-flex h-11 items-center rounded-lg border border-[#e5e7eb] bg-white p-1 shadow-sm">
+              <div className="inline-flex h-11 items-center rounded-lg border border-border-light bg-bg-card p-1 shadow-sm">
                 {RANGE_OPTIONS.map((option) => (
                   <button
                     key={option.key}
                     type="button"
                     className={`h-9 rounded-md px-3 text-[13px] font-semibold transition-colors ${
                       range === option.key
-                        ? 'bg-[#0f6bff] text-white'
-                        : 'text-[#71717a] hover:bg-[#f3f4f6] hover:text-[#09090b]'
+                        ? 'bg-text-primary text-bg-base'
+                        : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                     }`}
                     onClick={() => {
                       setRange(option.key)
@@ -330,31 +339,31 @@ export default function Dashboard() {
                 ))}
               </div>
               <button
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-4 text-[13px] font-semibold text-[#09090b] shadow-sm transition-colors hover:bg-[#f3f4f6] disabled:opacity-60"
+                className="inline-flex h-11 items-center gap-2 rounded-lg border border-border-light bg-bg-card px-4 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-bg-hover disabled:opacity-60"
                 onClick={handleRefresh}
                 disabled={refreshing}
               >
-                <i className={`fa-solid fa-arrows-rotate ${refreshing ? 'fa-spin' : ''}`} /> 刷新
+                <Icon name="fa-arrows-rotate" className={refreshing ? 'icon-spin' : ''} /> 刷新
               </button>
               <button
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-4 text-[13px] font-semibold text-[#09090b] shadow-sm transition-colors hover:bg-[#f3f4f6]"
+                className="inline-flex h-11 items-center gap-2 rounded-lg border border-border-light bg-bg-card px-4 text-[13px] font-semibold text-text-primary shadow-sm transition-colors hover:bg-bg-hover"
                 onClick={() => handleExport(summary)}
               >
-                <i className="fa-solid fa-arrow-up-from-bracket" /> 导出
+                <Icon name="fa-arrow-up-from-bracket" /> 导出
               </button>
             </div>
           </section>
 
-          <section className="rounded-lg border border-[#e5e7eb] bg-white p-6 shadow-sm">
+          <section className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div className="flex min-w-0 items-start gap-4">
-                <div className="flex h-[60px] w-[60px] flex-none items-center justify-center rounded-lg bg-[#0f6bff]/15 text-[#1e90ff]">
-                  <i className="fa-solid fa-bolt text-[26px]" />
+                <div className="flex h-[60px] w-[60px] flex-none items-center justify-center rounded-lg bg-accent-dim text-accent-text">
+                  <Icon name="fa-bolt" className="text-[26px]" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-[#71717a]">真实消耗 Tokens</p>
+                  <p className="text-[14px] font-semibold text-text-secondary">真实消耗 Tokens</p>
                   <div className="mt-1 flex flex-wrap items-end gap-3">
-                    <div className="max-w-full break-words text-[44px] font-bold leading-none tracking-normal text-[#09090b]">
+                    <div className="max-w-full break-words text-[44px] font-bold leading-none tracking-normal text-text-primary">
                       {heroNumber !== null ? (
                         <AnimatedNumber value={heroNumber} format={fmtCount} durationMs={520} />
                       ) : (
@@ -362,12 +371,12 @@ export default function Dashboard() {
                       )}
                     </div>
                     {heroNumber && heroNumber >= 1e8 ? (
-                      <span className="mb-1 rounded-md bg-[#f3f4f6] px-2 py-1 text-[12px] font-semibold text-[#71717a]">
+                      <span className="mb-1 rounded-md bg-bg-hover px-2 py-1 text-[12px] font-semibold text-text-secondary">
                         ≈ {(heroNumber / 1e8).toFixed(2)} 亿
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-3 text-[12.5px] text-[#71717a]">
+                  <p className="mt-3 text-[12.5px] text-text-secondary">
                     {totalTokens > 0
                       ? `${activeRangeLabel}内记录的请求与本地 CLI 会话消耗`
                       : totalBalanceTokens > 0
@@ -377,10 +386,10 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid min-w-[280px] grid-cols-2 gap-3 rounded-lg border border-[#e5e7eb] bg-white p-4 shadow-sm max-sm:min-w-0 max-sm:w-full">
+              <div className="grid min-w-[280px] grid-cols-2 gap-3 rounded-lg border border-border-light bg-bg-card p-4 shadow-sm max-sm:min-w-0 max-sm:w-full">
                 <div>
-                  <p className="text-[12px] font-semibold text-[#71717a]">总请求数</p>
-                  <p className="mt-1 font-mono text-[20px] font-bold text-[#09090b]">
+                  <p className="text-[12px] font-semibold text-text-secondary">总请求数</p>
+                  <p className="mt-1 font-mono text-[20px] font-bold text-text-primary">
                     <AnimatedNumber
                       value={summary?.totalRequests ?? 0}
                       format={(value) => Math.round(value).toLocaleString('en-US')}
@@ -388,9 +397,9 @@ export default function Dashboard() {
                     />
                   </p>
                 </div>
-                <div className="border-l border-[#e5e7eb] pl-4">
-                  <p className="text-[12px] font-semibold text-[#71717a]">总成本</p>
-                  <p className="mt-1 font-mono text-[20px] font-bold text-[#12c99b]">
+                <div className="border-l border-border-light pl-4">
+                  <p className="text-[12px] font-semibold text-text-secondary">总成本</p>
+                  <p className="mt-1 font-mono text-[20px] font-bold text-accent-text">
                     <AnimatedNumber
                       value={estimatedCostValue}
                       format={(value) => (hasCnySpend ? fmtMoney(value, 'CNY') : fmtMoney(value))}
@@ -404,28 +413,28 @@ export default function Dashboard() {
             <MotionGroup className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
               <MetricBox
                 icon="fa-arrow-down"
-                iconClass="text-[#60a5fa]"
+                iconClass="text-status-blue"
                 label="新增输入"
                 value={summary?.totalInputTokens ?? 0}
                 format={fmtCount}
               />
               <MetricBox
                 icon="fa-arrow-up"
-                iconClass="text-[#c084fc]"
+                iconClass="text-status-purple"
                 label="Output"
                 value={summary?.totalOutputTokens ?? 0}
                 format={fmtCount}
               />
               <MetricBox
                 icon="fa-database"
-                iconClass="text-[#71717a]"
+                iconClass="text-text-secondary"
                 label="缓存命中"
                 value={summary?.totalCacheReadTokens ?? 0}
                 format={fmtCount}
               />
               <MetricBox
                 icon="fa-chart-line"
-                iconClass="text-[#12c99b]"
+                iconClass="text-accent-text"
                 label="缓存命中率"
                 value={cacheHitRate * 100}
                 format={(value) => `${value.toFixed(1)}%`}
@@ -434,12 +443,12 @@ export default function Dashboard() {
             </MotionGroup>
 
             {topProviders.length > 0 ? (
-              <div className="mt-5 flex flex-wrap items-center gap-2 text-[12px] text-[#71717a]">
-                <span className="font-semibold text-[#71717a]">主要来源</span>
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-[12px] text-text-secondary">
+                <span className="font-semibold text-text-secondary">主要来源</span>
                 {topProviders.map((p) => (
                   <span
                     key={p.providerId}
-                    className="rounded-md border border-[#e5e7eb] bg-[#f9fafb] px-2.5 py-1 font-mono"
+                    className="rounded-md border border-border-light bg-bg-hover/55 px-2.5 py-1 font-mono"
                   >
                     {p.providerId} · {fmtCount(p.tokens)}
                   </span>
@@ -448,47 +457,49 @@ export default function Dashboard() {
             ) : null}
           </section>
 
-          <section className="rounded-lg border border-[#e5e7eb] bg-white p-6 shadow-sm">
+          <section className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-[22px] font-bold text-[#09090b]">使用趋势</h2>
-                <p className="mt-1 text-[13px] text-[#71717a]">
+                <h2 className="text-[22px] font-bold text-text-primary">使用趋势</h2>
+                <p className="mt-1 text-[13px] text-text-secondary">
                   按模型分组显示，悬停曲线查看具体用量
                 </p>
               </div>
-              <span className="text-[14px] font-medium text-[#71717a]">{activeRangeLabel}</span>
+              <span className="text-[14px] font-medium text-text-secondary">
+                {activeRangeLabel}
+              </span>
             </div>
             {modelSeries.points.length > 0 ? (
               <ModelUsageLineChart series={modelSeries} />
             ) : (
-              <div className="flex h-[360px] items-center justify-center rounded-lg border border-dashed border-[#d1d5db] text-[13px] text-[#9ca3af]">
+              <div className="flex h-[360px] items-center justify-center rounded-lg border border-dashed border-border text-[13px] text-text-muted">
                 暂无当前时间段用量记录
               </div>
             )}
           </section>
 
           <section className="grid grid-cols-[minmax(0,1fr)_minmax(360px,0.6fr)] gap-6 max-xl:grid-cols-1">
-            <div className="rounded-lg border border-[#e5e7eb] bg-white p-6 shadow-sm">
+            <div className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-[20px] font-bold text-[#09090b]">消费统计</h2>
-                  <p className="mt-1 text-[13px] text-[#71717a]">
+                  <h2 className="text-[20px] font-bold text-text-primary">消费统计</h2>
+                  <p className="mt-1 text-[13px] text-text-secondary">
                     统一折算人民币，保留未计价请求提示
                   </p>
                 </div>
-                <i className="fa-solid fa-coins text-[#f59e0b]" />
+                <Icon name="fa-coins" className="text-accent" />
               </div>
               {spend && spend.totalRequests > 0 ? (
                 <div className="space-y-4">
                   <div>
-                    <div className="font-mono text-[34px] font-bold leading-none text-[#09090b]">
+                    <div className="font-mono text-[34px] font-bold leading-none text-text-primary">
                       <AnimatedNumber
                         value={spend.cnyTotal}
                         format={(value) => fmtMoney(value, 'CNY')}
                         durationMs={520}
                       />
                     </div>
-                    <p className="mt-2 text-[12.5px] text-[#71717a]">
+                    <p className="mt-2 text-[12.5px] text-text-secondary">
                       按请求日志 × 价格配置估算（{activeRangeLabel}，已折算人民币）
                     </p>
                   </div>
@@ -503,12 +514,12 @@ export default function Dashboard() {
                     />
                   </div>
                   {spend.byCurrency.length > 1 ? (
-                    <p className="font-mono text-[12px] text-[#71717a]">
+                    <p className="font-mono text-[12px] text-text-secondary">
                       原始币种{' '}
                       {spend.byCurrency.map((c) => fmtMoney(c.amount, c.currency)).join(' · ')}
                     </p>
                   ) : null}
-                  <p className="text-[12px] text-[#71717a]">
+                  <p className="text-[12px] text-text-secondary">
                     汇率来源：
                     {spend.exchangeRateSource === 'api'
                       ? `实时接口${spend.exchangeRateUpdatedAt ? ` · ${spend.exchangeRateUpdatedAt}` : ''}`
@@ -521,26 +532,28 @@ export default function Dashboard() {
                   </p>
                 </div>
               ) : (
-                <p className="text-[13px] text-[#9ca3af]">暂无可计价的请求（检查价格配置）</p>
+                <p className="text-[13px] text-text-muted">暂无可计价的请求（检查价格配置）</p>
               )}
             </div>
 
-            <div className="rounded-lg border border-[#e5e7eb] bg-white p-6 shadow-sm">
+            <div className="rounded-lg border border-border-light bg-bg-card p-6 shadow-sm">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-[20px] font-bold text-[#09090b]">余额快照</h2>
-                  <p className="mt-1 text-[13px] text-[#71717a]">各 Key 最近一次资源包读取结果</p>
+                  <h2 className="text-[20px] font-bold text-text-primary">余额快照</h2>
+                  <p className="mt-1 text-[13px] text-text-secondary">
+                    各 Key 最近一次资源包读取结果
+                  </p>
                 </div>
-                <i className="fa-solid fa-wallet text-[#12c99b]" />
+                <Icon name="fa-wallet" className="text-accent-text" />
               </div>
               {balances.length === 0 ? (
-                <p className="text-[13px] text-[#9ca3af]">
+                <p className="text-[13px] text-text-muted">
                   还没有余额记录，触发一次刷新后会自动抓取
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-[12.5px]">
-                    <thead className="text-left text-[#71717a]">
+                    <thead className="text-left text-text-secondary">
                       <tr>
                         <th className="py-2 font-medium">Provider</th>
                         <th className="py-2 text-right font-medium">剩余</th>
@@ -548,9 +561,9 @@ export default function Dashboard() {
                         <th className="py-2 text-right font-medium">时间</th>
                       </tr>
                     </thead>
-                    <tbody className="text-[#09090b]">
+                    <tbody className="text-text-primary">
                       {balances.slice(0, 6).map((b) => (
-                        <tr key={b.id} className="border-t border-[#e5e7eb]">
+                        <tr key={b.id} className="border-t border-border-light">
                           <td className="py-2">{b.providerId}</td>
                           <td className="py-2 text-right font-mono">
                             {b.remaining !== undefined ? fmtCount(b.remaining) : '—'}
@@ -558,7 +571,7 @@ export default function Dashboard() {
                           <td className="py-2 text-right font-mono">
                             {b.used !== undefined ? fmtCount(b.used) : '—'}
                           </td>
-                          <td className="py-2 text-right text-[#71717a]">
+                          <td className="py-2 text-right text-text-secondary">
                             {b.capturedAt.slice(0, 10)}
                           </td>
                         </tr>
@@ -592,12 +605,12 @@ function MetricBox({
   progress?: number
 }) {
   return (
-    <div className="rounded-lg border border-[#e5e7eb] bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-[13px] font-semibold text-[#71717a]">
-        <i className={`fa-solid ${icon} ${iconClass}`} />
+    <div className="rounded-lg border border-border-light bg-bg-card p-4 shadow-sm">
+      <div className="flex items-center gap-2 text-[13px] font-semibold text-text-secondary">
+        <Icon name={icon} className={iconClass} />
         <span>{label}</span>
       </div>
-      <div className="mt-2 font-mono text-[22px] font-bold text-[#09090b]">
+      <div className="mt-2 font-mono text-[22px] font-bold text-text-primary">
         <AnimatedNumber value={value} format={format} durationMs={480} />
       </div>
       {progress !== undefined ? (
@@ -605,8 +618,8 @@ function MetricBox({
           value={progress}
           label={`缓存命中率 ${format(value)}`}
           className="mt-3"
-          trackClassName="bg-[#e5e7eb]"
-          fillClassName="bg-[#12c99b]"
+          trackClassName="bg-border-light"
+          fillClassName="bg-accent"
         />
       ) : null}
     </div>
@@ -616,9 +629,9 @@ function MetricBox({
 /** 信息胶囊:标签 + 数值的小型展示块 */
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-4 py-3">
-      <p className="text-[12px] font-semibold text-[#71717a]">{label}</p>
-      <p className="mt-1 font-mono text-[17px] font-bold text-[#09090b]">{value}</p>
+    <div className="rounded-lg border border-border-light bg-bg-hover/55 px-4 py-3">
+      <p className="text-[12px] font-semibold text-text-secondary">{label}</p>
+      <p className="mt-1 font-mono text-[17px] font-bold text-text-primary">{value}</p>
     </div>
   )
 }

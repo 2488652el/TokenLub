@@ -1,3 +1,4 @@
+import { Icon } from './Icon'
 import type { CodexUsageSnapshot, CodexUsageWindow } from '../../shared/types/codex-usage'
 import { AnimatedNumber, ProgressBar } from './motion'
 
@@ -51,7 +52,7 @@ function QuotaRow({
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
-            <i className={`fa-solid ${icon} text-[11px]`} />
+            <Icon name={icon} className="text-[11px]" />
           </span>
           <div className="min-w-0">
             <div className="text-[12.5px] font-medium text-text-primary">{label}</div>
@@ -85,7 +86,7 @@ function QuotaRow({
           )}
         </span>
         <span className="inline-flex items-center gap-1 font-mono text-text-secondary">
-          <i className="fa-regular fa-clock text-[9px]" />
+          <Icon name="fa-clock" className="text-[9px]" />
           {formatResetAt(window?.resetAt ?? null)}
         </span>
       </div>
@@ -140,7 +141,7 @@ export function CodexQuotaPanel({
       )}
       {error && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-[11.5px] text-status-red">
-          <i className="fa-solid fa-circle-exclamation mt-0.5" />
+          <Icon name="fa-circle-exclamation" className="mt-0.5" />
           <p className="break-words">{error}</p>
         </div>
       )}

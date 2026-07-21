@@ -5,6 +5,7 @@
  */
 import { type CSSProperties, type ReactNode } from 'react'
 import clsx from 'clsx'
+import { Icon } from './Icon'
 
 /** Card 组件的 props 配置 */
 export interface CardProps {
@@ -48,7 +49,7 @@ export function Card({
     <div
       data-motion={motion}
       className={clsx(
-        'bg-bg-card border border-border-light rounded-lg overflow-hidden',
+        'overflow-hidden rounded-lg border border-border-light bg-bg-card/60 shadow-card backdrop-blur-[2px]',
         motion !== 'none' && 'motion-card',
         motion === 'interactive' && 'motion-card-interactive',
         motion === 'status' && 'motion-card-status',
@@ -57,11 +58,11 @@ export function Card({
       style={{ '--motion-order': motionOrder } as CSSProperties}
     >
       {hasHeader && (
-        <div className="px-5 py-4 pb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-4">
           {title && (
             <div>
-              <div className="text-[14px] font-semibold text-text-primary flex items-center gap-2">
-                {iconNode ?? (icon && <i className={`${icon} text-text-muted text-[13px]`} />)}
+              <div className="flex items-center gap-2 text-[13.5px] font-semibold text-text-primary">
+                {iconNode ?? (icon && <Icon name={icon} className="text-[13px] text-text-muted" />)}
                 {title}
               </div>
               {subtitle && (

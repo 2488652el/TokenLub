@@ -94,12 +94,14 @@ describe('PR-1: db v5 migration contract', () => {
     expect(guardCount).toBeGreaterThanOrEqual(2)
   })
 
-  it('opens the TokenLub database while preserving legacy TokenScope data candidates', () => {
+  it('opens the MoonMeter database while preserving TokenLub and TokenScope candidates', () => {
     const source = readFileSync(resolve('code/src/main/store/db.ts'), 'utf8')
 
-    expect(source).toContain("const DB_FILE_NAME = 'tokenlub.db'")
-    expect(source).toContain("const LEGACY_DB_FILE_NAMES = ['tokenscope.db']")
-    expect(source).toContain("const LEGACY_USER_DATA_DIRS = ['TokenScope', 'tokengirl']")
+    expect(source).toContain("const DB_FILE_NAME = 'moonmeter.db'")
+    expect(source).toContain("const LEGACY_DB_FILE_NAMES = ['tokenlub.db', 'tokenscope.db']")
+    expect(source).toContain(
+      "const LEGACY_USER_DATA_DIRS = ['TokenLub', 'TokenScope', 'tokengirl']"
+    )
     expect(source).toContain('copyFileSync(legacyPath, dbPath)')
     expect(source).toContain("const SQLITE_SIDECAR_SUFFIXES = ['-wal', '-shm']")
   })

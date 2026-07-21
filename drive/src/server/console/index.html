@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link rel="icon" href="/console/tokenlub-mark.png" type="image/png" />
-    <title>TokenLub 控制台</title>
+    <link rel="icon" href="/console/moonmeter-icon.png" type="image/png" />
+    <title>MoonMeter 控制台</title>
     <style>
       :root {
         color-scheme: light;
@@ -421,9 +421,9 @@
     <main>
       <header>
         <div class="brand">
-          <img class="brand-mark" src="/console/tokenlub-mark.png" alt="TokenLub" />
+          <img class="brand-mark" src="/console/moonmeter-icon.png" alt="MoonMeter" />
           <div>
-            <h1>TokenLub 控制台</h1>
+            <h1>MoonMeter 控制台</h1>
             <p class="muted">本地优先 · 白名单同步</p>
           </div>
         </div>
@@ -433,7 +433,7 @@
       <section id="auth" class="panel" aria-labelledby="auth-title">
         <div class="auth-heading">
           <p class="eyebrow">Secure sync</p>
-          <h2 id="auth-title">欢迎使用 TokenLub</h2>
+          <h2 id="auth-title">欢迎使用 MoonMeter</h2>
           <p class="muted">登录后管理同步数据、设备与账户安全</p>
         </div>
         <div class="mode-switch" role="tablist" aria-label="账户操作">
@@ -485,7 +485,7 @@
             <label for="base-url"
               >同步服务地址
               <input id="base-url" name="baseUrl" type="url" placeholder="默认使用当前站点" />
-              <span class="field-help">通常无需修改；仅在连接其他 TokenLub 服务时填写</span>
+              <span class="field-help">通常无需修改；仅在连接其他 MoonMeter 服务时填写</span>
             </label>
           </details>
           <button id="auth-submit" class="primary auth-submit" type="submit">登录</button>
@@ -499,7 +499,7 @@
         <div class="panel">
           <h2>设备</h2>
           <div class="actions" style="margin-bottom: 12px">
-            <button id="bind-app" class="primary" type="button">绑定 TokenLub 应用</button>
+            <button id="bind-app" class="primary" type="button">绑定 MoonMeter 应用</button>
           </div>
           <div id="devices"></div>
         </div>
@@ -883,11 +883,11 @@
         try {
           await withBusyButton(button, '正在绑定…', async () => {
             const binding = await request('/v1/auth/binding-ticket', json({}))
-            const link = new URL('tokenlub://sync/bind')
+            const link = new URL('moonmeter://sync/bind')
             link.searchParams.set('server', session.baseUrl)
             link.searchParams.set('ticket', binding.ticket)
             location.href = link.toString()
-            message('正在打开 TokenLub；若没有响应，请确认已安装最新版应用。')
+            message('正在打开 MoonMeter；若没有响应，请确认已安装最新版应用。')
           })
         } catch (error) {
           message(error instanceof Error ? error.message : '请求失败', 'error')

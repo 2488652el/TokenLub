@@ -3,50 +3,42 @@
  * 未匹配时回退为显示首字母的占位方块。
  * (glm-5.2)
  */
-import AnthropicIcon from '@lobehub/icons/es/Anthropic/components/Mono'
-import ClaudeCodeIcon from '@lobehub/icons/es/ClaudeCode/components/Color'
-import CodexIcon from '@lobehub/icons/es/Codex/components/Color'
-import DeepSeekIcon from '@lobehub/icons/es/DeepSeek/components/Color'
-import GeminiIcon from '@lobehub/icons/es/Gemini/components/Color'
-import KimiIcon from '@lobehub/icons/es/Kimi/components/Mono'
-import LongCatIcon from '@lobehub/icons/es/LongCat/components/Color'
-import MinimaxIcon from '@lobehub/icons/es/Minimax/components/Color'
-import NewAPIIcon from '@lobehub/icons/es/NewAPI/components/Color'
-import OpenAIIcon from '@lobehub/icons/es/OpenAI/components/Mono'
-import OpenRouterIcon from '@lobehub/icons/es/OpenRouter/components/Mono'
-import QwenIcon from '@lobehub/icons/es/Qwen/components/Color'
-import SiliconCloudIcon from '@lobehub/icons/es/SiliconCloud/components/Color'
-import StepfunIcon from '@lobehub/icons/es/Stepfun/components/Color'
-import type { IconType } from '@lobehub/icons/es/types'
-import ZhipuIcon from '@lobehub/icons/es/Zhipu/components/Color'
+import AnthropicIcon from '@lobehub/icons-static-svg/icons/anthropic.svg?url'
+import ClaudeCodeIcon from '@lobehub/icons-static-svg/icons/claudecode-color.svg?url'
+import CodexIcon from '@lobehub/icons-static-svg/icons/codex-color.svg?url'
+import DeepSeekIcon from '@lobehub/icons-static-svg/icons/deepseek-color.svg?url'
+import GeminiIcon from '@lobehub/icons-static-svg/icons/gemini-color.svg?url'
+import KimiIcon from '@lobehub/icons-static-svg/icons/kimi.svg?url'
+import LongCatIcon from '@lobehub/icons-static-svg/icons/longcat-color.svg?url'
+import MinimaxIcon from '@lobehub/icons-static-svg/icons/minimax-color.svg?url'
+import NewAPIIcon from '@lobehub/icons-static-svg/icons/newapi-color.svg?url'
+import OpenAIIcon from '@lobehub/icons-static-svg/icons/openai.svg?url'
+import OpenRouterIcon from '@lobehub/icons-static-svg/icons/openrouter.svg?url'
+import QwenIcon from '@lobehub/icons-static-svg/icons/qwen-color.svg?url'
+import SiliconCloudIcon from '@lobehub/icons-static-svg/icons/siliconcloud-color.svg?url'
+import StepfunIcon from '@lobehub/icons-static-svg/icons/stepfun-color.svg?url'
+import ZhipuIcon from '@lobehub/icons-static-svg/icons/zhipu-color.svg?url'
+import { BrandGlyph, type BrandGlyphAsset } from './BrandGlyph'
 
 // providerId 到品牌图标组件的映射表
-const PROVIDER_ICON: Record<string, IconType> = {
-  'anthropic-admin': AnthropicIcon,
-  'claude-code': ClaudeCodeIcon,
-  codex: CodexIcon,
-  deepseek: DeepSeekIcon,
-  'gemini-manual': GeminiIcon,
-  longcat: LongCatIcon,
-  manual: NewAPIIcon,
-  minimax: MinimaxIcon,
-  'kimi-coding': KimiIcon,
-  moonshot: KimiIcon,
-  'newapi-generic': NewAPIIcon,
-  'openai-admin': OpenAIIcon,
-  openrouter: OpenRouterIcon,
-  'qwen-manual': QwenIcon,
-  siliconflow: SiliconCloudIcon,
-  stepfun: StepfunIcon,
-  zhipu: ZhipuIcon
-}
-
-// Kimi's Color variant is designed for a dark logo background: its main mark
-// is white, so it becomes nearly invisible in the light card surfaces used by
-// TokenLub. The official monochrome mark stays legible and uses the brand blue.
-const PROVIDER_ICON_COLOR: Record<string, string> = {
-  'kimi-coding': '#1783FF',
-  moonshot: '#1783FF'
+const PROVIDER_ICON: Record<string, BrandGlyphAsset> = {
+  'anthropic-admin': { src: AnthropicIcon, monochrome: true },
+  'claude-code': { src: ClaudeCodeIcon },
+  codex: { src: CodexIcon },
+  deepseek: { src: DeepSeekIcon },
+  'gemini-manual': { src: GeminiIcon },
+  longcat: { src: LongCatIcon },
+  manual: { src: NewAPIIcon },
+  minimax: { src: MinimaxIcon },
+  'kimi-coding': { src: KimiIcon, monochrome: true, color: '#1783FF' },
+  moonshot: { src: KimiIcon, monochrome: true, color: '#1783FF' },
+  'newapi-generic': { src: NewAPIIcon },
+  'openai-admin': { src: OpenAIIcon, monochrome: true },
+  openrouter: { src: OpenRouterIcon, monochrome: true },
+  'qwen-manual': { src: QwenIcon },
+  siliconflow: { src: SiliconCloudIcon },
+  stepfun: { src: StepfunIcon },
+  zhipu: { src: ZhipuIcon }
 }
 
 // 无图标时回退显示的首字母映射表
@@ -88,10 +80,10 @@ export function ProviderIcon({
   size?: number
   className?: string
 }) {
-  const Icon = PROVIDER_ICON[providerId]
+  const asset = PROVIDER_ICON[providerId]
   const label = FALLBACK_LABEL[providerId] ?? providerId.slice(0, 1).toUpperCase()
 
-  if (!Icon) {
+  if (!asset) {
     return (
       <span
         aria-label={title ?? providerId}
@@ -110,12 +102,7 @@ export function ProviderIcon({
       className={`inline-flex items-center justify-center ${className}`}
       title={title ?? providerId}
     >
-      <Icon
-        size={size}
-        {...(PROVIDER_ICON_COLOR[providerId]
-          ? { style: { color: PROVIDER_ICON_COLOR[providerId] } }
-          : {})}
-      />
+      <BrandGlyph asset={asset} size={size} />
     </span>
   )
 }

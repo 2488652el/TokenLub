@@ -1,13 +1,24 @@
-/* 设计令牌与全局动画:定义 CSS 变量、淡入动画、滚动条样式等。 (glm-5.2) */
-/* 根变量:侧栏宽度、过渡时长、卡片/浮层阴影等设计令牌 */
 :root {
   --sidebar-w: 216px;
-  --transition-fast: 120ms ease;
-  --transition-base: 160ms ease;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --color-paper: 244 241 233;
+  --color-paper-strong: 235 230 220;
+  --color-surface: 250 248 242;
+  --color-surface-hover: 238 234 225;
+  --color-surface-active: 226 219 204;
+  --color-ink: 21 21 21;
+  --color-muted: 119 115 107;
+  --color-faint: 151 146 136;
+  --color-line: 21 21 21;
+  --color-accent: 181 154 88;
+  --color-accent-strong: 145 118 56;
+  --color-on-accent: 21 21 21;
+  --surface-alpha: 0.58;
+  --line-alpha: 0.14;
+  --line-strong-alpha: 0.24;
+  --shadow-card: 0 1px 0 rgb(21 21 21 / 0.02), 0 14px 36px rgb(31 28 20 / 0.035);
+  --shadow-popover: 0 24px 70px rgb(31 28 20 / 0.14);
   --motion-fast: 120ms;
-  --motion-control: 160ms;
+  --motion-control: 180ms;
   --motion-enter: 240ms;
   --motion-data: 480ms;
   --motion-chart: 640ms;
@@ -19,241 +30,334 @@
   --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+:root[data-theme='dark'] {
+  --color-paper: 18 18 18;
+  --color-paper-strong: 27 27 27;
+  --color-surface: 31 31 29;
+  --color-surface-hover: 40 39 36;
+  --color-surface-active: 51 47 38;
+  --color-ink: 242 239 231;
+  --color-muted: 157 153 143;
+  --color-faint: 121 118 110;
+  --color-line: 242 239 231;
+  --color-accent: 194 166 99;
+  --color-accent-strong: 220 195 132;
+  --color-on-accent: 18 18 18;
+  --surface-alpha: 0.72;
+  --line-alpha: 0.14;
+  --line-strong-alpha: 0.26;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.015), 0 16px 42px rgb(0 0 0 / 0.12);
+  --shadow-popover: 0 24px 70px rgb(0 0 0 / 0.38);
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: '';
+  opacity: 0.075;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitchTiles'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.24'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+}
+
+:root[data-theme='dark'] body::before {
+  opacity: 0.035;
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
+
+::selection {
+  color: rgb(var(--color-ink));
+  background: rgb(var(--color-accent) / 0.34);
+}
+
+:focus-visible {
+  outline: 1px solid rgb(var(--color-accent));
+  outline-offset: 3px;
+}
+
+.moonmeter-wordmark {
+  display: inline-flex;
+  align-items: center;
+  color: currentColor;
+  font-size: 15px;
+  font-weight: 460;
+  letter-spacing: 0.22em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.moonmeter-wordmark-compact {
+  font-size: 12px;
+  letter-spacing: 0.19em;
+}
+
+.moonmeter-wordmark-mark {
+  width: 2.05em;
+  height: 1em;
+  margin-inline: -0.03em 0.01em;
+  overflow: visible;
+}
+
+.moonmeter-app-icon {
+  display: inline-flex;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  color: rgb(244 241 233);
+  background: #121212;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 28%;
+  box-shadow: 0 12px 30px rgb(21 21 21 / 0.12);
+}
+
+.moon-icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: -0.125em;
+}
+
+.icon-spin,
+.fa-spin {
+  animation: motion-spin 900ms linear infinite;
+}
+
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
 .shadow-popover {
   box-shadow: var(--shadow-popover);
 }
 
-/* 全局滚动条样式:细窄轨道 + 圆角灰色滑块 */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d2;
-  border-radius: 5px;
+  background: rgb(var(--color-ink) / 0.18);
+  border-radius: 999px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* 页面内容容器:撑满剩余空间、纵向滚动,并复用细滚动条样式 */
 .page-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
-}
-.page-content::-webkit-scrollbar {
-  width: 5px;
-}
-.page-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-.page-content::-webkit-scrollbar-thumb {
-  background: var(--border-light, #d4d4d2);
-  border-radius: 5px;
+  padding: 28px clamp(24px, 3vw, 40px) 36px;
 }
 
-/* Button component classes — kept outside @layer so they work in any CSS entry order */
-/* 按钮组件类:置于 @layer 之外以保证任意 CSS 引入顺序下均生效 (glm-5.2) */
 .btn {
   display: inline-flex;
+  min-height: 34px;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 7px 14px;
-  border-radius: 6px;
-  font-family:
-    system-ui,
-    -apple-system,
-    'PingFang SC',
-    'Microsoft YaHei',
-    sans-serif;
-  font-size: 13px;
-  font-weight: 500;
+  color: rgb(var(--color-ink));
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
   transition:
     color var(--motion-control) var(--motion-ease-standard),
     background-color var(--motion-control) var(--motion-ease-standard),
     border-color var(--motion-control) var(--motion-ease-standard),
     box-shadow var(--motion-control) var(--motion-ease-standard),
     transform var(--motion-fast) var(--motion-ease-standard);
-  border: none;
-  white-space: nowrap;
-  line-height: 1.4;
 }
+
 .btn:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.48;
 }
+
 .btn:active:not(:disabled) {
   transform: scale(0.985);
 }
+
 .btn-primary {
-  background: #10b981;
-  color: #fff;
+  color: rgb(var(--color-on-accent));
+  background: rgb(var(--color-accent));
+  border-color: rgb(var(--color-accent));
 }
+
 .btn-primary:hover:not(:disabled) {
-  background: #059669;
+  background: rgb(var(--color-accent-strong));
+  border-color: rgb(var(--color-accent-strong));
 }
+
 .btn-outline {
-  background: transparent;
-  color: #737373;
-  border: 1px solid #d4d4d2;
+  color: rgb(var(--color-muted));
+  border-color: rgb(var(--color-line) / var(--line-alpha));
 }
-.btn-outline:hover:not(:disabled) {
-  border-color: #737373;
-  color: #171717;
-  background: #f3f4f6;
-}
-.btn-ghost {
-  background: transparent;
-  color: var(--text-secondary, #737373);
-  border: 1px solid transparent;
-}
+
+.btn-outline:hover:not(:disabled),
 .btn-ghost:hover:not(:disabled) {
-  color: var(--text-primary, #171717);
-  background: var(--bg-hover, #f3f4f6);
-  border-color: var(--border-light, #e8e8e6);
+  color: rgb(var(--color-ink));
+  background: rgb(var(--color-ink) / 0.045);
+  border-color: rgb(var(--color-line) / var(--line-strong-alpha));
 }
+
+.btn-ghost {
+  color: rgb(var(--color-muted));
+}
+
 .btn-sm {
-  padding: 4px 10px;
+  min-height: 30px;
+  padding: 5px 11px;
   font-size: 12px;
-  border-radius: 4px;
 }
+
 .btn-xs {
-  padding: 3px 7px;
-  font-size: 11.5px;
-  border-radius: 4px;
+  min-height: 26px;
   gap: 5px;
-  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 11.5px;
 }
 
 .mono {
   font-family: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 }
+
 .fw-500 {
   font-weight: 500;
 }
+
 .text-secondary {
-  color: var(--text-secondary, #737373);
-}
-.text-red {
-  color: var(--status-red, #ef4444);
+  color: rgb(var(--color-muted));
 }
 
-/* Form groups — used in CreateKeyModal + future forms (Settings, Alert rules) */
-/* 表单分组:用于 CreateKeyModal 及未来的表单(设置、告警规则) (glm-5.2) */
+.text-red {
+  color: #ef4444;
+}
+
 .form-group {
   margin-bottom: 16px;
 }
+
 .form-group:last-child {
   margin-bottom: 0;
 }
+
 .form-label {
   display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary, #171717);
   margin-bottom: 8px;
+  color: rgb(var(--color-ink));
+  font-size: 12.5px;
+  font-weight: 560;
 }
+
 .form-hint {
-  font-size: 12px;
-  color: var(--text-muted, #a3a3a3);
   margin-top: 4px;
+  color: rgb(var(--color-faint));
+  font-size: 11.5px;
+}
+
+.input,
+.select {
+  color: rgb(var(--color-ink));
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.4;
+  background-color: rgb(var(--color-surface) / var(--surface-alpha));
+  border: 1px solid rgb(var(--color-line) / var(--line-alpha));
+  border-radius: 10px;
+  outline: none;
+  transition:
+    border-color var(--motion-control) ease,
+    box-shadow var(--motion-control) ease,
+    background-color var(--motion-control) ease;
 }
 
 .input {
   display: block;
   width: 100%;
-  padding: 7px 10px;
-  border: 1px solid var(--border-default, #d4d4d2);
-  border-radius: 6px;
-  font-family:
-    system-ui,
-    -apple-system,
-    'PingFang SC',
-    'Microsoft YaHei',
-    sans-serif;
-  font-size: 12.5px;
-  line-height: 1.4;
-  color: var(--text-primary, #171717);
-  background: var(--bg-input, #ffffff);
-  outline: none;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-.input::placeholder {
-  color: var(--text-muted, #a3a3a3);
-}
-.input:focus {
-  border-color: var(--border-focus, #10b981);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.08);
-}
-.input:disabled {
-  cursor: not-allowed;
-  background: var(--bg-hover, #f3f4f6);
-  color: var(--text-muted, #a3a3a3);
+  padding: 8px 11px;
 }
 
-/* Native <select> styled to match the design's bordered dropdowns */
-/* 原生 <select> 样式:带边框下拉箭头,贴合设计稿风格 (glm-5.2) */
+.input::placeholder {
+  color: rgb(var(--color-faint));
+}
+
+.input:focus,
+.select:focus {
+  border-color: rgb(var(--color-accent) / 0.75);
+  box-shadow: 0 0 0 3px rgb(var(--color-accent) / 0.12);
+}
+
+.input:disabled {
+  color: rgb(var(--color-faint));
+  cursor: not-allowed;
+  background: rgb(var(--color-ink) / 0.035);
+}
+
 .select {
   appearance: none;
-  padding: 7px 28px 7px 10px;
-  border: 1px solid var(--border-default, #d4d4d2);
-  border-radius: 6px;
-  font-family:
-    system-ui,
-    -apple-system,
-    'PingFang SC',
-    'Microsoft YaHei',
-    sans-serif;
-  font-size: 12.5px;
-  color: var(--text-secondary, #737373);
-  background-color: #ffffff;
+  padding: 8px 30px 8px 11px;
+  color: rgb(var(--color-muted));
   cursor: pointer;
-  outline: none;
-  transition: border-color 0.15s ease;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23A3A3A3'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2377736b'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 10px center;
-}
-.select:focus {
-  border-color: var(--border-focus, #10b981);
+  background-position: right 11px center;
 }
 
-/* 表格容器与单元格:横向滚动、底边框、表头大写弱化等表格通用样式 */
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
 }
+
 .table-wrapper table {
   width: 100%;
   border-collapse: collapse;
 }
+
 .table-wrapper th,
 .table-wrapper td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border-light, #e8e8e6);
+  padding: 11px 13px;
   text-align: left;
   vertical-align: middle;
+  border-bottom: 1px solid rgb(var(--color-line) / var(--line-alpha));
 }
+
 .table-wrapper th {
-  color: var(--text-muted, #a3a3a3);
-  font-size: 11.5px;
-  font-weight: 500;
+  color: rgb(var(--color-faint));
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0;
   white-space: nowrap;
 }
+
 .table-wrapper td {
-  color: var(--text-primary, #171717);
-  font-size: 13px;
+  color: rgb(var(--color-ink));
+  font-size: 12.5px;
 }
+
 .table-wrapper tbody tr:last-child td {
   border-bottom: 0;
 }
+
 .table-wrapper tbody tr:hover td {
-  background: var(--bg-card-hover, #f9fafb);
+  background: rgb(var(--color-ink) / 0.025);
+}
+
+@media (max-width: 1100px) {
+  .page-content {
+    padding-inline: 22px;
+  }
 }

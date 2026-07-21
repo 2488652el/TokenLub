@@ -257,12 +257,12 @@ describe('Console HTTP assets', () => {
     expect(csp).toContain("default-src 'self'")
     expect(csp).toContain("frame-ancestors 'none'")
     expect(csp).toContain("base-uri 'none'")
-    expect(await response.text()).toContain('<title>TokenLub 控制台</title>')
+    expect(await response.text()).toContain('<title>MoonMeter 控制台</title>')
   })
 
-  it('serves the TokenLub mark as a cacheable PNG without content sniffing', async () => {
+  it('serves the MoonMeter icon as a cacheable PNG without content sniffing', async () => {
     const { handle } = createFixture()
-    const response = await handle(new Request('https://sync.local/console/tokenlub-mark.png'))
+    const response = await handle(new Request('https://sync.local/console/moonmeter-icon.png'))
 
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('image/png')

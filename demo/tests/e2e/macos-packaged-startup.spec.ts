@@ -5,24 +5,25 @@ import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 
-const appBundle = process.env['TOKENLUB_PACKAGED_APP']
-const packageVersion = (createRequire(__filename)('../../package.json') as { version: string })
+const appBundle = process.env['MOONMETER_PACKAGED_APP'] ?? process.env['TOKENLUB_PACKAGED_APP']
+const packageVersion = (createRequire(__filename)('../../../package.json') as { version: string })
   .version
 
 function executablePath(appPath: string): string {
-  return appPath.endsWith('.app') ? join(appPath, 'Contents', 'MacOS', 'TokenLub') : appPath
+  return appPath.endsWith('.app') ? join(appPath, 'Contents', 'MacOS', 'MoonMeter') : appPath
 }
 
 test('starts the packaged macOS app with an isolated profile', async () => {
   test.skip(process.platform !== 'darwin', 'macOS packaged smoke test')
-  test.skip(!appBundle, 'TOKENLUB_PACKAGED_APP is required')
+  test.skip(!appBundle, 'MOONMETER_PACKAGED_APP is required')
 
-  const configuredRoot = process.env['TOKENLUB_TEST_USER_DATA']
+  const configuredRoot =
+    process.env['MOONMETER_TEST_USER_DATA'] ?? process.env['TOKENLUB_TEST_USER_DATA']
   const root = configuredRoot
     ? resolve(configuredRoot)
     : mkdtempSync(join(tmpdir(), 'tokenlub-macos-e2e-'))
   if (configuredRoot) {
-    if (existsSync(root)) throw new Error('TOKENLUB_TEST_USER_DATA must not already exist')
+    if (existsSync(root)) throw new Error('MOONMETER_TEST_USER_DATA must not already exist')
     mkdirSync(root, { recursive: true })
   }
 
@@ -39,7 +40,7 @@ test('starts the packaged macOS app with an isolated profile', async () => {
     })
     const window = await app.firstWindow()
 
-    await expect(window).toHaveTitle('TokenLub')
+    await expect(window).toHaveTitle('MoonMeter')
     await expect(window.locator('body')).not.toBeEmpty()
     await expect(window.evaluate(() => window.api.version)).resolves.toBe(packageVersion)
 
@@ -72,7 +73,7 @@ test('starts the packaged macOS app with an isolated profile', async () => {
     await expect(window.evaluate(() => window.api.keys.list())).resolves.toContainEqual(created)
     await window.evaluate((id) => window.api.keys.delete(id), created.id)
     await expect(window.evaluate(() => window.api.keys.list())).resolves.toEqual([])
-    expect(existsSync(join(userData, 'tokenlub.db'))).toBe(true)
+    expect(existsSync(join(userData, 'moonmeter.db'))).toBe(true)
 
     await window.evaluate(() => {
       window.location.hash = '#/logs'

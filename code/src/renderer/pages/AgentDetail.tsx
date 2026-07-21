@@ -282,17 +282,21 @@ function ProjectTokenTrendChart({
       <div className="h-[300px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 18, bottom: 8, left: 4 }}>
-            <CartesianGrid stroke="#eef0f4" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid
+              stroke="rgb(var(--color-line) / 0.1)"
+              strokeDasharray="3 3"
+              vertical={false}
+            />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: '#71717a' }}
+              tick={{ fontSize: 11, fill: 'rgb(var(--color-muted))' }}
               tickLine={false}
               minTickGap={24}
-              axisLine={{ stroke: '#e5e7eb' }}
+              axisLine={{ stroke: 'rgb(var(--color-line) / 0.14)' }}
             />
             <YAxis
               width={52}
-              tick={{ fontSize: 11, fill: '#71717a' }}
+              tick={{ fontSize: 11, fill: 'rgb(var(--color-muted))' }}
               tickFormatter={(value) => fmtCount(Number(value))}
               tickLine={false}
               axisLine={false}

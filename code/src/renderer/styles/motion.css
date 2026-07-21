@@ -218,17 +218,17 @@
 
 .motion-sortable-item.is-dragging > .motion-card-interactive {
   transform: none;
-  border-color: rgba(16, 185, 129, 0.42);
+  border-color: rgb(var(--color-accent) / 0.46);
   box-shadow:
-    0 18px 42px rgba(15, 23, 42, 0.16),
-    0 0 0 2px rgba(16, 185, 129, 0.12);
+    0 18px 42px rgb(var(--color-ink) / 0.14),
+    0 0 0 2px rgb(var(--color-accent) / 0.14);
 }
 
 .motion-sortable-item.is-sort-target::after {
   position: absolute;
   inset: -3px;
   z-index: 22;
-  border: 2px dashed rgba(16, 185, 129, 0.58);
+  border: 2px dashed rgb(var(--color-accent) / 0.62);
   border-radius: 14px;
   pointer-events: none;
   content: '';
@@ -265,10 +265,10 @@
 .motion-sortable-grip:hover,
 .motion-sortable-grip:focus-visible,
 .motion-sortable-item.is-dragging .motion-sortable-grip {
-  color: var(--color-accent, #10b981);
+  color: rgb(var(--color-accent));
   opacity: 1;
   outline: none;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 2px 8px rgb(var(--color-ink) / 0.12);
 }
 
 .motion-sortable-grip:active {
@@ -284,7 +284,7 @@ body.is-card-sorting {
   .motion-card-interactive:hover {
     transform: translateY(calc(-1 * var(--motion-distance-sm)));
     border-color: var(--border-default, #d4d4d2);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+    box-shadow: 0 10px 24px rgb(var(--color-ink) / 0.07);
   }
 }
 
@@ -297,7 +297,7 @@ body.is-card-sorting {
   inset: 0 auto 0 0;
   width: 2px;
   content: '';
-  background: var(--motion-status-color, #10b981);
+  background: var(--motion-status-color, rgb(var(--color-accent)));
   opacity: 0.7;
 }
 
@@ -323,7 +323,7 @@ body.is-card-sorting {
   border-radius: inherit;
   pointer-events: none;
   content: '';
-  background: rgba(16, 185, 129, 0.1);
+  background: rgb(var(--color-accent) / 0.1);
   animation: motion-status-flash var(--motion-data) var(--motion-ease-standard) both;
 }
 

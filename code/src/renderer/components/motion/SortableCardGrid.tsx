@@ -1,3 +1,4 @@
+import { Icon } from '../Icon'
 import {
   useEffect,
   useMemo,
@@ -230,7 +231,7 @@ export function SortableCardGrid<T>({
               }}
               onKeyDown={(event) => handleKeyDown(event, id)}
             >
-              <i className="fa-solid fa-grip-lines" aria-hidden="true" />
+              <Icon name="fa-grip-lines" />
             </button>
             {renderItem(item)}
           </div>

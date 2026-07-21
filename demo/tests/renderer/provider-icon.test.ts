@@ -10,8 +10,8 @@ describe('ProviderIcon', () => {
     )
 
     expect(html).toContain(`aria-label="${providerId}"`)
-    expect(html).toContain('fill="currentColor"')
-    expect(html).toContain('color:#1783FF')
+    expect(html).toContain('background-color:#1783FF')
+    expect(html).toContain('mask-image:url(')
     expect(html).not.toContain('>K</span>')
   })
 })

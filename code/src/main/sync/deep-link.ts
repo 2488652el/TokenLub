@@ -10,7 +10,11 @@ export function parseSyncBindingLink(value: string): SyncBindingLink {
   } catch {
     throw new Error('invalid sync binding link')
   }
-  if (link.protocol !== 'tokenlub:' || link.hostname !== 'sync' || link.pathname !== '/bind') {
+  if (
+    (link.protocol !== 'moonmeter:' && link.protocol !== 'tokenlub:') ||
+    link.hostname !== 'sync' ||
+    link.pathname !== '/bind'
+  ) {
     throw new Error('invalid sync binding link')
   }
 
