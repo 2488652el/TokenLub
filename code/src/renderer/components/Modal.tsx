@@ -3,6 +3,7 @@
  * 支持 ESC 关闭与点击遮罩关闭。
  * (glm-5.2)
  */
+import { Icon } from './Icon'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useReducedMotion } from '../hooks/useReducedMotion'
@@ -84,7 +85,7 @@ export function Modal({
             aria-label="关闭"
             className="text-text-muted hover:text-text-primary w-7 h-7 flex items-center justify-center rounded"
           >
-            <i className="fa-solid fa-xmark" />
+            <Icon name="fa-xmark" />
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>

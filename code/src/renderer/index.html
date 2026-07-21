@@ -6,18 +6,13 @@
     <meta charset="UTF-8" />
     <!-- 移动端视口适配,初始缩放为 1.0 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- 引入 Font Awesome 图标库的 CDN 样式 -->
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
-    />
     <!-- 内容安全策略:限制各类资源来源,保障 Electron 渲染层安全 -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com data:; img-src 'self' data:; connect-src 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src 'self'"
     />
-    <link rel="icon" type="image/png" href="./assets/tokenlub-mark.png" />
-    <title>TokenLub</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/moonmeter-mark.svg" />
+    <title>MoonMeter</title>
   </head>
   <body class="h-full bg-bg-base text-text-primary antialiased">
     <div id="root" class="h-full"></div>

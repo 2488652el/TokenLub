@@ -4,6 +4,7 @@
  * 根据 providerId 自动选择不同的余额展示形态(coding-plan / token-pack / cash-balance / admin-usage / gateway)。
  * (glm-5.2)
  */
+import { Icon } from './Icon'
 import { useEffect, useState } from 'react'
 import { ProviderIcon } from './ProviderIcon'
 import { ProgressBar } from './motion'
@@ -128,7 +129,7 @@ export function ApiKeyCard({
             title="编辑 Key"
             aria-label={`编辑 ${keyRecord.alias}`}
           >
-            <i className="fa-solid fa-pen-to-square" />
+            <Icon name="fa-pen-to-square" />
           </button>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -136,12 +137,12 @@ export function ApiKeyCard({
             className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
             style={{ color: visual.accent, backgroundColor: visual.tint, borderColor: visual.tint }}
           >
-            <i className={`fa-solid ${profileMeta.icon} text-[10px]`} />
+            <Icon name={profileMeta.icon} className="text-[10px]" />
             {profileMeta.label}
           </span>
           <SourceBadge source={keyRecord.source} />
           <span className="inline-flex items-center gap-1 rounded-full border border-border-light bg-bg-card/70 px-2.5 py-1 font-mono text-[11px] text-text-muted">
-            <i className="fa-solid fa-key text-[9px]" />…{keyRecord.keyTail}
+            <Icon name="fa-key" className="text-[9px]" />…{keyRecord.keyTail}
           </span>
           <span
             className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
@@ -193,14 +194,14 @@ export function ApiKeyCard({
                   onClick={() => onRefreshOne(keyRecord)}
                   title="手动刷新余额"
                 >
-                  <i className="fa-solid fa-arrows-rotate" />
+                  <Icon name="fa-arrows-rotate" />
                 </button>
                 <button
                   className="btn btn-ghost btn-xs"
                   onClick={() => onTest(keyRecord.id, keyRecord.alias)}
                   title="测试连接"
                 >
-                  <i className="fa-solid fa-plug" />
+                  <Icon name="fa-plug" />
                 </button>
               </>
             )}
@@ -209,7 +210,7 @@ export function ApiKeyCard({
               onClick={() => onDelete(keyRecord)}
               title="删除"
             >
-              <i className="fa-solid fa-trash-can text-red" />
+              <Icon name="fa-trash-can" className="text-red" />
             </button>
           </div>
         </div>

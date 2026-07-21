@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { mergeVisibleCardOrder, normalizeCardOrder } from '../../shared/utils/card-order'
 
-function readStoredOrder(storageKey: string): string[] {
+export function readStoredCardOrder(storageKey: string): string[] {
   if (typeof window === 'undefined') return []
   try {
-    const value: unknown = JSON.parse(window.localStorage.getItem(storageKey) ?? '[]')
+    let raw = window.localStorage.getItem(storageKey)
+    if (raw === null && storageKey.startsWith('moonmeter.')) {
+      raw = window.localStorage.getItem(storageKey.replace(/^moonmeter\./, 'tokenlub.'))
+      if (raw !== null) window.localStorage.setItem(storageKey, raw)
+    }
+    const value: unknown = JSON.parse(raw ?? '[]')
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
   } catch {
     return []
@@ -33,7 +38,7 @@ export function useCardOrder<T>(
   reorderVisible: (visibleIds: readonly string[]) => void
 } {
   const currentIds = useMemo(() => items.map(getId), [getId, items])
-  const [order, setOrder] = useState<string[]>(() => readStoredOrder(storageKey))
+  const [order, setOrder] = useState<string[]>(() => readStoredCardOrder(storageKey))
 
   useEffect(() => {
     setOrder((previous) => {

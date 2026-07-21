@@ -1,32 +1,44 @@
 # Provider Catalog
 
-| ID              | Display                | Category       | Auth         | Status              | Live endpoint                             |
-| --------------- | ---------------------- | -------------- | ------------ | ------------------- | ----------------------------------------- |
-| deepseek        | DeepSeek               | third-party    | Bearer       | ✅ verified         | GET /user/balance, /user/usage            |
-| zhipu           | 智谱 GLM               | token-plan     | Bearer       | ✅ verified         | /api/biz/account/{balance,limit,cash}     |
-| moonshot        | 月之暗面 Kimi          | token-plan     | Bearer       | ⚠️ undocumented     | TBD probe in Phase D                      |
-| minimax         | MiniMax                | third-party    | Bearer       | ⚠️ undocumented     | probe                                     |
-| stepfun         | StepFun 阶跃           | third-party    | Bearer       | ⚠️ undocumented     | probe                                     |
-| siliconflow     | SiliconFlow 硅基流动   | third-party    | Bearer       | ⚠️ undocumented     | probe                                     |
-| openrouter      | OpenRouter             | third-party    | Bearer       | ⚠️ undocumented     | probe                                     |
-| anthropic-admin | Anthropic Admin        | admin-org      | sk-ant-admin | ⚠️ gated            | GET /v1/organizations/{usage,cost_report} |
-| openai-admin    | OpenAI Admin           | admin-org      | sk-admin     | ⚠️ gated            | GET /v1/organization/usage/*              |
-| longcat         | 美团 LongCat           | token-plan     | Bearer       | ⚠️ undocumented     | probe                                     |
-| qwen-manual     | 通义千问 (manual)      | manual         | n/a          | ❌ no API           | user enters balance                       |
-| gemini-manual   | Gemini 免费层 (manual) | manual         | n/a          | ❌ no API           | user enters balance                       |
-| newapi-generic  | NewAPI / OneAPI 通用   | newapi-generic | Bearer       | ✅ verified pattern | {baseUrl}/api/user/self                   |
-| manual          | Manual fallback        | manual         | n/a          | always              | user enters                               |
+The runtime registry in `code/src/main/providers/registry.ts` is authoritative
+for built-in implementations. The table below describes the current code paths;
+real-account availability still depends on vendor credentials, account tier,
+region, and upstream API behavior.
 
-Auto-detected CLI keys (Phase D2):
+| ID              | Category       | Current implementation                                                               |
+| --------------- | -------------- | ------------------------------------------------------------------------------------ |
+| deepseek        | third-party    | Balance through `/user/balance`                                                      |
+| zhipu           | token-plan     | `/api/biz/account/balance`, with chat-completions connectivity fallback              |
+| moonshot        | token-plan     | Tries known balance, credit-grant, and subscription endpoints                        |
+| kimi-coding     | token-plan     | Coding Plan usage through `/coding/v1/usages`; `/models` validates connectivity      |
+| minimax         | token-plan     | Token Plan quota through `/v1/token_plan/remains`; `/v1/models` validates the key    |
+| stepfun         | third-party    | Tries supported account and balance endpoint shapes                                  |
+| siliconflow     | third-party    | Tries supported user/account balance endpoint shapes                                 |
+| openrouter      | third-party    | Credit limit, remaining credit, and usage through `/auth/key`                        |
+| anthropic-admin | admin-org      | Organization cost report and usage APIs; requires an Anthropic Admin key             |
+| openai-admin    | admin-org      | Organization costs and completions usage APIs; requires an OpenAI Admin key          |
+| longcat         | token-plan     | Key validation through `/openai/v1/models`; token packs require platform-cookie mode |
+| newapi-generic  | newapi-generic | Self-hosted account quota through `{baseUrl}/api/user/self`                          |
+| qwen-manual     | manual         | No balance API; user enters the balance                                              |
+| gemini-manual   | manual         | No balance API; user enters the balance                                              |
+| manual          | manual         | Generic user-entered fallback                                                        |
+
+Provider implementations and automated tests are verified locally. This table
+does not claim that every credential-gated vendor endpoint was live-verified in
+the current workspace.
+
+Auto-detected CLI credentials:
 
 - Claude Code `.credentials.json` if present
 - Codex CLI `.codex/auth.json` if present
 
-Each Phase D sub-task updates this document when a provider goes live.
+When a provider implementation or fallback path changes, update this table and
+its provider tests together. Do not label an endpoint live-verified without a
+current real-account probe.
 
 ## Pricing catalog sync
 
-TokenLub imports provider-specific model pricing from [models.dev](https://models.dev) using its public `https://models.dev/api.json` endpoint. Prices are USD per million tokens.
+MoonMeter imports provider-specific model pricing from [models.dev](https://models.dev) using its public `https://models.dev/api.json` endpoint. Prices are USD per million tokens.
 
 **How it works:**
 
@@ -40,9 +52,9 @@ TokenLub imports provider-specific model pricing from [models.dev](https://model
 - Before a manual update is applied, the price page can create a preview containing added, changed, and removed models. A price change above the configured 200% ratio is blocked from automatic application; the user must explicitly review and confirm it. Every detected/applied change is retained in `pricing_change_history`.
 - **User prices win**: `upsertCatalogBatch` only overwrites rows where `source='catalog'`. Existing `source='user'` rows are preserved (enforced by `WHERE pricing_entries.source = 'catalog'` in the ON CONFLICT clause). `findPricing` also sorts `source='user'` ahead of `catalog`.
 
-**Provider mapping** (models.dev prefix → TokenLub providerId):
+**Provider mapping** (models.dev prefix → MoonMeter providerId):
 
-| models.dev prefix | TokenLub providerId | Note                                                        |
+| models.dev prefix | MoonMeter providerId | Note                                                        |
 | ----------------- | ------------------- | ----------------------------------------------------------- |
 | `anthropic`       | `anthropic-admin`   | Prices are the same for public API and org admin            |
 | `openai`          | `openai-admin`      | Same                                                        |
@@ -57,4 +69,4 @@ TokenLub imports provider-specific model pricing from [models.dev](https://model
 | `openrouter`      | `openrouter`        | Uses OpenRouter's provider-specific routed prices           |
 | `google`          | `gemini-manual`     | Pricing is useful even though balance is entered manually   |
 
-Providers not in this map are skipped because TokenLub cannot associate their usage with a supported provider. `newapi-generic` remains manual because each deployment can define its own multipliers and prices. To add a mapping, edit `PROVIDER_MAPPING` in `code/src/main/pricing/catalog.ts`.
+Providers not in this map are skipped because MoonMeter cannot associate their usage with a supported provider. `newapi-generic` remains manual because each deployment can define its own multipliers and prices. To add a mapping, edit `PROVIDER_MAPPING` in `code/src/main/pricing/catalog.ts`.

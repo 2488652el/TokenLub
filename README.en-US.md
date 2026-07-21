@@ -1,205 +1,177 @@
-# TokenLub
+<div align="center">
+  <img src="./design/assets/icon.png" width="112" alt="MoonMeter Logo" />
+  <h1>MoonMeter</h1>
+  <p><strong>Every token, in a clearer light.</strong></p>
+  <p>A local-first LLM usage, balance, and cost workspace for multi-model developers.</p>
 
-**TokenLub is a Windows and macOS desktop dashboard for LLM token usage, API key
-balances, model pricing, and local coding-session cost analysis.**
+  <p>
+    <img alt="Version" src="https://img.shields.io/badge/version-1.2.0-151515?style=flat-square" />
+    <img alt="React" src="https://img.shields.io/badge/React-19.2-151515?style=flat-square&logo=react" />
+    <img alt="Electron" src="https://img.shields.io/badge/Electron-31-151515?style=flat-square&logo=electron" />
+    <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-B59A58?style=flat-square" />
+  </p>
 
-[中文说明](./README.md) · [Architecture](./design/ARCHITECTURE.md) ·
-[Provider Notes](./design/PROVIDERS.md)
+  <p>
+    <a href="./README.md">中文</a> ·
+    <a href="./design/ARCHITECTURE.md">Architecture</a> ·
+    <a href="./design/PROVIDERS.md">Providers</a> ·
+    <a href="./drive/docs/ONE-CLICK-SERVER.md">Self-hosted sync</a> ·
+    <a href="https://github.com/2488652el/TokenLub/releases">Downloads</a>
+  </p>
+</div>
 
----
+![MoonMeter usage dashboard](./design/screenshots/dashboard.png)
 
-## Why TokenLub
+## What is MoonMeter?
 
-TokenLub brings provider balances, request logs, local CLI session usage, and
-model pricing into one local Electron app. It is designed for developers who use
-multiple LLM providers and want a private, practical view of where tokens and
-money are going.
+When you use Claude Code, Codex CLI, multiple model APIs, and gateway services, usage, balances, token plans, and real costs end up scattered across different products. MoonMeter brings them together in one Windows and macOS desktop application while keeping data on your machine by default.
 
-### Highlights
+It is not another chat client. It is a focused dashboard for three questions:
 
-| Area                  | What it does                                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Provider balances     | Query balances and token plans across DeepSeek, Zhipu, Moonshot, MiniMax, LongCat, OpenRouter, NewAPI-compatible services, and more. |
-| Local session parsing | Parse Claude Code and Codex CLI JSONL logs on demand; background parsing follows the toggle and page open never triggers it.         |
-| Cost accounting       | Estimate spend with high-precision decimal math and configurable per-model pricing.                                                  |
-| API key management    | Store API keys locally with Electron `safeStorage`; the renderer never receives raw secrets.                                         |
-| Request logs          | Browse, filter, inspect, and export request-level token usage as CSV.                                                                |
-| Desktop packaging     | Ships Windows installer/portable builds and separate macOS x64/arm64 DMGs.                                                           |
+- Where did the tokens go?
+- How much quota is left?
+- What did each model and project actually cost?
 
----
+## Core capabilities
 
-## Latest Release
+| Capability         | What it does                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| Usage overview     | Combines API requests and local CLI sessions into input, output, cache, and cost trends       |
+| Project analytics  | Shows tokens, model mix, active dates, and normalized cost by coding project                  |
+| Provider summary   | Aggregates requests, tokens, spend, and model distribution across providers                   |
+| Model comparison   | Compares spend ranking, providers, token composition, request averages, and pricing coverage  |
+| API key management | Encrypts credentials locally with Electron `safeStorage`; the UI only sees key tails          |
+| Balances and plans | Reads API balances, coding plans, token packages, organization usage, and gateway quota       |
+| Request logs       | Filters, paginates, inspects, and exports request-level CSV for API and local-session sources |
+| Model pricing      | Searches official and custom prices with currency conversion, scopes, and change review       |
+| Usage alerts       | Evaluates rules based on remaining balance, percentage, or consumption state                  |
+| Multi-device sync  | Optionally syncs settings, prices, and balance snapshots with local backup support            |
 
-Current formal build: **TokenLub 1.1.2**
+## Moonlit paper interface
 
-API Keys and Balance Query cards can now be reordered with restrained lift,
-target, displacement, and drop feedback. Ordering persists per page and remains
-accessible through keyboard controls and reduced motion. This release also fixes
-catalog price matching for provider-prefixed, case-varied, and Kimi K3 model names,
-and converts mixed-currency project costs to CNY before aggregation.
+MoonMeter uses warm paper surfaces, black-and-white contrast, hairline borders, and restrained gold data accents. Appearance can follow the system or be set to light or dark. Long animations respect `prefers-reduced-motion`.
 
-| Artifact     | Path                                                               |
-| ------------ | ------------------------------------------------------------------ |
-| Installer    | `demo/tokenlub-1.1.2-<change>-<model>/TokenLub-1.1.2-x64.exe`      |
-| Portable app | `demo/tokenlub-1.1.2-<change>-<model>/TokenLub-1.1.2-portable.exe` |
-| Unpacked app | `demo/tokenlub-1.1.2-<change>-<model>/win-unpacked/`               |
+| API Keys                                      | Request logs                                           |
+| --------------------------------------------- | ------------------------------------------------------ |
+| ![API Keys](./design/screenshots/apikeys.png) | ![Request logs](./design/screenshots/request-logs.png) |
 
-### Windows downloads
+| Dark dashboard                                                       | Sync settings                                            |
+| -------------------------------------------------------------------- | -------------------------------------------------------- |
+| ![Dark dashboard](./design/screenshots/moonmeter-dashboard-dark.png) | ![Sync settings](./design/screenshots/settings-sync.png) |
 
-- [TokenLub-1.1.2-x64.exe installer](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-x64.exe)
-- [TokenLub-1.1.2-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-portable.exe)
-- [GitHub Release v1.1.2](https://github.com/2488652el/TokenLub/releases/tag/v1.1.2)
+## Privacy and security
 
-The app icon is bundled through `design/assets/icon.ico` on Windows,
-`design/assets/icon.icns` on macOS, and `design/assets/icon.png` for local
-development windows.
+- API keys are encrypted by the Electron main process with the operating system's `safeStorage` facility.
+- The sandboxed renderer cannot access Node.js, the filesystem, SQLite, raw IPC, or plaintext secrets.
+- Renderer-to-main payloads are validated through shared schemas.
+- Claude Code and Codex CLI logs are parsed incrementally and read-only.
+- No telemetry is added by default. Cloud sync is optional and can be self-hosted.
+- The SQLite database lives under Electron's user-data directory, outside the installation directory.
 
----
+See [design/ARCHITECTURE.md](./design/ARCHITECTURE.md) for the full process and trust boundaries.
 
-## Quick Start
+## Quick start
 
 ### Requirements
 
-- Windows 10/11 or macOS 12+
-- Node.js 24.x, matching `.nvmrc`
-- npm 11+
+- Node.js 24 (the repository includes an `.nvmrc`)
+- npm
+- Windows 10/11 or a supported macOS version
 
-### Install Dependencies
+### Run locally
 
 ```bash
+git clone https://github.com/2488652el/TokenLub.git
+cd TokenLub
 npm install
-```
-
-On a clean Windows machine, if native dependency installation fails because
-Visual Studio Build Tools are missing, use the project helper:
-
-```bash
-npm install --ignore-scripts
-node code/scripts/postinstall-better-sqlite3.cjs
-```
-
-The helper fetches the Electron-compatible `better-sqlite3` prebuild and is safe
-to run more than once.
-
-### Run Locally
-
-```bash
 npm run dev
 ```
 
-### Build and Verify
+> The GitHub repository temporarily keeps the `TokenLub` name to preserve updater and deployment compatibility. The application, package, and visible product brand are MoonMeter.
+
+### Quality gates
 
 ```bash
 npm run typecheck
+npm test
 npm run lint
-npm run test
+npm run format:check
 npm run build
 ```
 
 ### Package for Windows
 
 ```powershell
-npm run dist:win -- --change "project-classification" --model "GPT-5"
+npm run dist:win -- --change "MoonMeter-1.2.0" --model "GPT-5"
 ```
 
-Outputs are written to `demo/tokenlub-<version>-<change>-<model>/`. Both
-`--change` and `--model` are required; the version comes from `package.json`.
-
-### GitHub version synchronization
-
-Every latest-version package must compare the local `package.json` version with
-the default-branch `package.json`, the latest GitHub Release/Tag, and the
-versioned download links in both README files. A failed GitHub lookup is an
-unknown result, not a match.
-
-When a version differs, update both README files, run `npm run github:prepare`
-and `npm run github:audit`, review `github/repository/`, and publish source only
-from that staging directory. Update the Git tag, GitHub Release, and release
-assets afterward; generated installers must not be committed to the Git
-repository. Do not repeat an upload when every version already matches.
-
-### Package for macOS
-
-Run these commands on macOS; each architecture is intentionally packaged as a
-separate DMG:
-
-```bash
-npm run dist:mac:x64 -- --change "release-change" --model "GPT-5"
-npm run dist:mac:arm64 -- --change "release-change" --model "GPT-5"
-```
-
-Signing and notarization credentials must come from the macOS Keychain or the
-`CSC_NAME`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
-`APPLE_TEAM_ID` environment variables. A build without these credentials is an
-unsigned local build, not a formal release.
-
-Before publishing, verify the identity, app signature, Gatekeeper assessment,
-notarization staple, and checksum without printing credential values:
-
-```bash
-security find-identity -v -p codesigning
-codesign --verify --deep --strict --verbose=2 "/path/to/TokenLub.app"
-spctl --assess --type execute --verbose=4 "/path/to/TokenLub.app"
-xcrun stapler validate "/path/to/TokenLub.app"
-shasum -a 256 demo/tokenlub-<version>-<change>-<model>/TokenLub-*.dmg
-```
-
----
-
-## Data and Migration
-
-TokenLub stores its SQLite database under Electron `app.getPath('userData')` as:
+Output:
 
 ```text
-tokenlub.db
+demo/moonmeter-1.2.0-MoonMeter-1.2.0-GPT-5/
 ```
 
-For users upgrading from the earlier TokenScope name, the app attempts a
-one-time local copy from legacy database locations such as `tokenscope.db` in
-the old user-data directories. This preserves historical API keys, usage logs,
-pricing, and balance snapshots after the rename.
+For macOS, use `npm run dist:mac:x64`, `npm run dist:mac:arm64`, or `npm run dist:mac`. Formal builds and historical versions are available from [GitHub Releases](https://github.com/2488652el/TokenLub/releases).
 
----
+## Providers and local sessions
 
-## Security Model
+The built-in catalog covers DeepSeek, Zhipu GLM, Kimi / Moonshot, MiniMax, LongCat, SiliconFlow, OpenRouter, OpenAI Admin, Anthropic Admin, NewAPI / OneAPI-compatible services, and manual quota entries. See the [provider documentation](./design/PROVIDERS.md) for protocols, capabilities, and pricing sources.
 
-- `contextIsolation: true`
-- `sandbox: true`
-- `nodeIntegration: false`
-- IPC payloads are validated on the main-process side
-- API keys are encrypted with Electron `safeStorage`
-- Local log parsers only read session files; they do not modify or delete them
-- Secrets must be supplied through the UI or environment variables, never pasted
-  into source code
+Local session sources:
 
----
+- Claude Code project JSONL sessions under the user's home directory.
+- Codex CLI session JSONL organized by date.
+- Incremental, deduplicated parsing that never modifies source logs.
 
-## Project Layout
+## Data and upgrade compatibility
+
+MoonMeter stores its local database as:
 
 ```text
-skill/          Project-specific skills, each with its own SKILL.md
-code/           Desktop frontend, Electron backend, shared code, and build helpers
-drive/          Cloud-sync server, Docker definitions, deployment docs, and operations
-plan/           Timestamped plans and decision records
-design/         Architecture, provider notes, screenshots, and application assets
-demo/           Unit/E2E/integration tests, temporary scripts, and generated builds
-github/         GitHub staging, allowlist, and sensitive-content audit tooling
+moonmeter.db
 ```
 
----
+On first launch, it can copy compatible databases and SQLite WAL/SHM sidecars from legacy TokenLub, TokenScope, or tokengirl user-data directories. Legacy files are never moved or deleted, so rollback remains possible.
 
-## Development Notes
+Compatibility surfaces retained in 1.2.0:
 
-- Keep changes small and reviewable.
-- Add tests for behavior changes.
-- Do not add telemetry or network calls unless explicitly requested.
-- Do not print or commit secrets.
-- Use `npm run dist:win -- --change "..." --model "..."` for the canonical Windows release path.
-- Build macOS DMGs on macOS and verify signing, notarization, and Gatekeeper
-  before calling them release artifacts.
+- `moonmeter://sync/bind` is the new default binding protocol.
+- `tokenlub://sync/bind` remains registered and accepted.
+- New `moonmeter.*` local keys can migrate values from legacy `tokenlub.*` keys.
+- `MOONMETER_*` is the new environment prefix; critical release settings still accept `TOKENLUB_*` aliases.
 
----
+## Repository layout
 
-## License
+```text
+code/      Electron Main, Preload, React Renderer, and shared contracts
+drive/     Optional sync server, PostgreSQL, Docker, and operations
+design/    Architecture, provider docs, motion, brand assets, and screenshots
+demo/      Tests, verification assets, and local build output
+github/    Public allowlist, staging generator, and secret audit
+plan/      Local planning and decision records (not published)
+```
 
-MIT
+## Stack
+
+Electron 31 · React 19 · TypeScript · Vite · Tailwind CSS · Recharts · Zustand · SQLite · Vitest · Playwright · PostgreSQL (optional sync service)
+
+## Self-hosted sync
+
+`drive/` includes the PostgreSQL sync service, web console, Docker Compose files, and Ubuntu scripts for installation, backup, upgrade, and uninstall. Sync is not required to use the desktop application.
+
+Deployment guide: [drive/docs/ONE-CLICK-SERVER.md](./drive/docs/ONE-CLICK-SERVER.md)
+
+## Contributing
+
+Issues and pull requests are welcome. Before making changes, read:
+
+- [Architecture boundaries](./design/ARCHITECTURE.md)
+- [Provider conventions](./design/PROVIDERS.md)
+- [Motion guidelines](./design/MOTION.md)
+- [Changelog](./CHANGELOG.md)
+
+Run at least `typecheck`, `test`, `lint`, and `format:check` before submitting a change.
+
+## Version
+
+Current source version: **MoonMeter 1.2.0**. This release introduces the new product identity and UI, React 19, system/light/dark themes, redesigned model comparison and pricing catalog views, and compatibility migrations for existing users. See [CHANGELOG.md](./CHANGELOG.md).

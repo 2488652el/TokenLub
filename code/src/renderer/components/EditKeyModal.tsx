@@ -4,6 +4,7 @@
  * 提交时通过 onSave 将 ApiKeyUpdateInput 交给父页面处理。
  * (glm-5.2)
  */
+import { Icon } from './Icon'
 import { useMemo, useState } from 'react'
 import { Modal } from './Modal'
 import { ProviderMetaCard } from './ProviderMetaCard'
@@ -123,7 +124,7 @@ export function EditKeyModal({
         {needsAdminKey && (
           <div className="form-group">
             <label className="form-label">
-              <i className="fa-solid fa-shield-halved text-text-muted mr-1" /> Admin Key
+              <Icon name="fa-shield-halved" className="text-text-muted mr-1" /> Admin Key
             </label>
             <input
               className="input font-mono"
@@ -138,7 +139,7 @@ export function EditKeyModal({
         {supportsPlatformCookie && (
           <div className="form-group">
             <label className="form-label">
-              <i className="fa-solid fa-cookie-bite text-text-muted mr-1" /> 平台 Cookie
+              <Icon name="fa-cookie-bite" className="text-text-muted mr-1" /> 平台 Cookie
             </label>
             <textarea
               className="input font-mono min-h-[88px] resize-y"
@@ -165,7 +166,7 @@ export function EditKeyModal({
           onToggle={(e) => setShowAdvanced((e.currentTarget as HTMLDetailsElement).open)}
         >
           <summary className="cursor-pointer select-none py-1 hover:text-text-primary">
-            <i className="fa-solid fa-sliders text-text-muted mr-1" /> 高级 (Base URL 覆盖)
+            <Icon name="fa-sliders" className="text-text-muted mr-1" /> 高级 (Base URL 覆盖)
           </summary>
           <div className="form-group pt-2">
             <label className="form-label">

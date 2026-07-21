@@ -3,6 +3,7 @@
  * 支持按供应商/来源/日期/模型筛选、排序、分页与导出 CSV。
  * (glm-5.2)
  */
+import { Icon } from '../components/Icon'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
@@ -84,7 +85,7 @@ function downloadCsv(rows: UsageRecord[]) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `tokenlub-logs-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `moonmeter-logs-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -306,15 +307,14 @@ export default function RequestLogs() {
               onClick={handleRefresh}
               disabled={refreshing}
             >
-              <i className="fa-solid fa-arrows-rotate" /> {refreshing ? '刷新中…' : '刷新'}
+              <Icon name="fa-arrows-rotate" /> {refreshing ? '刷新中…' : '刷新'}
             </button>
             <button
               className="btn btn-outline btn-sm"
               onClick={handleExportCsv}
               disabled={totalCount === 0 || exporting}
             >
-              <i className="fa-solid fa-arrow-up-from-bracket" />{' '}
-              {exporting ? '导出中…' : '导出 CSV'}
+              <Icon name="fa-arrow-up-from-bracket" /> {exporting ? '导出中…' : '导出 CSV'}
             </button>
           </div>
         }
@@ -341,7 +341,7 @@ export default function RequestLogs() {
               条
             </span>
             <button className="btn btn-outline btn-sm" onClick={handleReset}>
-              <i className="fa-solid fa-rotate-left" /> 重置
+              <Icon name="fa-rotate-left" /> 重置
             </button>
           </div>
         }
@@ -397,7 +397,10 @@ export default function RequestLogs() {
 
           <FilterField label="模型名称" className="lg:col-span-4">
             <div className="relative">
-              <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted" />
+              <Icon
+                name="fa-magnifying-glass"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted"
+              />
               <input
                 type="search"
                 placeholder="搜索模型名称"
@@ -563,7 +566,7 @@ export default function RequestLogs() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page <= 1}
                 >
-                  <i className="fa-solid fa-chevron-left" /> 上一页
+                  <Icon name="fa-chevron-left" /> 上一页
                 </button>
                 <input
                   type="number"
@@ -584,7 +587,7 @@ export default function RequestLogs() {
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page >= totalPages}
                 >
-                  下一页 <i className="fa-solid fa-chevron-right" />
+                  下一页 <Icon name="fa-chevron-right" />
                 </button>
               </div>
             </div>
@@ -640,7 +643,7 @@ export default function RequestLogs() {
           <div className="mt-4 flex items-center justify-between">
             <span className="text-[11.5px] text-text-muted">{copied ? '已复制' : 'JSON 快照'}</span>
             <button className="btn btn-outline btn-sm" onClick={() => copyRaw(detail)}>
-              <i className="fa-regular fa-copy" /> 复制 raw JSON
+              <Icon name="fa-copy" /> 复制 raw JSON
             </button>
           </div>
         </Modal>

@@ -12,6 +12,7 @@ export default [
       'demo/out/**',
       'demo/artifacts/**',
       'demo/tokenlub-*/**',
+      'demo/moonmeter-*/**',
       'demo/coverage/**',
       'demo/playwright-report/**',
       'demo/test-results/**',

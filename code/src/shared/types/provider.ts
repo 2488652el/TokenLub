@@ -1,5 +1,5 @@
 /**
- * Provider 类型定义模块:定义 TokenLub 中"供应商(Provider)"相关的核心类型。
+ * Provider 类型定义模块:定义 MoonMeter 中"供应商(Provider)"相关的核心类型。
  * 包含供应商清单(Manifest)、余额快照、用量切片、能力声明与统一错误类型等,
  * 是主进程 providers 实现层与渲染层共享的数据契约。
  * (glm-5.2)

@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const address = runtime.server.address()
   const port = address && typeof address !== 'string' ? address.port : config.port
 
-  console.log(`TokenLub sync server listening on ${port}`)
+  console.log(`MoonMeter sync server listening on ${port}`)
 
   async function shutdown(): Promise<void> {
     await new Promise<void>((resolve, reject) =>
@@ -37,6 +37,6 @@ async function main(): Promise<void> {
 }
 
 void main().catch(() => {
-  console.error('TokenLub sync server failed to start')
+  console.error('MoonMeter sync server failed to start')
   process.exitCode = 1
 })

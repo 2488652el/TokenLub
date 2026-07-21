@@ -3,6 +3,7 @@
  * 含费用占比环形图、Top 5 排行、明细表格与每日费用趋势折线图。
  * (glm-5.2)
  */
+import { Icon } from '../components/Icon'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -106,7 +107,14 @@ function DonutChart({ providers }: { providers: DashboardSummary['providers'] })
           aria-label={`${providers.length} 个 Provider 的费用占比`}
           role="img"
         >
-          <circle cx="70" cy="70" r="55" fill="none" stroke="#F3F4F6" strokeWidth="18" />
+          <circle
+            cx="70"
+            cy="70"
+            r="55"
+            fill="none"
+            stroke="rgb(var(--color-line) / 0.08)"
+            strokeWidth="18"
+          />
           {providers.map((provider, index) => {
             const start = cursor
             cursor += provider.pct
@@ -182,16 +190,20 @@ function DailyCostLineChart({
       <div className="h-[240px] min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={points} margin={{ top: 10, right: 18, bottom: 8, left: 4 }}>
-            <CartesianGrid stroke="#E8E8E8" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid
+              stroke="rgb(var(--color-line) / 0.1)"
+              strokeDasharray="3 3"
+              vertical={false}
+            />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: '#9CA3AF' }}
+              tick={{ fontSize: 11, fill: 'rgb(var(--color-muted))' }}
               tickLine={false}
               minTickGap={24}
             />
             <YAxis
               width={64}
-              tick={{ fontSize: 11, fill: '#9CA3AF' }}
+              tick={{ fontSize: 11, fill: 'rgb(var(--color-muted))' }}
               tickFormatter={(v) => fmtMoney(Number(v))}
               tickLine={false}
               axisLine={false}
@@ -206,7 +218,7 @@ function DailyCostLineChart({
             <Line
               type="monotone"
               dataKey="cost"
-              stroke="#10B981"
+              stroke="rgb(var(--color-accent))"
               strokeWidth={2.5}
               dot={false}
               activeDot={{ r: 4 }}
@@ -368,7 +380,7 @@ export default function ProviderSummary() {
               onClick={handleRefresh}
               disabled={refreshing}
             >
-              <i className="fa-solid fa-arrows-rotate" /> 刷新
+              <Icon name="fa-arrows-rotate" /> 刷新
             </button>
           </div>
         }
@@ -389,10 +401,10 @@ export default function ProviderSummary() {
                   onClick={handleRefresh}
                   disabled={refreshing}
                 >
-                  <i className="fa-solid fa-arrows-rotate" /> 刷新用量
+                  <Icon name="fa-arrows-rotate" /> 刷新用量
                 </button>
                 <button className="btn btn-outline btn-sm" onClick={() => navigate('/apikeys')}>
-                  <i className="fa-solid fa-arrow-right" /> 前往 API Keys
+                  <Icon name="fa-arrow-right" /> 前往 API Keys
                 </button>
               </div>
             }

@@ -2,6 +2,7 @@
  * 余额查询页面：按凭据用途展示余额、套餐额度或组织用量。
  * 不同供应商沿用统一卡片骨架，但拥有独立品牌色和信息重点。
  */
+import { Icon } from '../components/Icon'
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
@@ -68,7 +69,7 @@ const PROFILE_META: Record<BalanceCardProfile, { label: string; icon: string }> 
   manual: { label: '手动额度', icon: 'fa-pen-to-square' }
 }
 
-const BALANCE_CARD_ORDER_KEY = 'tokenlub.balance-card-order.v1'
+const BALANCE_CARD_ORDER_KEY = 'moonmeter.balance-card-order.v1'
 const CODEX_CARD: BalanceCardItem = { id: 'codex', kind: 'codex' }
 
 function balanceCardId(card: BalanceCardItem): string {
@@ -215,7 +216,7 @@ export default function BalanceQuery() {
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-            <i className="fa-solid fa-bolt text-[9px]" />
+            <Icon name="fa-bolt" className="text-[9px]" />
             订阅计划
           </span>
           <button
@@ -224,10 +225,9 @@ export default function BalanceQuery() {
             disabled={codex.loading}
             title="刷新 ChatGPT 额度"
           >
-            <i
-              className={`fa-solid fa-arrows-rotate ${
-                codex.loading && !reducedMotion ? 'animate-spin' : ''
-              }`}
+            <Icon
+              name="fa-arrows-rotate"
+              className={codex.loading && !reducedMotion ? 'icon-spin' : ''}
             />
           </button>
         </div>
@@ -249,10 +249,9 @@ export default function BalanceQuery() {
             onClick={handleRefreshAll}
             disabled={refreshing}
           >
-            <i
-              className={`fa-solid fa-arrows-rotate ${
-                refreshing && !reducedMotion ? 'animate-spin' : ''
-              }`}
+            <Icon
+              name="fa-arrows-rotate"
+              className={refreshing && !reducedMotion ? 'icon-spin' : ''}
             />
             {refreshing ? '刷新中' : '全部刷新'}
           </button>
@@ -292,7 +291,7 @@ export default function BalanceQuery() {
           />
           <div className="mt-3 flex justify-end text-[12px] text-text-muted">
             <span className="inline-flex items-center gap-1.5">
-              <i className="fa-solid fa-grip-lines text-[10px]" />
+              <Icon name="fa-grip-lines" className="text-[10px]" />
               拖动卡片调整顺序
             </span>
           </div>
@@ -354,7 +353,7 @@ function ProviderBalanceCard({
             borderColor: theme.tint
           }}
         >
-          <i className={`fa-solid ${profileMeta.icon} text-[10px]`} />
+          <Icon name={profileMeta.icon} className="text-[10px]" />
           {profileMeta.label}
         </span>
       </header>
@@ -365,11 +364,11 @@ function ProviderBalanceCard({
         </div>
         <footer className="mt-4 flex items-center justify-between gap-3 border-t border-border-light pt-3 text-[11.5px] text-text-muted">
           <span className="inline-flex items-center gap-1.5 font-mono">
-            <i className="fa-solid fa-key text-[10px]" />
+            <Icon name="fa-key" className="text-[10px]" />
             ••••{keyRecord.keyTail}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <i className="fa-regular fa-clock text-[10px]" />
+            <Icon name="fa-clock" className="text-[10px]" />
             {formatSnapshotTime(balance?.capturedAt)}
           </span>
         </footer>
@@ -615,8 +614,9 @@ function AdminUsagePanel({
         className="flex items-start gap-2 rounded-md px-3 py-2.5"
         style={{ backgroundColor: theme.tint }}
       >
-        <i
-          className="fa-solid fa-shield-halved mt-0.5 text-[12px]"
+        <Icon
+          name="fa-shield-halved"
+          className="mt-0.5 text-[12px]"
           style={{ color: theme.accent }}
         />
         <div>
@@ -789,7 +789,7 @@ function MetricTile({ label, value, icon }: { label: string; value: string; icon
   return (
     <div className="rounded-lg border border-border-light bg-bg-base/50 px-3 py-2.5">
       <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-text-muted">
-        <i className={`fa-solid ${icon} text-[9px]`} />
+        <Icon name={icon} className="text-[9px]" />
         {label}
       </div>
       <div className="truncate font-mono text-[12.5px] font-medium text-text-primary" title={value}>
@@ -816,7 +816,7 @@ function BalanceUnavailable({
         className="flex h-10 w-10 flex-none items-center justify-center rounded-full"
         style={{ backgroundColor: theme.tint, color: theme.accent }}
       >
-        <i className={`fa-solid ${icon}`} />
+        <Icon name={icon} />
       </span>
       <div>
         <div className="text-[13px] font-medium text-text-primary">{title}</div>

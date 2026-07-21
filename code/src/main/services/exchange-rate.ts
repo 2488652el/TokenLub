@@ -66,9 +66,16 @@ interface ExchangeApiResponse {
  * @returns 汇率数值与可选的更新时间;API 不可用时抛错
  */
 async function fetchRateToCny(currency: string): Promise<{ rate: number; updatedAt?: string }> {
-  const id = process.env.TOKENLUB_EXCHANGE_ID ?? process.env.TOKENSCOPE_EXCHANGE_ID ?? PUBLIC_DOC_ID
+  const id =
+    process.env.MOONMETER_EXCHANGE_ID ??
+    process.env.TOKENLUB_EXCHANGE_ID ??
+    process.env.TOKENSCOPE_EXCHANGE_ID ??
+    PUBLIC_DOC_ID
   const key =
-    process.env.TOKENLUB_EXCHANGE_KEY ?? process.env.TOKENSCOPE_EXCHANGE_KEY ?? PUBLIC_DOC_KEY
+    process.env.MOONMETER_EXCHANGE_KEY ??
+    process.env.TOKENLUB_EXCHANGE_KEY ??
+    process.env.TOKENSCOPE_EXCHANGE_KEY ??
+    PUBLIC_DOC_KEY
   const url = new URL(API_URL)
   url.searchParams.set('id', id)
   url.searchParams.set('key', key)

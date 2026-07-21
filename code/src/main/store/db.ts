@@ -12,9 +12,9 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 /** 数据库文件名与历史遗留文件名/目录名常量。 */
 let dbInstance: Database.Database | null = null
 
-const DB_FILE_NAME = 'tokenlub.db'
-const LEGACY_DB_FILE_NAMES = ['tokenscope.db'] as const
-const LEGACY_USER_DATA_DIRS = ['TokenScope', 'tokengirl'] as const
+const DB_FILE_NAME = 'moonmeter.db'
+const LEGACY_DB_FILE_NAMES = ['tokenlub.db', 'tokenscope.db'] as const
+const LEGACY_USER_DATA_DIRS = ['TokenLub', 'TokenScope', 'tokengirl'] as const
 const SQLITE_SIDECAR_SUFFIXES = ['-wal', '-shm'] as const
 
 /**
@@ -63,7 +63,7 @@ function legacyDbCandidates(userData: string): string[] {
   const roots = new Set<string>([userData])
   try {
     const appData = app.getPath('appData')
-    if (basename(userData).toLowerCase() === 'tokenlub') {
+    if (basename(userData).toLowerCase() === 'moonmeter') {
       for (const dir of LEGACY_USER_DATA_DIRS) roots.add(join(appData, dir))
     }
   } catch {

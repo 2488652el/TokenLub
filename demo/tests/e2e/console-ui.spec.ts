@@ -15,7 +15,7 @@ type CapturedRequest = {
 
 const maliciousDeviceName = '<img src=x onerror="window.__xss=1">'
 
-test.describe.serial('TokenLub web console', () => {
+test.describe.serial('MoonMeter web console', () => {
   let server: Server
   let baseUrl: string
   let loginDeviceId: string

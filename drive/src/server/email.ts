@@ -24,8 +24,8 @@ export function createVerificationEmailSender(options: VerificationEmailOptions)
     return options.transport.sendMail({
       from: options.from,
       to: email,
-      subject: 'Verify your TokenLub email',
-      text: `Verify your TokenLub email: ${url.toString()}`
+      subject: 'Verify your MoonMeter email',
+      text: `Verify your MoonMeter email: ${url.toString()}`
     })
   }
 }

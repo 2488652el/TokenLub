@@ -4,6 +4,7 @@
  */
 import { type CSSProperties, type ReactNode } from 'react'
 import clsx from 'clsx'
+import { Icon } from './Icon'
 
 /**
  * 统计瓷砖组件。
@@ -38,7 +39,7 @@ export function StatTile({
   }[accent]
   return (
     <div
-      className="motion-card p-4 border border-border-light rounded-md bg-bg-card"
+      className="motion-card rounded-lg border border-border-light bg-bg-card/55 p-4 shadow-card"
       style={{ '--motion-order': motionOrder } as CSSProperties}
     >
       <div
@@ -47,10 +48,10 @@ export function StatTile({
           iconColor
         )}
       >
-        {icon && <i className={`fa-solid ${icon}`} />}
+        {icon && <Icon name={icon} />}
         {label}
       </div>
-      <div className="text-[24px] font-semibold text-text-primary tracking-[-0.02em] leading-[1.2]">
+      <div className="text-[26px] font-medium leading-[1.2] tracking-[-0.035em] text-text-primary">
         {value}
       </div>
       {sub && <div className="text-[11.5px] text-text-muted mt-1 font-mono">{sub}</div>}

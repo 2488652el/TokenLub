@@ -20,11 +20,11 @@
 └──────────────────┬──────────────────────────────────────────┘
                    │ window.api.*
 ┌──────────────────▼──────────────────────────────────────────┐
-│  RENDERER (React 18, sandboxed)                              │
+│  RENDERER (React 19, sandboxed)                              │
 │    • Pure UI: pages, charts, forms, tables                  │
 │    • React pages cache fetched data in local component state│
 │    • Recharts renders dashboards                            │
-│    • Tailwind for LongCat-inspired tokens                   │
+│    • Tailwind with MoonMeter semantic design tokens         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -42,6 +42,7 @@ All names centralized in `code/src/shared/ipc-channels.ts` as `IPC.*`. Naming: `
 Every provider implements `ProviderImpl` from `code/src/shared/types/provider.ts`. New provider = drop a file under `code/src/main/providers/<id>/index.ts` and add to `registry.ts`.
 
 Categories:
+
 - `token-plan` — prepaid plan balance (Zhipu, MiniMax, Moonshot...)
 - `third-party` — third-party aggregator balance (DeepSeek, SiliconFlow...)
 - `admin-org` — org-level cost API (Anthropic Admin, OpenAI Admin)

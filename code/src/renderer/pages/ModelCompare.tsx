@@ -1,15 +1,21 @@
 /**
- * 模型对比页面:按模型维度聚合请求数、Input/Output/Cache Read Token 与费用,
- * 跨供应商对比成本与用量,以表格展示 Top 10。
+ * 模型对比页面:按模型维度聚合请求数、Token 构成、计价覆盖与费用,
+ * 使用品牌卡片跨供应商对比模型用量。
  * (glm-5.2)
  */
-import { useEffect, useState } from 'react'
+import { Icon } from '../components/Icon'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
 import { EmptyState } from '../components/EmptyState'
-import { AnimatedNumber } from '../components/motion'
-import { fmtCount, fmtMoney } from '../../shared/utils/money'
+import { ModelUsageCard } from '../components/ModelUsageCard'
+import { StatTile } from '../components/StatTile'
+import { AnimatedNumber, MotionGroup } from '../components/motion'
+import { fmtCount } from '../../shared/utils/money'
+import { buildModelCompareSummary } from '../../shared/utils/model-compare'
 import type { ModelSpendAggregate } from '../../shared/types/usage'
+
+const MAX_VISIBLE_MODELS = 12
 
 /**
  * 模型对比页面组件。
@@ -17,6 +23,7 @@ import type { ModelSpendAggregate } from '../../shared/types/usage'
  */
 export default function ModelCompare() {
   const [models, setModels] = useState<ModelSpendAggregate[] | null>(null)
+  const summary = useMemo(() => buildModelCompareSummary(models ?? []), [models])
 
   useEffect(() => {
     let alive = true
@@ -37,67 +44,93 @@ export default function ModelCompare() {
     <div className="page-content">
       <PageHeader
         title="模型对比"
-        desc="按模型维度聚合，跨 Provider 对比成本与质量"
+        desc="按模型聚合请求、Token、缓存和费用，跨 Provider 对比使用结构"
         action={
-          <span className="inline-flex items-center px-2 py-[2px] rounded-full text-[11px] font-medium leading-[1.5] bg-text-primary text-white">
-            NEW
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-border bg-accent-dim px-2.5 py-1 text-[11px] font-medium text-accent-text">
+            <Icon name="fa-layer-group" className="text-[9px]" />
+            模型画像
           </span>
         }
       />
-      <Card>
-        {models === null ? (
-          <p className="text-text-muted text-[13px] py-6 text-center">加载中…</p>
-        ) : models.length === 0 ? (
+
+      {models === null ? (
+        <Card>
+          <EmptyState icon="fa-spinner" title="加载模型数据…" hint="正在聚合本地用量与价格" />
+        </Card>
+      ) : models.length === 0 ? (
+        <Card>
           <EmptyState
             icon="fa-cube"
             title="尚无模型数据"
             hint="先在 API Keys 添加 Key 并刷新即可看到聚合结果"
           />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead className="text-text-muted text-left">
-                <tr>
-                  <th className="py-2 font-medium">#</th>
-                  <th className="py-2 font-medium">Model</th>
-                  <th className="py-2 font-medium text-right">请求数</th>
-                  <th className="py-2 font-medium text-right">Input</th>
-                  <th className="py-2 font-medium text-right">Output</th>
-                  <th className="py-2 font-medium text-right">Cache Read</th>
-                  <th className="py-2 font-medium text-right">费用</th>
-                </tr>
-              </thead>
-              <tbody className="motion-table-rows text-text-primary">
-                {models.slice(0, 10).map((m, i) => (
-                  <tr key={m.model} className="border-t border-border-light">
-                    <td className="py-2 text-text-muted w-8">{i + 1}</td>
-                    <td
-                      className="py-2 font-mono text-[12px] truncate max-w-[320px]"
-                      title={m.model}
-                    >
-                      {m.model}
-                    </td>
-                    <td className="py-2 text-right font-mono">
-                      {m.requests.toLocaleString('en-US')}
-                    </td>
-                    <td className="py-2 text-right font-mono">{fmtCount(m.inputTokens)}</td>
-                    <td className="py-2 text-right font-mono">{fmtCount(m.outputTokens)}</td>
-                    <td className="py-2 text-right font-mono">{fmtCount(m.cacheReadTokens)}</td>
-                    <td className="py-2 text-right font-mono">
-                      <span key={`${m.model}-${m.total}`} className="motion-data-flash">
-                        <AnimatedNumber
-                          value={m.total}
-                          format={(value) => fmtMoney(value, m.currency)}
-                        />
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        </Card>
+      ) : (
+        <>
+          <MotionGroup className="mb-4 grid grid-cols-4 gap-3 max-xl:grid-cols-2">
+            <StatTile
+              label="活跃模型"
+              icon="fa-cubes"
+              value={<AnimatedNumber value={summary.modelCount} />}
+              sub={`展示费用最高的前 ${Math.min(models.length, MAX_VISIBLE_MODELS)} 个`}
+              motionOrder={0}
+            />
+            <StatTile
+              label="模型请求"
+              icon="fa-arrow-right-arrow-left"
+              value={<AnimatedNumber value={summary.requests} />}
+              sub="跨 Provider 聚合"
+              accent="blue"
+              motionOrder={1}
+            />
+            <StatTile
+              label="总 Token"
+              icon="fa-coins"
+              value={<AnimatedNumber value={summary.tokens} format={(value) => fmtCount(value)} />}
+              sub="Input + Output"
+              accent="purple"
+              motionOrder={2}
+            />
+            <StatTile
+              label="计价覆盖"
+              icon="fa-tag"
+              value={
+                <AnimatedNumber
+                  value={summary.coverage * 100}
+                  format={(value) => `${value.toFixed(0)}%`}
+                />
+              }
+              sub={`${summary.pricedRequests}/${summary.requests} 次请求`}
+              accent={summary.coverage < 1 ? 'amber' : 'accent'}
+              motionOrder={3}
+            />
+          </MotionGroup>
+
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-[13px] font-semibold text-text-primary">模型用量卡片</h2>
+              <p className="mt-0.5 text-[11.5px] text-text-muted">
+                按费用降序排列，Logo 由 LobeHub Icons 根据模型 ID 自动匹配
+              </p>
+            </div>
+            <span className="font-mono text-[11px] text-text-muted">
+              Top {Math.min(models.length, MAX_VISIBLE_MODELS)}
+            </span>
           </div>
-        )}
-      </Card>
+
+          <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
+            {models.slice(0, MAX_VISIBLE_MODELS).map((model, index) => (
+              <ModelUsageCard key={model.model} model={model} rank={index + 1} />
+            ))}
+          </div>
+
+          {models.length > MAX_VISIBLE_MODELS ? (
+            <p className="mt-4 text-center text-[11.5px] text-text-muted">
+              另有 {models.length - MAX_VISIBLE_MODELS} 个低用量模型未展开
+            </p>
+          ) : null}
+        </>
+      )}
     </div>
   )
 }

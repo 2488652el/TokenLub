@@ -24,7 +24,7 @@ const hasSingleInstanceLock = app.requestSingleInstanceLock()
 if (!hasSingleInstanceLock) app.quit()
 
 function findBindingLink(args: string[]): string | undefined {
-  return args.find((arg) => arg.startsWith('tokenlub://'))
+  return args.find((arg) => arg.startsWith('moonmeter://') || arg.startsWith('tokenlub://'))
 }
 
 function focusMainWindow(): void {
@@ -40,12 +40,12 @@ async function handleBindingLink(value: string): Promise<void> {
     const binding = parseSyncBindingLink(value)
     await bindSync({
       ...binding,
-      deviceName: hostname() || 'TokenLub Desktop',
+      deviceName: hostname() || 'MoonMeter Desktop',
       platform: process.platform,
       appVersion: app.getVersion()
     })
     focusMainWindow()
-    await dialog.showMessageBox({ type: 'info', message: 'TokenLub 已绑定同步服务' })
+    await dialog.showMessageBox({ type: 'info', message: 'MoonMeter 已绑定同步服务' })
     void syncNow().catch(() => undefined)
   } catch {
     focusMainWindow()
@@ -76,9 +76,12 @@ if (hasSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
-  app.setName('TokenLub')
+  app.setName('MoonMeter')
   if (process.platform === 'win32') app.setAppUserModelId('com.tokenlub.app')
-  if (app.isPackaged) app.setAsDefaultProtocolClient('tokenlub')
+  if (app.isPackaged) {
+    app.setAsDefaultProtocolClient('moonmeter')
+    app.setAsDefaultProtocolClient('tokenlub')
+  }
 
   // Open DB + ensure schema before any handler fires. Must run inside
   // whenReady — app.getPath('userData') is unreliable before the 'ready'

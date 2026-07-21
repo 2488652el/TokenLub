@@ -2,11 +2,14 @@
  * 设置页面:提供全局配置项,当前包含余额自动刷新间隔设置。
  * (glm-5.2)
  */
+import { Icon } from '../components/Icon'
 import { useEffect, useState, type FormEvent } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
+import { MoonMeterAppIcon } from '../components/Brand'
 import { AnimatedNumber, ProgressBar } from '../components/motion'
 import { useReducedMotion } from '../hooks/useReducedMotion'
+import { useTheme, type ThemeMode } from '../theme'
 import type { SyncMode } from '../../shared/sync-mode'
 import { SYNC_BACKUP_DIRECTORY_SETTING_KEY } from '../../shared/sync-v2'
 import type { AppUpdateStatus } from '../../shared/types/app-update'
@@ -23,13 +26,20 @@ const REFRESH_OPTIONS: Array<{ value: number; label: string }> = [
 ]
 /** 自动刷新间隔的设置 key */
 const REFRESH_KEY = 'refresh_interval_min'
-const TOKENLUB_MARK_URL = new URL('../assets/tokenlub-mark.png', import.meta.url).href
+const APPEARANCE_OPTIONS: Array<{ value: ThemeMode; label: string; icon: string }> = [
+  { value: 'system', label: '跟随系统', icon: 'fa-display' },
+  { value: 'light', label: '浅色', icon: 'fa-sun' },
+  { value: 'dark', label: '深色', icon: 'fa-moon' }
+]
 
 const UPDATE_PHASE_META: Record<
   AppUpdateStatus['phase'],
   { label: string; badgeClassName: string }
 > = {
-  idle: { label: '等待检查', badgeClassName: 'border-border-light bg-white text-text-secondary' },
+  idle: {
+    label: '等待检查',
+    badgeClassName: 'border-border-light bg-bg-card text-text-secondary'
+  },
   checking: { label: '检查中', badgeClassName: 'border-sky-200 bg-sky-50 text-sky-700' },
   available: { label: '发现新版本', badgeClassName: 'border-sky-200 bg-sky-50 text-sky-700' },
   downloading: { label: '下载中', badgeClassName: 'border-sky-200 bg-sky-50 text-sky-700' },
@@ -100,6 +110,7 @@ const SYNC_STATE_META: Record<
  * 读取并持久化余额自动刷新间隔设置。
  */
 export default function Settings() {
+  const { mode, setMode } = useTheme()
   const [refreshMin, setRefreshMin] = useState<number>(30)
   const [appUpdateStatus, setAppUpdateStatus] = useState<AppUpdateStatus | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
@@ -290,9 +301,42 @@ export default function Settings() {
 
   return (
     <div className="page-content" data-motion-group>
-      <PageHeader title="设置" desc="管理应用更新、自动刷新与 TokenLub 云端同步" />
+      <PageHeader title="设置" desc="管理 MoonMeter 的外观、更新、自动刷新与云端同步" />
 
-      <Card title="应用更新" icon="fa-cloud-arrow-down" motionOrder={0}>
+      <Card title="外观" icon="fa-sun" motionOrder={0}>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-[13px] font-medium text-text-primary">界面主题</div>
+            <p className="form-hint mt-1">
+              月光纸感会随主题保持一致；「跟随系统」将在系统外观变化时自动切换。
+            </p>
+          </div>
+          <div
+            className="grid grid-cols-3 gap-1 rounded-full border border-border-light bg-bg-base/50 p-1"
+            role="group"
+            aria-label="界面主题"
+          >
+            {APPEARANCE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[11.5px] font-medium transition-colors ${
+                  mode === option.value
+                    ? 'bg-text-primary text-bg-base'
+                    : 'text-text-muted hover:bg-bg-hover hover:text-text-primary'
+                }`}
+                onClick={() => setMode(option.value)}
+                aria-pressed={mode === option.value}
+              >
+                <Icon name={option.icon} />
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <Card className="mt-4" title="应用更新" icon="fa-cloud-arrow-down" motionOrder={1}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -347,10 +391,9 @@ export default function Settings() {
             onClick={() => void checkForAppUpdate()}
             disabled={updateBusy}
           >
-            <i
-              className={`fa-solid fa-arrows-rotate ${
-                updateBusy && !reducedMotion ? 'fa-spin' : ''
-              }`}
+            <Icon
+              name="fa-arrows-rotate"
+              className={updateBusy && !reducedMotion ? 'icon-spin' : ''}
             />
             {appUpdateStatus?.phase === 'checking' ? '检查中…' : '检查更新'}
           </button>
@@ -361,7 +404,7 @@ export default function Settings() {
         className={`mt-4 ${refreshSaving ? 'motion-data-flash' : ''}`}
         title="余额自动刷新"
         icon="fa-arrows-rotate"
-        motionOrder={1}
+        motionOrder={2}
       >
         <div className="flex items-center justify-between gap-3 text-[13px] text-text-secondary">
           <div>
@@ -393,17 +436,15 @@ export default function Settings() {
         </div>
       </Card>
 
-      <Card className="mt-4" bodyClassName="p-0" motionOrder={2}>
-        <div className="border-b border-border-light bg-[#fafaf8] px-5 py-5">
+      <Card className="mt-4" bodyClassName="p-0" motionOrder={3}>
+        <div className="border-b border-border-light bg-bg-base/45 px-5 py-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-white shadow-sm">
-                <img className="h-9 w-9 object-contain" src={TOKENLUB_MARK_URL} alt="TokenLub" />
-              </div>
+              <MoonMeterAppIcon className="h-12 w-12 shrink-0" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-text-primary">
-                    TokenLub 云端同步
+                    MoonMeter 云端同步
                   </h2>
                   {syncStatus?.configured && statusMeta && (
                     <span
@@ -433,7 +474,7 @@ export default function Settings() {
                   disabled={syncBusy}
                   aria-expanded={reconnecting}
                 >
-                  <i className="fa-solid fa-link" />
+                  <Icon name="fa-link" />
                   {reconnecting ? '收起连接' : '重新连接'}
                 </button>
                 <button
@@ -442,10 +483,9 @@ export default function Settings() {
                   onClick={() => void triggerSync()}
                   disabled={!syncStatus.configured || syncBusy}
                 >
-                  <i
-                    className={`fa-solid fa-arrows-rotate ${
-                      syncing && !reducedMotion ? 'fa-spin' : ''
-                    }`}
+                  <Icon
+                    name="fa-arrows-rotate"
+                    className={syncing && !reducedMotion ? 'icon-spin' : ''}
                   />
                   {syncing ? '同步中…' : '立即同步'}
                 </button>
@@ -460,10 +500,9 @@ export default function Settings() {
             role="status"
             aria-live="polite"
           >
-            <i
-              className={`fa-solid fa-circle-notch ${
-                !reducedMotion ? 'fa-spin' : ''
-              } text-emerald-600`}
+            <Icon
+              name="fa-circle-notch"
+              className={`${!reducedMotion ? 'icon-spin' : ''} text-emerald-600`}
             />
             正在读取同步状态…
           </div>
@@ -591,7 +630,7 @@ export default function Settings() {
                   </span>
                 </div>
                 <div className="mt-2 border-t border-emerald-100 pt-2 text-text-primary">
-                  <i className="fa-solid fa-shield-halved mr-1.5 text-emerald-600" />
+                  <Icon name="fa-shield-halved" className="mr-1.5 text-emerald-600" />
                   风险提示：{syncPreview.risk}
                 </div>
               </div>
@@ -599,10 +638,9 @@ export default function Settings() {
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button type="submit" className="btn btn-primary" disabled={syncBusy}>
-                <i
-                  className={`fa-solid ${
-                    loggingIn ? `fa-circle-notch ${!reducedMotion ? 'fa-spin' : ''}` : 'fa-link'
-                  }`}
+                <Icon
+                  name={loggingIn ? 'fa-circle-notch' : 'fa-link'}
+                  className={loggingIn && !reducedMotion ? 'icon-spin' : ''}
                 />
                 {loggingIn ? '连接中…' : '连接并开始同步'}
               </button>
@@ -624,19 +662,19 @@ export default function Settings() {
         ) : (
           <div className="px-5 py-5">
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-border-light bg-[#fafaf8] px-3.5 py-3">
+              <div className="rounded-lg border border-border-light bg-bg-base/45 px-3.5 py-3">
                 <div className="text-[11.5px] text-text-muted">当前模式</div>
                 <div className="mt-1 text-[13px] font-medium text-text-primary">
                   {syncStatus?.mode ? SYNC_MODE_LABEL[syncStatus.mode] : '尚未设置'}
                 </div>
               </div>
-              <div className="rounded-lg border border-border-light bg-[#fafaf8] px-3.5 py-3">
+              <div className="rounded-lg border border-border-light bg-bg-base/45 px-3.5 py-3">
                 <div className="text-[11.5px] text-text-muted">快照版本</div>
                 <div className="mt-1 text-[13px] font-medium text-text-primary">
                   {syncStatus?.revision ?? 0}
                 </div>
               </div>
-              <div className="rounded-lg border border-border-light bg-[#fafaf8] px-3.5 py-3">
+              <div className="rounded-lg border border-border-light bg-bg-base/45 px-3.5 py-3">
                 <div className="text-[11.5px] text-text-muted">最近同步</div>
                 <div className="mt-1 truncate text-[13px] font-medium text-text-primary">
                   {syncStatus?.lastSuccessAt ?? '暂无记录'}
@@ -668,7 +706,7 @@ export default function Settings() {
                   撤销后，该设备需要重新登录才能继续同步
                 </div>
               </div>
-              <span className="rounded-full bg-[#fafaf8] px-2 py-1 text-[11px] text-text-secondary">
+              <span className="rounded-full bg-bg-base/45 px-2 py-1 text-[11px] text-text-secondary">
                 {devices.length} 台
               </span>
             </div>
@@ -676,11 +714,11 @@ export default function Settings() {
               {devices.map((device) => (
                 <div
                   key={device.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border-light bg-[#fafaf8] px-3.5 py-3 text-[12px]"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border-light bg-bg-base/45 px-3.5 py-3 text-[12px]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-text-muted shadow-sm">
-                      <i className="fa-solid fa-laptop" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-bg-card text-text-muted shadow-sm">
+                      <Icon name="fa-laptop" />
                     </span>
                     <div className="min-w-0">
                       <div className="truncate font-medium text-text-primary">{device.name}</div>
@@ -694,12 +732,11 @@ export default function Settings() {
                     onClick={() => void revokeDevice(device)}
                     title="撤销设备"
                   >
-                    <i
-                      className={`fa-solid ${
-                        revokingDeviceId === device.id
-                          ? `fa-circle-notch ${!reducedMotion ? 'fa-spin' : ''}`
-                          : 'fa-ban'
-                      }`}
+                    <Icon
+                      name={revokingDeviceId === device.id ? 'fa-circle-notch' : 'fa-ban'}
+                      className={
+                        revokingDeviceId === device.id && !reducedMotion ? 'icon-spin' : ''
+                      }
                     />
                     {device.revokedAt
                       ? '已撤销'

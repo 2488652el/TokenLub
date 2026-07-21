@@ -15,7 +15,7 @@ describe('verification email sender', () => {
     expect(sendMail).toHaveBeenCalledWith({
       from: 'TokenLub <no-reply@example.com>',
       to: 'user@example.com',
-      subject: 'Verify your TokenLub email',
+      subject: 'Verify your MoonMeter email',
       text: expect.stringContaining(
         'https://sync.example.com/v1/auth/verify-email?token=one-time-token'
       )

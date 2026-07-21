@@ -6,7 +6,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm ci --ignore-scripts --include=dev --legacy-peer-deps
 COPY code/src/shared ./code/src/shared
-COPY code/src/renderer/assets/tokenlub-mark.png ./code/src/renderer/assets/tokenlub-mark.png
+COPY code/src/renderer/assets/moonmeter-icon.png ./code/src/renderer/assets/moonmeter-icon.png
 COPY drive/src/server ./drive/src/server
 COPY tsconfig.node.json ./
 

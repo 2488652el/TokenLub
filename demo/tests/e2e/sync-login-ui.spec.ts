@@ -54,7 +54,7 @@ test('drives sync login, restore cancellation, manual sync, and responsive layou
   browserName
 }, testInfo) => {
   expect(browserName).toBe('chromium')
-  const root = mkdtempSync(join(tmpdir(), 'tokenlub-sync-login-ui-'))
+  const root = mkdtempSync(join(tmpdir(), 'moonmeter-sync-login-ui-'))
   let app: ElectronApplication | undefined
   let server: Server | undefined
 
@@ -102,9 +102,9 @@ test('drives sync login, restore cancellation, manual sync, and responsive layou
       cwd: process.cwd()
     })
     const window = await app.firstWindow()
-    await expect(window).toHaveTitle('TokenLub')
+    await expect(window).toHaveTitle('MoonMeter')
     await window.getByRole('link', { name: '设置' }).click()
-    await expect(window.getByRole('heading', { name: 'TokenLub 云端同步' })).toBeVisible()
+    await expect(window.getByRole('heading', { name: 'MoonMeter 云端同步' })).toBeVisible()
     await expect(window.getByText('备份目录', { exact: true })).toBeVisible()
     await expect(window.getByRole('button', { name: '修改' })).toBeVisible()
     await expect(window.getByRole('button', { name: '立即同步' })).toHaveCount(0)

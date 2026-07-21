@@ -1,6 +1,6 @@
-# TokenLub Motion System
+# MoonMeter Motion System
 
-TokenLub 的动效采用 Fathom 式数据叙事：动画只用于解释信息层级、数据变化和操作反馈，不承担装饰任务。
+MoonMeter 的动效采用克制的数据叙事：动画只用于解释信息层级、数据变化和操作反馈，不承担装饰任务。
 
 ## Motion tokens
 

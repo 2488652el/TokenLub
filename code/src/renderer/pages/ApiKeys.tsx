@@ -3,6 +3,7 @@
  * 搜索与按供应商筛选,以及创建/编辑/导入/测试/删除/刷新/用量查询开关等操作。
  * (glm-5.2)
  */
+import { Icon } from '../components/Icon'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { Card } from '../components/Card'
@@ -54,7 +55,7 @@ type SessionStats = Record<
 
 /** localStorage/settings 中控制自动解析的 key */
 const SESSION_AUTO_SYNC_KEY = 'session_auto_parse_enabled'
-const API_KEY_CARD_ORDER_KEY = 'tokenlub.api-key-card-order.v1'
+const API_KEY_CARD_ORDER_KEY = 'moonmeter.api-key-card-order.v1'
 
 function apiKeyId(key: ApiKeyRecord): string {
   return key.id
@@ -501,7 +502,7 @@ export default function ApiKeys() {
               disabled={importing}
               title="从 ~/.claude/.credentials.json 或 ANTHROPIC_API_KEY 环境变量检测"
             >
-              <i className="fa-solid fa-file-import" /> 导入 Claude
+              <Icon name="fa-file-import" /> 导入 Claude
             </button>
             <button
               className="btn btn-outline btn-sm"
@@ -509,10 +510,10 @@ export default function ApiKeys() {
               disabled={importing}
               title="从 ~/.codex/auth.json 或 OPENAI_API_KEY 环境变量检测"
             >
-              <i className="fa-solid fa-file-import" /> 导入 Codex
+              <Icon name="fa-file-import" /> 导入 Codex
             </button>
             <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>
-              <i className="fa-solid fa-plus" /> 创建新 Key
+              <Icon name="fa-plus" /> 创建新 Key
             </button>
           </div>
         }
@@ -535,17 +536,17 @@ export default function ApiKeys() {
                   onClick={() => handleImportCLI('claude')}
                   disabled={importing}
                 >
-                  <i className="fa-solid fa-file-import" /> 导入 Claude
+                  <Icon name="fa-file-import" /> 导入 Claude
                 </button>
                 <button
                   className="btn btn-outline btn-sm"
                   onClick={() => handleImportCLI('codex')}
                   disabled={importing}
                 >
-                  <i className="fa-solid fa-file-import" /> 导入 Codex
+                  <Icon name="fa-file-import" /> 导入 Codex
                 </button>
                 <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>
-                  <i className="fa-solid fa-plus" /> 创建新 Key
+                  <Icon name="fa-plus" /> 创建新 Key
                 </button>
               </div>
             }
@@ -585,12 +586,9 @@ export default function ApiKeys() {
                   onClick={() => void syncAllSessions()}
                   disabled={sessionSyncing.size > 0}
                 >
-                  <i
-                    className={`fa-solid ${
-                      sessionSyncing.size > 0
-                        ? `fa-arrows-rotate ${!reducedMotion ? 'fa-spin' : ''}`
-                        : 'fa-code-branch'
-                    }`}
+                  <Icon
+                    name={sessionSyncing.size > 0 ? 'fa-arrows-rotate' : 'fa-code-branch'}
+                    className={sessionSyncing.size > 0 && !reducedMotion ? 'icon-spin' : ''}
                   />{' '}
                   解析全部
                 </button>
@@ -639,7 +637,7 @@ export default function ApiKeys() {
           <Card className="mb-3" bodyClassName="py-3">
             <div className="flex items-center gap-4 flex-wrap text-[12.5px]">
               <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                <i className="fa-solid fa-magnifying-glass text-text-muted text-[12px]" />
+                <Icon name="fa-magnifying-glass" className="text-text-muted text-[12px]" />
                 <input
                   className="input flex-1"
                   placeholder="搜索 alias 或 provider"
@@ -670,7 +668,7 @@ export default function ApiKeys() {
                       setProviderFilter(null)
                     }}
                   >
-                    <i className="fa-solid fa-xmark" /> 清空筛选
+                    <Icon name="fa-xmark" /> 清空筛选
                   </button>
                 )}
               </div>
@@ -715,7 +713,7 @@ export default function ApiKeys() {
                 )}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <i className="fa-solid fa-grip-lines text-[10px]" />
+                <Icon name="fa-grip-lines" className="text-[10px]" />
                 拖动卡片调整顺序
               </span>
             </div>
@@ -990,7 +988,7 @@ function FilterChip({
       onClick={onClick}
       className={`px-2.5 py-1 rounded-full text-[12px] border transition-colors ${
         active
-          ? 'bg-accent text-white border-accent'
+          ? 'bg-accent text-text-primary border-accent'
           : 'bg-bg-base text-text-secondary border-border-light hover:border-text-muted'
       } inline-flex items-center gap-1.5`}
     >

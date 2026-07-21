@@ -13,7 +13,7 @@ export default defineConfig({
     trace: 'on-first-retry'
   },
   projects: [{ name: 'electron', use: { ...devices['Desktop Chrome'] } }],
-  ...(process.env['TOKENLUB_PACKAGED_APP']
+  ...(process.env['MOONMETER_PACKAGED_APP'] ?? process.env['TOKENLUB_PACKAGED_APP']
     ? {}
     : {
         webServer: {

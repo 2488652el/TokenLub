@@ -1,157 +1,177 @@
-# TokenLub
+<div align="center">
+  <img src="./design/assets/icon.png" width="112" alt="MoonMeter Logo" />
+  <h1>MoonMeter</h1>
+  <p><strong>Every token, in a clearer light.</strong></p>
+  <p>面向多模型开发者的本地优先 LLM 用量、余额与成本工作台。</p>
 
-**TokenLub 是一款 Windows 与 macOS 桌面应用，把多家 LLM 服务商的 Token 用量、余额、模型价格和本机编码会话成本集中到一个本地工作台。**
+  <p>
+    <img alt="Version" src="https://img.shields.io/badge/version-1.2.0-151515?style=flat-square" />
+    <img alt="React" src="https://img.shields.io/badge/React-19.2-151515?style=flat-square&logo=react" />
+    <img alt="Electron" src="https://img.shields.io/badge/Electron-31-151515?style=flat-square&logo=electron" />
+    <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-B59A58?style=flat-square" />
+  </p>
 
-[English README](./README.en-US.md) · [架构说明](./design/ARCHITECTURE.md) ·
-[Provider 说明](./design/PROVIDERS.md) · [云端同步部署](./drive/docs/ONE-CLICK-SERVER.md)
+  <p>
+    <a href="./README.en-US.md">English</a> ·
+    <a href="./design/ARCHITECTURE.md">架构</a> ·
+    <a href="./design/PROVIDERS.md">Provider</a> ·
+    <a href="./drive/docs/ONE-CLICK-SERVER.md">自托管同步</a> ·
+    <a href="https://github.com/2488652el/TokenLub/releases">下载</a>
+  </p>
+</div>
 
-![TokenLub 用量概览](./design/screenshots/dashboard.png)
+![MoonMeter 使用统计](./design/screenshots/dashboard.png)
 
-## 为什么使用 TokenLub
+## MoonMeter 是什么
 
-当你同时使用多个模型服务商、Claude Code、Codex CLI 或 NewAPI 中转服务时，
-余额、资源包、请求日志和真实成本很容易散落在不同平台。TokenLub 将它们
-收进本地 Electron 应用：数据默认留在本机，API Key 使用 Electron
-`safeStorage` 加密，渲染层不会接触明文密钥。
+同时使用 Claude Code、Codex CLI、多个模型 API 和中转服务时，用量、余额、资源包和真实成本往往散落在不同平台。MoonMeter 把这些信息统一到一款 Windows / macOS 桌面应用中，并默认将数据留在本机。
 
-## 功能展示
+它不是另一个聊天客户端，而是一块专注于回答三个问题的仪表盘：
 
-| 功能                    | 你可以做什么                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------ |
-| 用量概览                | 查看 Token、请求数、成本、缓存命中率和按日/小时趋势                                        |
-| Provider 余额           | 查询 DeepSeek、智谱、Moonshot、MiniMax、LongCat、OpenRouter、NewAPI 兼容服务等余额或资源包 |
-| API Key 管理            | 本地加密保存 Key，按 Provider 查看状态并安全编辑                                           |
-| Claude Code / Codex CLI | 按需解析本机会话 JSONL 日志；自动解析由开关控制，打开 API Keys 页面不会触发解析            |
-| 请求日志                | 筛选、分页、查看请求详情并导出 CSV                                                         |
-| 模型定价                | 配置模型价格，用高精度 decimal 估算人民币成本                                              |
-| 告警                    | 按余额或剩余百分比设置低额度提醒                                                           |
-| 多设备同步              | 同步设置、价格和余额快照，支持设备管理、冲突预览和本地备份目录                             |
-| 自托管同步服务          | Ubuntu 上一键部署 PostgreSQL + TokenLub + Caddy，支持 HTTPS 域名或 SSH 隧道                |
+- Token 用到哪里了？
+- 还剩多少额度？
+- 不同模型和项目实际花了多少钱？
 
-### 界面一览
+## 核心能力
 
-| 用量总览                                        | API Key 与本机会话                                  |
-| ----------------------------------------------- | --------------------------------------------------- |
-| ![用量总览](./design/screenshots/dashboard.png) | ![API Key 与会话](./design/screenshots/apikeys.png) |
+| 能力          | 说明                                                         |
+| ------------- | ------------------------------------------------------------ |
+| 使用统计      | 汇总 API 请求与本地 CLI 会话，展示输入、输出、缓存与费用趋势 |
+| 项目分析      | 按项目查看 Token、模型构成、活跃日期和折算后的统一成本       |
+| Provider 汇总 | 聚合不同服务商的请求量、Token、费用与模型分布                |
+| 模型对比      | 对比费用排名、Provider、Token 构成、单次均值与计价覆盖       |
+| API Key 管理  | 使用 Electron `safeStorage` 本地加密，界面只显示 Key 尾号    |
+| 余额与套餐    | 查询 API 余额、Coding Plan、Token 包、组织用量及聚合网关额度 |
+| 请求日志      | 筛选、分页、检查并导出请求级 CSV，支持 API 与本地会话来源    |
+| 模型价格      | 搜索和筛选官方或自定义价格，支持币种换算、范围与变更审核     |
+| 用量告警      | 按余额、剩余比例或消耗状态配置提醒规则                       |
+| 多设备同步    | 可选同步设置、价格和余额快照，并支持本地备份及自托管服务     |
 
-| 请求日志                                           | 云端同步设置                                            |
-| -------------------------------------------------- | ------------------------------------------------------- |
-| ![请求日志](./design/screenshots/request-logs.png) | ![云端同步设置](./design/screenshots/settings-sync.png) |
+## 月光纸感界面
 
-## 1.1.2 最新版本
+MoonMeter 采用米白纸面、黑白对比、发丝线和克制金色数据强调。主题支持“跟随系统 / 浅色 / 深色”，所有长动画都会服从 `prefers-reduced-motion`。
 
-API Keys 与余额查询卡片现可拖动排序，并提供克制的抬升、占位、让位和落位反馈；
-顺序会按页面保存，同时支持筛选、方向键和 reduced motion。本版还修复了带供应商
-前缀、大小写或 Kimi K3 别名的模型价格匹配，并在项目用量聚合前统一折算多币种成本。
+| API Keys                                      | 请求日志                                           |
+| --------------------------------------------- | -------------------------------------------------- |
+| ![API Keys](./design/screenshots/apikeys.png) | ![请求日志](./design/screenshots/request-logs.png) |
 
-### Windows 下载
+| 深色概览                                                       | 云端同步设置                                        |
+| -------------------------------------------------------------- | --------------------------------------------------- |
+| ![深色概览](./design/screenshots/moonmeter-dashboard-dark.png) | ![同步设置](./design/screenshots/settings-sync.png) |
 
-- [安装版 TokenLub-1.1.2-x64.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-x64.exe)
-- [便携版 TokenLub-1.1.2-portable.exe](https://github.com/2488652el/TokenLub/releases/download/v1.1.2/TokenLub-1.1.2-portable.exe)
-- [GitHub Release v1.1.2](https://github.com/2488652el/TokenLub/releases/tag/v1.1.2)
+## 隐私与安全
 
-安装包统一输出到 `demo/tokenlub-<版本号>-<修改说明>-<执行模型>/`。正式
-Windows 构建命令为：
+- API Key 由 Electron 主进程使用系统 `safeStorage` 加密，Renderer 不接触明文凭据。
+- Renderer 保持沙箱隔离，不能访问 Node.js、文件系统、SQLite 或原始 IPC。
+- 所有 Renderer → Main 输入均通过共享 schema 校验。
+- Claude Code 与 Codex CLI 日志仅做只读增量解析。
+- 默认不发送遥测；云端同步为可选功能，可使用自己的服务器。
+- SQLite 数据库位于 Electron 用户数据目录，不会写进安装目录。
 
-```powershell
-npm run dist:win -- --change "项目目录分类" --model "GPT-5"
-```
-
-`--change` 和 `--model` 为必填项；版本号自动读取 `package.json`。也可分别通过
-`TOKENLUB_CHANGE` 和 `TOKENLUB_EXECUTION_MODEL` 环境变量提供。
-
-### GitHub 版本同步
-
-每次打包最新版本时，必须核对本地 `package.json`、GitHub `main` 分支中的
-`package.json`、最新 GitHub Release/Tag，以及中英文 README 的版本和下载链接。
-GitHub 无法访问时不能视为版本一致。
-
-发现版本不一致时，先更新 `README.md` 和 `README.en-US.md`，再运行
-`npm run github:prepare` 与 `npm run github:audit`。人工复核
-`github/repository/` 后，只从该目录同步源码，最后更新 Tag、GitHub Release 和
-安装包；生成的安装包不提交到 Git 仓库。版本完全一致时不重复上传。
+更完整的边界说明见 [design/ARCHITECTURE.md](./design/ARCHITECTURE.md)。
 
 ## 快速开始
 
 ### 环境要求
 
-- Windows 10/11 或 macOS 12+
-- Node.js 24.x（与 `.nvmrc` 一致）
-- npm 11+
+- Node.js 24（推荐使用仓库中的 `.nvmrc`）
+- npm
+- Windows 10/11，或受支持的 macOS 版本
 
-### 安装依赖并启动
+### 本地运行
 
 ```bash
+git clone https://github.com/2488652el/TokenLub.git
+cd TokenLub
 npm install
 npm run dev
 ```
 
-如果全新 Windows 环境缺少 Visual Studio Build Tools，导致
-`better-sqlite3` 安装失败，可执行：
+> GitHub 仓库暂时保留 `TokenLub` 名称，以维持现有自动更新与部署兼容；应用、包名和界面品牌均已升级为 MoonMeter。
 
-```bash
-npm install --ignore-scripts
-node code/scripts/postinstall-better-sqlite3.cjs
-```
-
-### 开发检查
+### 质量检查
 
 ```bash
 npm run typecheck
+npm test
 npm run lint
-npm run test
+npm run format:check
 npm run build
 ```
 
-## 一键部署云端同步服务
+### Windows 打包
 
-在 Ubuntu 22.04/24.04 上，准备好域名和 80/443 端口后：
-
-```bash
-sudo bash drive/ops/one-click/install.sh \
-  --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.1.2 \
-  --domain sync.example.com \
-  --email admin@example.com
+```powershell
+npm run dist:win -- --change "MoonMeter-1.2.0" --model "GPT-5"
 ```
 
-没有域名时可使用 SSH 隧道模式：
+输出目录：
 
-```bash
-sudo bash drive/ops/one-click/install.sh \
-  --repo-url https://github.com/2488652el/TokenLub.git \
-  --ref v1.1.2 \
-  --ssh-only
+```text
+demo/moonmeter-1.2.0-MoonMeter-1.2.0-GPT-5/
 ```
 
-安装完成后可使用 `tokenlub-sync health`、`logs`、`backup`、`upgrade` 和
-`uninstall` 管理服务。完整前置条件和安全边界见
-[一键部署文档](./drive/docs/ONE-CLICK-SERVER.md)。
+macOS 可使用 `npm run dist:mac:x64`、`npm run dist:mac:arm64` 或 `npm run dist:mac`。正式构建与历史版本请前往 [GitHub Releases](https://github.com/2488652el/TokenLub/releases)。
 
-## 安全与数据边界
+## Provider 与本地会话
 
-- `contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`
-- IPC 入参在主进程侧校验，主进程负责 SQLite、Provider 请求和本机文件读取
-- API Key 使用 Electron `safeStorage` 本地加密，渲染层不接收明文 Key
-- 本机日志解析只读 JSONL 文件，不修改、不删除原始日志
-- 不在源码、日志或文档中写入密钥、token 或 `.env` 内容
+内置目录覆盖 DeepSeek、智谱 GLM、Kimi / Moonshot、MiniMax、LongCat、SiliconFlow、OpenRouter、OpenAI Admin、Anthropic Admin、NewAPI / OneAPI 兼容服务及手动额度等类型。具体能力、协议和价格来源见 [Provider 文档](./design/PROVIDERS.md)。
+
+本地会话支持：
+
+- Claude Code：读取用户目录下的项目 JSONL 会话。
+- Codex CLI：读取按日期组织的本地 session JSONL。
+- 日志按增量解析并去重，不修改原始文件。
+
+## 数据与升级兼容
+
+MoonMeter 使用：
+
+```text
+moonmeter.db
+```
+
+首次启动时会从旧 TokenLub、TokenScope 或 tokengirl 用户目录复制兼容数据库及 SQLite WAL/SHM 边车文件。旧文件不会被移动或删除，因此可安全回滚。
+
+同时保留以下兼容入口：
+
+- `moonmeter://sync/bind` 为新的默认绑定协议。
+- `tokenlub://sync/bind` 继续注册和解析。
+- 新的 `moonmeter.*` 本地设置键会在需要时读取旧 `tokenlub.*` 值。
+- `MOONMETER_*` 为新的环境变量前缀，关键发布变量继续接受 `TOKENLUB_*` 别名。
 
 ## 项目结构
 
 ```text
-skill/          项目专用 Skill；每个 Skill 使用独立目录和 SKILL.md
-code/           TokenLub 桌面端前端、Electron 后端、共享代码和构建脚本
-drive/          云同步服务端、Docker、部署文档和运维脚本
-plan/           带 YYYYMMDD 时间戳的执行计划与决策记录
-design/         架构、Provider 规范、视觉资源和界面截图
-demo/           单元/E2E/集成测试、临时脚本和本地构建产物
-github/         GitHub 发布准备区、白名单和敏感内容审计工具
+code/      Electron Main、Preload、React Renderer 与共享契约
+drive/     可选同步服务、PostgreSQL、Docker 与运维脚本
+design/    架构、Provider、动效、Logo、图标和产品截图
+demo/      测试、验证资产与本地构建输出
+github/    可公开上传的 allowlist、生成脚本与安全审计
+plan/      本地计划和决策记录（不进入公开源码）
 ```
 
-依赖目录 `node_modules/` 以及 `.git/`、`.claude/`、`.codex/` 等工具状态仍位于
-根目录，但都不属于可发布项目内容。发布前运行 `npm run github:prepare`，只从
-白名单生成 `github/repository/`，审计通过后再从该目录上传。
+## 技术栈
 
-## 许可证
+Electron 31 · React 19 · TypeScript · Vite · Tailwind CSS · Recharts · Zustand · SQLite · Vitest · Playwright · PostgreSQL（可选同步服务）
 
-MIT
+## 自托管同步
+
+`drive/` 提供 PostgreSQL 同步服务、Web 控制台、Docker Compose，以及 Ubuntu 一键安装、备份、升级和卸载脚本。同步不是使用桌面端的前置条件。
+
+部署说明：[drive/docs/ONE-CLICK-SERVER.md](./drive/docs/ONE-CLICK-SERVER.md)
+
+## 参与开发
+
+欢迎提交 Issue 和 Pull Request。修改前请先阅读：
+
+- [架构边界](./design/ARCHITECTURE.md)
+- [Provider 规范](./design/PROVIDERS.md)
+- [动效规范](./design/MOTION.md)
+- [更新日志](./CHANGELOG.md)
+
+提交前请至少运行 `typecheck`、`test`、`lint` 与 `format:check`。
+
+## 版本
+
+当前源码版本：**MoonMeter 1.2.0**。本次版本包含全新品牌与 UI、React 19、三态主题、模型对比和价格目录重构，以及旧数据与协议兼容迁移。详见 [CHANGELOG.md](./CHANGELOG.md)。
