@@ -5,6 +5,7 @@ release/
 release*/
 demo/artifacts/
 demo/tokenlub-*/
+demo/moonmeter-*/
 /index.js
 .env
 .env.local
@@ -28,3 +29,5 @@ tmp-visual-audit/
 AGENTS.md
 docs/ADVERSARIAL-REPORTS/
 docs/superpowers/
+_temp/
+plan/

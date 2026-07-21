@@ -82,12 +82,10 @@ See [design/ARCHITECTURE.md](./design/ARCHITECTURE.md) for the full process and 
 
 ```bash
 git clone https://github.com/2488652el/MoonMeter.git
-cd TokenLub
+cd MoonMeter
 npm install
 npm run dev
 ```
-
-> The GitHub repository temporarily keeps the `TokenLub` name to preserve updater and deployment compatibility. The application, package, and visible product brand are MoonMeter.
 
 ### Quality gates
 
@@ -102,13 +100,13 @@ npm run build
 ### Package for Windows
 
 ```powershell
-npm run dist:win -- --change "MoonMeter-1.2.2" --model "GPT-5"
+npm run dist:win -- --change "MoonMeter-1.2.2" --model "release"
 ```
 
 Output:
 
 ```text
-demo/moonmeter-1.2.2-MoonMeter-1.2.2-GPT-5/
+demo/moonmeter-1.2.2-MoonMeter-1.2.2-release/
 ```
 
 For macOS, use `npm run dist:mac:x64`, `npm run dist:mac:arm64`, or `npm run dist:mac`. Formal builds and historical versions are available from [GitHub Releases](https://github.com/2488652el/MoonMeter/releases).
@@ -148,7 +146,6 @@ drive/     Optional sync server, PostgreSQL, Docker, and operations
 design/    Architecture, provider docs, motion, brand assets, and screenshots
 demo/      Tests, verification assets, and local build output
 github/    Public allowlist, staging generator, and secret audit
-plan/      Local planning and decision records (not published)
 ```
 
 ## Stack
