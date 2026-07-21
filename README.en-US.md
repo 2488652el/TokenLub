@@ -16,7 +16,7 @@
     <a href="./design/ARCHITECTURE.md">Architecture</a> ·
     <a href="./design/PROVIDERS.md">Providers</a> ·
     <a href="./drive/docs/ONE-CLICK-SERVER.md">Self-hosted sync</a> ·
-    <a href="https://github.com/2488652el/TokenLub/releases">Downloads</a>
+    <a href="https://github.com/2488652el/MoonMeter/releases">Downloads</a>
   </p>
 </div>
 
@@ -81,7 +81,7 @@ See [design/ARCHITECTURE.md](./design/ARCHITECTURE.md) for the full process and 
 ### Run locally
 
 ```bash
-git clone https://github.com/2488652el/TokenLub.git
+git clone https://github.com/2488652el/MoonMeter.git
 cd TokenLub
 npm install
 npm run dev
@@ -111,7 +111,7 @@ Output:
 demo/moonmeter-1.2.1-MoonMeter-1.2.1-GPT-5/
 ```
 
-For macOS, use `npm run dist:mac:x64`, `npm run dist:mac:arm64`, or `npm run dist:mac`. Formal builds and historical versions are available from [GitHub Releases](https://github.com/2488652el/TokenLub/releases).
+For macOS, use `npm run dist:mac:x64`, `npm run dist:mac:arm64`, or `npm run dist:mac`. Formal builds and historical versions are available from [GitHub Releases](https://github.com/2488652el/MoonMeter/releases).
 
 ## Providers and local sessions
 
