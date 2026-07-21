@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_REPO_URL="https://github.com/2488652el/TokenLub.git"
+DEFAULT_REPO_URL="https://github.com/2488652el/MoonMeter.git"
 INSTALL_DIR="${TOKENLUB_INSTALL_DIR:-/opt/tokenlub}"
 REPO_URL="${TOKENLUB_REPO_URL:-$DEFAULT_REPO_URL}"
 REPO_REF="${TOKENLUB_REPO_REF:-main}"

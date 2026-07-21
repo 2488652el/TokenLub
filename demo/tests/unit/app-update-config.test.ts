@@ -10,14 +10,14 @@ interface PackageConfig {
 }
 
 describe('application update packaging contract', () => {
-  it('publishes NSIS update metadata to the TokenLub GitHub repository', () => {
+  it('publishes NSIS update metadata to the MoonMeter GitHub repository', () => {
     const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as PackageConfig
 
     expect(pkg.dependencies['electron-updater']).toBeTruthy()
     expect(pkg.build.publish).toContainEqual({
       provider: 'github',
       owner: '2488652el',
-      repo: 'TokenLub',
+      repo: 'MoonMeter',
       releaseType: 'release'
     })
     expect(pkg.build.win.target.some((target) => target.target === 'nsis')).toBe(true)
