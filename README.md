@@ -5,7 +5,7 @@
   <p>面向多模型开发者的本地优先 LLM 用量、余额与成本工作台。</p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.2.0-151515?style=flat-square" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.2.1-151515?style=flat-square" />
     <img alt="React" src="https://img.shields.io/badge/React-19.2-151515?style=flat-square&logo=react" />
     <img alt="Electron" src="https://img.shields.io/badge/Electron-31-151515?style=flat-square&logo=electron" />
     <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-B59A58?style=flat-square" />
@@ -102,13 +102,13 @@ npm run build
 ### Windows 打包
 
 ```powershell
-npm run dist:win -- --change "MoonMeter-1.2.0" --model "GPT-5"
+npm run dist:win -- --change "MoonMeter-1.2.1" --model "GPT-5"
 ```
 
 输出目录：
 
 ```text
-demo/moonmeter-1.2.0-MoonMeter-1.2.0-GPT-5/
+demo/moonmeter-1.2.1-MoonMeter-1.2.1-GPT-5/
 ```
 
 macOS 可使用 `npm run dist:mac:x64`、`npm run dist:mac:arm64` 或 `npm run dist:mac`。正式构建与历史版本请前往 [GitHub Releases](https://github.com/2488652el/TokenLub/releases)。
@@ -174,4 +174,4 @@ Electron 31 · React 19 · TypeScript · Vite · Tailwind CSS · Recharts · Zus
 
 ## 版本
 
-当前源码版本：**MoonMeter 1.2.0**。本次版本包含全新品牌与 UI、React 19、三态主题、模型对比和价格目录重构，以及旧数据与协议兼容迁移。详见 [CHANGELOG.md](./CHANGELOG.md)。
+当前源码版本：**MoonMeter 1.2.1**。本次热修复恢复 TokenLub/TokenScope 升级用户的原始加密上下文，并确保同步凭据异常时应用仍能正常打开。详见 [CHANGELOG.md](./CHANGELOG.md)。

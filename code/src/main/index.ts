@@ -16,9 +16,11 @@ import { parseSyncBindingLink } from './sync/deep-link'
 import { startCatalogAutoRefresh } from './pricing/catalog-service'
 import { initializeAppUpdater } from './services/app-updater'
 import { startSessionAutoParse } from './scheduler/session-auto-parse'
+import { configureCompatibleUserDataPath } from './platform/user-data-compat'
 
 const isDev = !app.isPackaged
 const pendingBindingLinks: string[] = []
+configureCompatibleUserDataPath()
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!hasSingleInstanceLock) app.quit()

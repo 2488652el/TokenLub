@@ -76,6 +76,25 @@ describe('sync service', () => {
     expect(JSON.stringify(service.getSyncStatus())).not.toContain('refresh-1')
   })
 
+  it('keeps the app usable when local sync credentials cannot be decrypted', async () => {
+    state.loadSyncSession.mockImplementation(() => {
+      throw new Error('Error while decrypting ciphertext secret-value')
+    })
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const service = await import('../../../../code/src/main/sync/service')
+
+    expect(() => service.initializeSync()).not.toThrow()
+    expect(service.getSyncStatus()).toEqual({
+      configured: false,
+      state: 'needs_login',
+      revision: 0,
+      lastError: 'Local sync credentials could not be restored; sign in again'
+    })
+    expect(JSON.stringify(service.getSyncStatus())).not.toContain('secret-value')
+    expect(warning).toHaveBeenCalledWith('[sync] local credentials could not be restored')
+    warning.mockRestore()
+  })
+
   it('uses only the single-exchange V2 runner', async () => {
     state.loadSyncSession.mockReturnValue(state.session)
     state.scheduler.trigger.mockImplementationOnce(async (run: () => Promise<void>) => run())
