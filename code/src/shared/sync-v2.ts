@@ -60,22 +60,6 @@ export const EMPTY_SYNC_V2_SNAPSHOT: SyncV2Snapshot = {
   balances: []
 }
 
-export function mergeSyncV2Snapshots(
-  remote: SyncV2Snapshot,
-  local: SyncV2Snapshot
-): SyncV2Snapshot {
-  return {
-    settings: { ...remote.settings, ...local.settings },
-    pricing: mergeByKey(
-      remote.pricing,
-      local.pricing,
-      (entry) =>
-        `${entry.providerId}:${normalizeBillingScope(entry.billingScope)}:${entry.model}:${entry.currency}`
-    ),
-    balances: mergeByKey(remote.balances, local.balances, (entry) => entry.id)
-  }
-}
-
 export function rebaseSyncV2Snapshot(
   base: SyncV2Snapshot,
   remote: SyncV2Snapshot,
@@ -123,10 +107,4 @@ function rebaseByKey<T>(base: T[], remote: T[], local: T[], key: (item: T) => st
 
 function jsonEqual(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
-}
-
-function mergeByKey<T>(remote: T[], local: T[], key: (item: T) => string): T[] {
-  const merged = new Map<string, T>()
-  for (const item of [...remote, ...local]) merged.set(key(item), item)
-  return [...merged.values()]
 }

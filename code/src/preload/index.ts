@@ -2,7 +2,6 @@
  * 预加载脚本(preload):运行在沙箱化渲染进程中,作为主进程与渲染进程之间唯一的桥梁。
  * 通过 `contextBridge.exposeInMainWorld` 暴露一组白名单化的 IPC 方法,渲染进程只能调用这些方法,
  * 无法直接访问 `ipcRenderer` 或 Node 能力。所属模块:preload。
- * (glm-5.2)
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC } from '../shared/ipc-channels'
@@ -11,7 +10,6 @@ import type {
   UsageRecord,
   UsageLogPage,
   DashboardSummary,
-  ProviderSummary,
   RefreshAllResult,
   TotalSpendSummary,
   KeySpendSummary,
@@ -43,7 +41,7 @@ window.addEventListener('online', () => {
  * Whitelisted API surface exposed to the renderer via contextBridge.
  * Renderer code can ONLY call these methods — no raw ipcRenderer.
  *
- * ponytail: no zod in preload. Sandbox mode disallows asar-internal npm
+ * no zod in preload. Sandbox mode disallows asar-internal npm
  * modules at require-time, and the main-process IPC handler already runs
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
@@ -96,8 +94,6 @@ const api = {
       modelContains?: string | undefined
     }): Promise<UsageLogPage> => ipcRenderer.invoke(IPC.usageGetLogsPage, filter ?? {}),
     refreshAll: (): Promise<RefreshAllResult> => ipcRenderer.invoke(IPC.usageRefreshAll),
-    getProviderSummary: (): Promise<ProviderSummary[]> =>
-      ipcRenderer.invoke(IPC.usageGetProviderSummary),
     /**
      * Per-key spend estimate. Backed by `computeSpendByKey` in
      * `code/src/main/store/usage-repo.ts`; reads `usage_records` filtered by

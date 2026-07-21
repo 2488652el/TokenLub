@@ -153,31 +153,7 @@
   --motion-order: 4;
 }
 
-[data-motion-group] > :nth-child(6) {
-  --motion-order: 5;
-}
-
-[data-motion-group] > :nth-child(7) {
-  --motion-order: 5;
-}
-
-[data-motion-group] > :nth-child(8) {
-  --motion-order: 5;
-}
-
-[data-motion-group] > :nth-child(9) {
-  --motion-order: 5;
-}
-
-[data-motion-group] > :nth-child(10) {
-  --motion-order: 5;
-}
-
-[data-motion-group] > :nth-child(11) {
-  --motion-order: 5;
-}
-
-[data-motion-group] > :nth-child(12) {
+[data-motion-group] > :nth-child(n + 6):nth-child(-n + 12) {
   --motion-order: 5;
 }
 

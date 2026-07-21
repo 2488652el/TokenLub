@@ -1,4 +1,5 @@
 # One relative path per line. Add new public files explicitly after review.
+.gitattributes
 .dockerignore
 .editorconfig
 .gitignore

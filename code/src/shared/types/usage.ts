@@ -114,20 +114,6 @@ export interface DashboardSummary {
   daily: Array<{ date: string; cost: number; tokens: number }>
 }
 
-/** 供应商汇总:用于供应商列表页的单行统计。 */
-export interface ProviderSummary {
-  providerId: string
-  displayName: string
-  totalCost: number
-  inputTokens: number
-  outputTokens: number
-  cacheReadTokens: number
-  requestCount: number
-  avgLatencyMs?: number
-  trendPct?: number
-  color?: string
-}
-
 /** Per-key failure detail from a bulk refresh (e.g. usage.refreshAll). */
 export interface RefreshFailure {
   alias: string
