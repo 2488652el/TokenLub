@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   apiKeyCreateInputSchema,
   apiKeyUpdateInputSchema,
+  usageAnalysisFilterSchema,
   usageFilterSchema,
   pricingSetInputSchema,
   pricingCatalogApplyInputSchema,
@@ -160,8 +161,17 @@ describe('ipc-schemas', () => {
   })
 
   it('accepts usage filter with modelContains substring', () => {
-    const r = usageFilterSchema.safeParse({ modelContains: 'gpt-4o' })
+    const r = usageFilterSchema.safeParse({
+      modelContains: 'gpt-4o',
+      projectContains: 'tokenlub'
+    })
     expect(r.success).toBe(true)
+  })
+
+  it('validates dashboard analysis days', () => {
+    expect(usageAnalysisFilterSchema.safeParse({ days: 30 }).success).toBe(true)
+    expect(usageAnalysisFilterSchema.safeParse({ days: -1 }).success).toBe(false)
+    expect(usageAnalysisFilterSchema.safeParse({ days: 4000 }).success).toBe(false)
   })
 
   it('rejects pricing with missing currency', () => {

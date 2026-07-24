@@ -5,7 +5,15 @@
  * (glm-5.2)
  */
 import { Icon } from '../components/Icon'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode
+} from 'react'
+import clsx from 'clsx'
 import {
   CartesianGrid,
   Line,
@@ -20,7 +28,13 @@ import { EmptyState } from '../components/EmptyState'
 import { AnimatedNumber, MotionGroup, ProgressBar } from '../components/motion'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import { fmtCount, fmtMoney } from '../../shared/utils/money'
-import type { DashboardSummary, TotalSpendSummary } from '../../shared/types/usage'
+import type {
+  DashboardSummary,
+  RefreshAllResult,
+  TotalSpendSummary,
+  UsageAnalysisFilter,
+  UsageRecord
+} from '../../shared/types/usage'
 import type { BalanceSnapshot } from '../../shared/types/provider'
 import {
   buildModelUsageSeries,
@@ -28,7 +42,12 @@ import {
   type UsageTrendRange,
   type UsageTrendSeries
 } from '../../shared/utils/usage-trend'
-import { readDashboardRange, writeDashboardRange } from '../../shared/utils/dashboard-range'
+import { buildDashboardHealth, type DashboardHealthTone } from '../../shared/utils/dashboard-health'
+import {
+  readUsageAnalysisFilter,
+  writeUsageAnalysisFilter,
+  type PersistedUsageAnalysisFilter
+} from '../../shared/utils/usage-analysis-filter'
 
 /** 时间范围类型,复用 UsageTrendRange */
 type RangeKey = UsageTrendRange
@@ -40,6 +59,32 @@ const RANGE_OPTIONS: Array<{ key: RangeKey; label: string; days: number | null }
   { key: '30d', label: '30 天', days: 30 },
   { key: 'all', label: '全部', days: null }
 ]
+
+const HEALTH_META: Record<
+  DashboardHealthTone,
+  { label: string; description: string; dotClass: string }
+> = {
+  healthy: {
+    label: '数据完整',
+    description: '当前范围内的请求均已匹配价格',
+    dotClass: 'bg-emerald-500'
+  },
+  partial: {
+    label: '部分待补价',
+    description: '存在尚未匹配价格的请求',
+    dotClass: 'bg-amber-500'
+  },
+  error: {
+    label: '刷新有异常',
+    description: '部分数据源最近一次刷新失败',
+    dotClass: 'bg-red-500'
+  },
+  empty: {
+    label: '等待数据',
+    description: '刷新或解析本地会话后显示可信度',
+    dotClass: 'bg-text-muted'
+  }
+}
 
 /** 将仪表盘汇总导出为 CSV 并触发下载 */
 function handleExport(d: DashboardSummary | null) {
@@ -101,6 +146,19 @@ function rangeSince(range: RangeKey): string | undefined {
   if (range === 'today') return startOfToday().toISOString()
   const days = RANGE_OPTIONS.find((r) => r.key === range)?.days ?? 30
   return new Date(Date.now() - days * 24 * 3600 * 1000).toISOString()
+}
+
+function formatCapturedAt(value: string | null): string {
+  if (!value) return '暂无'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '暂无'
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
 }
 
 /** 按模型分组的用量趋势折线图组件 */
@@ -213,12 +271,19 @@ function ModelTooltip({
  * 并行拉取仪表盘汇总、余额快照、总消费与请求日志,渲染概览指标、趋势图、消费与余额。
  */
 export default function Dashboard() {
+  const initialFilter = useMemo(() => readUsageAnalysisFilter(window.localStorage), [])
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [balances, setBalances] = useState<
     Array<BalanceSnapshot & { id: number; apiKeyId?: string }>
   >([])
   const [spend, setSpend] = useState<TotalSpendSummary | null>(null)
-  const [range, setRange] = useState<RangeKey>(() => readDashboardRange(window.localStorage))
+  const [records, setRecords] = useState<UsageRecord[]>([])
+  const [refreshResult, setRefreshResult] = useState<RefreshAllResult | null>(null)
+  const [syncStatus, setSyncStatus] = useState<Awaited<
+    ReturnType<typeof window.api.sync.status>
+  > | null>(null)
+  const [filter, setFilter] = useState<PersistedUsageAnalysisFilter>(initialFilter)
+  const [filterDraft, setFilterDraft] = useState<PersistedUsageAnalysisFilter>(initialFilter)
   const [modelSeries, setModelSeries] = useState<UsageTrendSeries>({
     points: [],
     models: [],
@@ -226,33 +291,46 @@ export default function Dashboard() {
   })
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const range = filter.range
 
   /** 加载仪表盘数据(汇总、余额、消费、日志) */
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const selected = RANGE_OPTIONS.find((r) => r.key === range) ?? RANGE_OPTIONS[2]!
       const days = selected.days ?? 0
       const fromISO = rangeSince(range)
-      // ponytail: a single dashboard call covers the chart + totals. Balance
+      const analysisFilter: UsageAnalysisFilter = { days }
+      if (filter.source !== 'all') analysisFilter.source = filter.source
+      if (filter.modelContains) analysisFilter.modelContains = filter.modelContains
+      if (filter.projectContains) analysisFilter.projectContains = filter.projectContains
+      const logFilter = { ...analysisFilter, ...(fromISO ? { fromISO } : {}), limit: 10000 }
+      // a single dashboard call covers the chart + totals. Balance
       // snapshots are independent (per-key) so they ride along in parallel.
       // Total spend is computed from logs × pricing config over the period.
-      const [d, b, s, logs] = await Promise.all([
-        window.api.usage.getDashboard(days),
+      const [d, b, s, logs, nextSyncStatus] = await Promise.all([
+        window.api.usage.getDashboard(analysisFilter),
         window.api.balance.latest().catch(() => []),
-        window.api.usage.getTotalSpend(days).catch(() => null),
-        window.api.usage.getLogs({ ...(fromISO ? { fromISO } : {}), limit: 10000 }).catch(() => [])
+        window.api.usage.getTotalSpend(analysisFilter).catch(() => null),
+        window.api.usage.getLogs(logFilter).catch(() => []),
+        window.api.sync.status().catch(() => null)
       ])
       setSummary(
         d ? { ...d, daily: selected.days ? fillMissingDays(d.daily, selected.days) : d.daily } : d
       )
       setBalances(b)
       setSpend(s)
+      setRecords(logs)
+      setSyncStatus(nextSyncStatus)
       setModelSeries(buildModelUsageSeries(logs, range))
+    } catch (error) {
+      setLoadError((error as Error).message || '仪表盘数据加载失败')
     } finally {
       setLoading(false)
     }
-  }, [range])
+  }, [filter, range])
 
   useEffect(() => {
     void load()
@@ -262,8 +340,11 @@ export default function Dashboard() {
   async function handleRefresh() {
     setRefreshing(true)
     try {
-      await window.api.usage.refreshAll()
+      const result = await window.api.usage.refreshAll()
+      setRefreshResult(result)
       await load()
+    } catch (error) {
+      setLoadError((error as Error).message || '刷新失败')
     } finally {
       setRefreshing(false)
     }
@@ -284,12 +365,73 @@ export default function Dashboard() {
     return [...(summary?.providers ?? [])].sort((a, b) => b.tokens - a.tokens).slice(0, 4)
   }, [summary])
   const activeRangeLabel = RANGE_OPTIONS.find((r) => r.key === range)?.label ?? '30 天'
+  const activeFilterCount =
+    (filter.source !== 'all' ? 1 : 0) +
+    (filter.modelContains ? 1 : 0) +
+    (filter.projectContains ? 1 : 0)
   const hasCnySpend = Boolean(spend && spend.totalRequests > 0)
   const estimatedCostValue = hasCnySpend ? (spend?.cnyTotal ?? 0) : (summary?.totalCost ?? 0)
+  const health = useMemo(
+    () => buildDashboardHealth(spend, records, refreshResult),
+    [records, refreshResult, spend]
+  )
+  const healthMeta = HEALTH_META[health.tone]
+  const syncLabel = !syncStatus?.configured
+    ? '本地模式'
+    : syncStatus.state === 'syncing'
+      ? '云端同步中'
+      : syncStatus.state === 'error'
+        ? '同步异常'
+        : syncStatus.state === 'needs_login'
+          ? '需要登录'
+          : '云端已连接'
+
+  function updateRange(nextRange: RangeKey) {
+    const next = { ...filter, range: nextRange }
+    setFilter(next)
+    setFilterDraft((current) => ({ ...current, range: nextRange }))
+    writeUsageAnalysisFilter(window.localStorage, next)
+  }
+
+  function applyFilters() {
+    const next: PersistedUsageAnalysisFilter = {
+      ...filterDraft,
+      modelContains: filterDraft.modelContains.trim(),
+      projectContains: filterDraft.projectContains.trim()
+    }
+    setFilter(next)
+    setFilterDraft(next)
+    writeUsageAnalysisFilter(window.localStorage, next)
+  }
+
+  function clearFilters() {
+    const next: PersistedUsageAnalysisFilter = {
+      range,
+      source: 'all',
+      modelContains: '',
+      projectContains: ''
+    }
+    setFilter(next)
+    setFilterDraft(next)
+    writeUsageAnalysisFilter(window.localStorage, next)
+  }
 
   return (
     <div className="page-content overflow-x-hidden bg-bg-base text-text-primary">
-      {isEmpty ? (
+      {loadError && !summary ? (
+        <Card className="border-red-200/60 bg-red-50/40 shadow-sm">
+          <EmptyState
+            icon="fa-triangle-exclamation"
+            title="仪表盘加载失败"
+            hint={loadError}
+            action={
+              <button className="btn btn-primary btn-sm" onClick={() => void load()}>
+                <Icon name="fa-arrows-rotate" /> 重试
+              </button>
+            }
+          />
+        </Card>
+      ) : isEmpty ? (
         <Card className="border-border-light bg-bg-card shadow-sm">
           <EmptyState
             icon="fa-chart-simple"
@@ -329,10 +471,8 @@ export default function Dashboard() {
                         ? 'bg-text-primary text-bg-base'
                         : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                     }`}
-                    onClick={() => {
-                      setRange(option.key)
-                      writeDashboardRange(window.localStorage, option.key)
-                    }}
+                    aria-pressed={range === option.key}
+                    onClick={() => updateRange(option.key)}
                   >
                     {option.label}
                   </button>
@@ -354,103 +494,257 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-border-light bg-bg-card/60 p-6 shadow-card backdrop-blur-[2px]">
-            <div className="flex flex-wrap items-start justify-between gap-5">
-              <div className="flex min-w-0 items-start gap-4">
-                <div className="flex h-[60px] w-[60px] flex-none items-center justify-center rounded-lg bg-accent-dim text-accent-text">
-                  <Icon name="fa-bolt" className="text-[26px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-semibold text-text-secondary">真实消耗 Tokens</p>
-                  <div className="mt-1 flex flex-wrap items-end gap-3">
-                    <div className="max-w-full break-words text-[44px] font-bold leading-none tracking-normal text-text-primary">
-                      {heroNumber !== null ? (
-                        <AnimatedNumber value={heroNumber} format={fmtCount} durationMs={520} />
-                      ) : (
-                        '—'
-                      )}
-                    </div>
-                    {heroNumber && heroNumber >= 1e8 ? (
-                      <span className="mb-1 rounded-md bg-bg-hover px-2 py-1 text-[12px] font-semibold text-text-secondary">
-                        ≈ {(heroNumber / 1e8).toFixed(2)} 亿
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-[12.5px] text-text-secondary">
-                    {totalTokens > 0
-                      ? `${activeRangeLabel}内记录的请求与本地 CLI 会话消耗`
-                      : totalBalanceTokens > 0
-                        ? `来自 Provider 余额快照，共 ${fmtCount(totalBalanceTokens)} Tokens`
-                        : '尚未记录任何 Token 消耗'}
-                  </p>
-                </div>
-              </div>
+          <div data-usage-filter-bar>
+            <Card
+              title="统一筛选"
+              subtitle="首页指标、趋势与请求日志复用同一组条件"
+              action={
+                <span className="rounded-full bg-bg-base px-2.5 py-1 text-[11px] font-medium text-text-secondary">
+                  {activeFilterCount > 0 ? `${activeFilterCount} 项生效` : '全部数据'}
+                </span>
+              }
+              bodyClassName="pt-1"
+            >
+              <form
+                className="grid grid-cols-1 items-end gap-3 lg:grid-cols-12"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  applyFilters()
+                }}
+              >
+                <label className="lg:col-span-4">
+                  <span className="mb-1.5 block text-[11.5px] font-medium text-text-secondary">
+                    数据来源
+                  </span>
+                  <span className="flex h-9 rounded-md border border-border-light bg-bg-base p-1">
+                    {[
+                      ['all', '全部'],
+                      ['vendor-api', 'API 调用'],
+                      ['session-log', 'CLI 会话']
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={filterDraft.source === value}
+                        onClick={() =>
+                          setFilterDraft((current) => ({
+                            ...current,
+                            source: value as PersistedUsageAnalysisFilter['source']
+                          }))
+                        }
+                        className={clsx(
+                          'flex-1 rounded-sm px-2 text-[11.5px] font-medium transition-colors',
+                          filterDraft.source === value
+                            ? 'bg-bg-card text-accent-text shadow-sm'
+                            : 'text-text-secondary hover:text-text-primary'
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </span>
+                </label>
 
-              <div className="grid min-w-[280px] grid-cols-2 gap-3 rounded-md border border-border-light bg-bg-base/40 p-4 max-sm:min-w-0 max-sm:w-full">
-                <div>
-                  <p className="text-[12px] font-semibold text-text-secondary">总请求数</p>
-                  <p className="mt-1 font-mono text-[20px] font-bold text-text-primary">
-                    <AnimatedNumber
-                      value={summary?.totalRequests ?? 0}
-                      format={(value) => Math.round(value).toLocaleString('en-US')}
-                      durationMs={480}
-                    />
-                  </p>
+                <label className="lg:col-span-3">
+                  <span className="mb-1.5 block text-[11.5px] font-medium text-text-secondary">
+                    模型
+                  </span>
+                  <input
+                    type="search"
+                    aria-label="全局模型筛选"
+                    placeholder="例如 gpt-5"
+                    value={filterDraft.modelContains}
+                    onChange={(event) =>
+                      setFilterDraft((current) => ({
+                        ...current,
+                        modelContains: event.target.value
+                      }))
+                    }
+                    className="h-9 w-full rounded-md border border-border-light bg-bg-input px-3 text-[12.5px] text-text-primary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-accent-dim"
+                  />
+                </label>
+
+                <label className="lg:col-span-3">
+                  <span className="mb-1.5 block text-[11.5px] font-medium text-text-secondary">
+                    项目 / Agent
+                  </span>
+                  <input
+                    type="search"
+                    aria-label="全局项目筛选"
+                    placeholder="例如 tokenlub"
+                    value={filterDraft.projectContains}
+                    onChange={(event) =>
+                      setFilterDraft((current) => ({
+                        ...current,
+                        projectContains: event.target.value
+                      }))
+                    }
+                    className="h-9 w-full rounded-md border border-border-light bg-bg-input px-3 text-[12.5px] text-text-primary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-accent-dim"
+                  />
+                </label>
+
+                <div className="flex gap-2 lg:col-span-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm flex-1"
+                    onClick={clearFilters}
+                  >
+                    清除
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm flex-1">
+                    应用
+                  </button>
                 </div>
-                <div className="border-l border-border-light pl-4">
-                  <p className="text-[12px] font-semibold text-text-secondary">总成本</p>
-                  <p className="mt-1 font-mono text-[20px] font-bold text-accent-text">
-                    <AnimatedNumber
-                      value={estimatedCostValue}
-                      format={(value) => (hasCnySpend ? fmtMoney(value, 'CNY') : fmtMoney(value))}
-                      durationMs={520}
-                    />
-                  </p>
-                </div>
+              </form>
+            </Card>
+          </div>
+
+          <section>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-[14px] font-semibold text-text-primary">核心指标</h2>
+                <p className="mt-0.5 text-[12px] text-text-muted">
+                  {activeRangeLabel}内的成本、用量与数据可信度
+                </p>
+              </div>
+              <div
+                className="inline-flex items-center gap-2 rounded-full border border-border-light bg-bg-card/70 px-3 py-1.5 text-[11.5px] text-text-secondary shadow-sm"
+                title={healthMeta.description}
+              >
+                <span className={clsx('h-1.5 w-1.5 rounded-full', healthMeta.dotClass)} />
+                <span className="font-semibold text-text-primary">{healthMeta.label}</span>
+                <span className="text-text-muted">·</span>
+                <span>{syncLabel}</span>
               </div>
             </div>
 
-            <MotionGroup className="mt-6 grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
-              <MetricBox
-                icon="fa-arrow-down"
-                iconClass="text-status-blue"
+            <MotionGroup className="grid grid-cols-4 gap-3 max-xl:grid-cols-2 max-sm:grid-cols-1">
+              <OverviewMetricCard
+                label="总成本"
+                icon="fa-coins"
+                tone="accent"
+                value={
+                  <AnimatedNumber
+                    value={estimatedCostValue}
+                    format={(value) => (hasCnySpend ? fmtMoney(value, 'CNY') : fmtMoney(value))}
+                    durationMs={520}
+                  />
+                }
+                sub={hasCnySpend ? '统一折算人民币' : '按原始记录汇总'}
+                motionOrder={0}
+              />
+              <OverviewMetricCard
+                label="真实消耗 Tokens"
+                icon="fa-bolt"
+                value={
+                  heroNumber !== null ? (
+                    <AnimatedNumber value={heroNumber} format={fmtCount} durationMs={520} />
+                  ) : (
+                    '—'
+                  )
+                }
+                sub={
+                  totalTokens > 0
+                    ? 'API 请求 + 本地 CLI 会话'
+                    : totalBalanceTokens > 0
+                      ? `余额快照共 ${fmtCount(totalBalanceTokens)}`
+                      : '尚未记录消耗'
+                }
+                motionOrder={1}
+              />
+              <OverviewMetricCard
+                label="总请求数"
+                icon="fa-arrow-right-arrow-left"
+                tone="blue"
+                value={
+                  <AnimatedNumber
+                    value={summary?.totalRequests ?? 0}
+                    format={(value) => Math.round(value).toLocaleString('en-US')}
+                    durationMs={480}
+                  />
+                }
+                sub={`${summary?.providers.length ?? 0} 个活跃来源`}
+                motionOrder={2}
+              />
+              <OverviewMetricCard
+                label="计价覆盖"
+                icon="fa-tag"
+                tone={health.tone === 'error' ? 'red' : health.coverage < 1 ? 'amber' : 'accent'}
+                value={
+                  <AnimatedNumber
+                    value={health.coverage * 100}
+                    format={(value) => `${value.toFixed(0)}%`}
+                    durationMs={480}
+                  />
+                }
+                sub={
+                  health.failedSources > 0
+                    ? `${health.failedSources} 个来源刷新失败`
+                    : `${health.pricedRequests} 已计价 · ${health.unpricedRequests} 待补价`
+                }
+                motionOrder={3}
+              />
+              <OverviewMetricCard
                 label="新增输入"
-                value={summary?.totalInputTokens ?? 0}
-                format={fmtCount}
+                icon="fa-arrow-down"
+                tone="blue"
+                value={
+                  <AnimatedNumber
+                    value={summary?.totalInputTokens ?? 0}
+                    format={fmtCount}
+                    durationMs={480}
+                  />
+                }
+                sub="Input tokens"
+                motionOrder={4}
               />
-              <MetricBox
+              <OverviewMetricCard
+                label="模型输出"
                 icon="fa-arrow-up"
-                iconClass="text-status-purple"
-                label="Output"
-                value={summary?.totalOutputTokens ?? 0}
-                format={fmtCount}
+                tone="purple"
+                value={
+                  <AnimatedNumber
+                    value={summary?.totalOutputTokens ?? 0}
+                    format={fmtCount}
+                    durationMs={480}
+                  />
+                }
+                sub="Output tokens"
+                motionOrder={5}
               />
-              <MetricBox
-                icon="fa-database"
-                iconClass="text-text-secondary"
-                label="缓存命中"
-                value={summary?.totalCacheReadTokens ?? 0}
-                format={fmtCount}
-              />
-              <MetricBox
-                icon="fa-chart-line"
-                iconClass="text-accent-text"
+              <OverviewMetricCard
                 label="缓存命中率"
-                value={cacheHitRate * 100}
-                format={(value) => `${value.toFixed(1)}%`}
+                icon="fa-database"
+                value={
+                  <AnimatedNumber
+                    value={cacheHitRate * 100}
+                    format={(value) => `${value.toFixed(1)}%`}
+                    durationMs={480}
+                  />
+                }
+                sub={`${fmtCount(summary?.totalCacheReadTokens ?? 0)} 缓存读取`}
                 progress={cacheHitRate}
+                motionOrder={6}
+              />
+              <OverviewMetricCard
+                label="最近数据"
+                icon="fa-clock"
+                tone={health.lastCapturedAt ? 'accent' : 'amber'}
+                value={formatCapturedAt(health.lastCapturedAt)}
+                sub={healthMeta.description}
+                motionOrder={7}
               />
             </MotionGroup>
 
             {topProviders.length > 0 ? (
-              <div className="mt-5 flex flex-wrap items-center gap-2 text-[12px] text-text-secondary">
-                <span className="font-semibold text-text-secondary">主要来源</span>
-                {topProviders.map((p) => (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11.5px] text-text-secondary">
+                <span className="font-semibold">主要来源</span>
+                {topProviders.map((provider) => (
                   <span
-                    key={p.providerId}
-                    className="rounded-md border border-border-light bg-bg-hover/55 px-2.5 py-1 font-mono"
+                    key={provider.providerId}
+                    className="rounded-full border border-border-light bg-bg-card/55 px-2.5 py-1 font-mono"
                   >
-                    {p.providerId} · {fmtCount(p.tokens)}
+                    {provider.providerId} · {fmtCount(provider.tokens)}
                   </span>
                 ))}
               </div>
@@ -588,40 +882,71 @@ export default function Dashboard() {
   )
 }
 
-/** 概览指标小卡片:图标 + 标签 + 数值,可选进度条 */
-function MetricBox({
+/** 首页核心指标卡片：复用 MoonMeter token，并采用紧凑、可扫读的两行卡片布局。 */
+function OverviewMetricCard({
   icon,
-  iconClass,
   label,
   value,
-  format,
-  progress
+  sub,
+  tone = 'neutral',
+  progress,
+  motionOrder
 }: {
   icon: string
-  iconClass: string
   label: string
-  value: number
-  format: (value: number) => string
+  value: ReactNode
+  sub: string
+  tone?: 'neutral' | 'accent' | 'amber' | 'blue' | 'purple' | 'red'
   progress?: number
+  motionOrder: number
 }) {
+  const iconClass = {
+    neutral: 'text-text-secondary bg-bg-hover',
+    accent: 'text-accent-text bg-accent-dim',
+    amber: 'text-status-amber bg-status-amber-dim',
+    blue: 'text-status-blue bg-status-blue-dim',
+    purple: 'text-status-purple bg-status-purple-dim',
+    red: 'text-status-red bg-status-red-dim'
+  }[tone]
+
   return (
-    <div className="rounded-md border border-border-light bg-bg-base/40 p-4">
-      <div className="flex items-center gap-2 text-[13px] font-semibold text-text-secondary">
-        <Icon name={icon} className={iconClass} />
-        <span>{label}</span>
+    <div
+      data-dashboard-metric={label}
+      className="motion-card flex min-h-[132px] flex-col rounded-lg border border-border-light bg-bg-card/60 p-4 shadow-card backdrop-blur-[2px] transition-colors hover:bg-bg-card/80"
+      style={{ '--motion-order': motionOrder } as CSSProperties}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-[12px] font-semibold text-text-secondary">{label}</div>
+        <span
+          className={clsx(
+            'flex h-7 w-7 flex-none items-center justify-center rounded-md text-[10px]',
+            iconClass
+          )}
+        >
+          <Icon name={icon} />
+        </span>
       </div>
-      <div className="mt-2 font-mono text-[22px] font-bold text-text-primary">
-        <AnimatedNumber value={value} format={format} durationMs={480} />
+      <div className="mt-2 min-w-0 truncate font-mono text-[24px] font-bold leading-tight tracking-[-0.025em] text-text-primary">
+        {value}
       </div>
       {progress !== undefined ? (
-        <ProgressBar
-          value={progress}
-          label={`缓存命中率 ${format(value)}`}
-          className="mt-3"
-          trackClassName="bg-border-light"
-          fillClassName="bg-accent"
-        />
-      ) : null}
+        <>
+          <ProgressBar
+            value={progress}
+            label={`${label}进度`}
+            className="mt-auto pt-3"
+            trackClassName="bg-border-light"
+            fillClassName="bg-accent"
+          />
+          <div className="mt-2 truncate text-[11px] text-text-secondary" title={sub}>
+            {sub}
+          </div>
+        </>
+      ) : (
+        <div className="mt-auto truncate pt-3 text-[11px] text-text-secondary" title={sub}>
+          {sub}
+        </div>
+      )}
     </div>
   )
 }

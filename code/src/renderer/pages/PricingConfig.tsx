@@ -14,6 +14,7 @@ import { ProviderIcon } from '../components/ProviderIcon'
 import { useReducedMotion } from '../hooks/useReducedMotion'
 import { convertPriceCurrency, fmtMoney, normalizeCurrency } from '../../shared/utils/money'
 import {
+  dedupePricingToOfficial,
   filterPricingEntries,
   paginatePricingEntries,
   summarizePricingEntries,
@@ -145,7 +146,9 @@ export default function PricingConfig() {
   )
 
   /** 按筛选条件过滤后的条目 */
-  const filtered = useMemo(() => filterPricingEntries(sorted, filter), [sorted, filter])
+  const filteredRaw = useMemo(() => filterPricingEntries(sorted, filter), [sorted, filter])
+  /** 每个模型只保留官方价(官方目录没有时保留聚合商独有行);用户自定义行不动 */
+  const filtered = useMemo(() => dedupePricingToOfficial(filteredRaw), [filteredRaw])
   const summary = useMemo(() => summarizePricingEntries(entries), [entries])
   const paginated = useMemo(
     () => paginatePricingEntries(filtered, page, PAGE_SIZE),

@@ -7,6 +7,24 @@
 /** 用量数据来源:供应商 API 实时拉取 或 本地会话日志解析。 */
 export type UsageSource = 'vendor-api' | 'session-log'
 
+/** 仪表盘与请求日志共享的用量筛选条件。 */
+export interface UsageAnalysisFilter {
+  /** 统计最近 N 天；0 表示全部历史。 */
+  days?: number
+  providerId?: string
+  fromISO?: string
+  toISO?: string
+  source?: UsageSource
+  modelContains?: string
+  projectContains?: string
+}
+
+/** 请求日志查询额外支持分页。 */
+export interface UsageLogFilter extends UsageAnalysisFilter {
+  limit?: number
+  offset?: number
+}
+
 /** 单条用量记录:对应 usage_records 表的一行。 */
 export interface UsageRecord {
   id?: number

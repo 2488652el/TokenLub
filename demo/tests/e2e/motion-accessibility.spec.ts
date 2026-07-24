@@ -149,8 +149,8 @@ function seedSyntheticModelUsage(databasePath: string): void {
     'const db=new Database(process.argv[1]);',
     `const fixtures=${JSON.stringify(fixtures)};`,
     "const pricing=db.prepare(`INSERT OR REPLACE INTO pricing_entries (provider_id,billing_scope,model,prompt_price_per_mtok,completion_price_per_mtok,cache_read_price_per_mtok,cache_creation_price_per_mtok,currency,source,catalog_active,updated_at) VALUES (@providerId,'default',@model,@promptPrice,@completionPrice,0.1,0.5,'USD','user',1,@capturedAt)`);",
-    "const usage=db.prepare(`INSERT INTO usage_records (provider_id,billing_scope,model,prompt_tokens,completion_tokens,cache_creation_tokens,cache_read_tokens,total_tokens,cost,currency,source,upstream_dimension,message_id,captured_at) VALUES (@providerId,'default',@model,@input,@output,@cacheWrite,@cacheRead,@total,0,'USD','session-log','',@messageId,@capturedAt)`);",
-    'const insert=db.transaction((rows)=>{for(const [index,row] of rows.entries()){const capturedAt=new Date(Date.UTC(2026,6,20,8,index)).toISOString();pricing.run({...row,capturedAt});usage.run({...row,total:row.input+row.output,messageId:`model-card-${index}`,capturedAt});}});',
+    "const usage=db.prepare(`INSERT INTO usage_records (provider_id,billing_scope,model,prompt_tokens,completion_tokens,cache_creation_tokens,cache_read_tokens,total_tokens,cost,currency,source,upstream_dimension,message_id,agent_label,captured_at) VALUES (@providerId,'default',@model,@input,@output,@cacheWrite,@cacheRead,@total,0,'USD','session-log','',@messageId,@agentLabel,@capturedAt)`);",
+    'const insert=db.transaction((rows)=>{for(const [index,row] of rows.entries()){const capturedAt=new Date(Date.UTC(2026,6,20,8,index)).toISOString();pricing.run({...row,capturedAt});usage.run({...row,total:row.input+row.output,messageId:`model-card-${index}`,agentLabel:index%2===0?`tokenlub`:`vibe-cafe`,capturedAt});}});',
     'insert(fixtures);',
     "const extraPricing=db.prepare(`INSERT OR REPLACE INTO pricing_entries (provider_id,billing_scope,model,prompt_price_per_mtok,completion_price_per_mtok,currency,source,catalog_active,updated_at) VALUES ('manual','default',?,1,2,'USD','catalog',1,?)`);",
     "const seedPricing=db.transaction(()=>{for(let index=0;index<60;index++){extraPricing.run(`pricing-e2e-${String(index).padStart(2,'0')}`,'2026-07-20T08:00:00.000Z');}});",
@@ -423,6 +423,107 @@ test.describe.serial('Electron motion and accessibility', () => {
     for (const route of ROUTES) {
       await navigateTo(window, route)
       await expectSettled(window)
+    }
+  })
+
+  test('renders the dashboard metric grid and keeps range controls responsive', async ({
+    browserName: _browserName
+  }, testInfo) => {
+    const window = page
+    if (!window) throw new Error('Electron window was not created')
+    expect(_browserName).toBe('chromium')
+    const runtimeErrors: string[] = []
+    const onConsole = (message: { type(): string; text(): string }) => {
+      if (message.type() === 'error') runtimeErrors.push(message.text())
+    }
+    const onPageError = (error: Error) => runtimeErrors.push(error.message)
+    window.on('console', onConsole)
+    window.on('pageerror', onPageError)
+
+    try {
+      await navigateTo(
+        window,
+        ROUTES.find((item) => item.path === '/settings')!
+      )
+      await navigateTo(
+        window,
+        ROUTES.find((item) => item.path === '/')!
+      )
+      const metrics = window.locator('[data-dashboard-metric]')
+      await expect(metrics).toHaveCount(8)
+      await expect(metrics.filter({ hasText: '计价覆盖' })).toContainText('%')
+      await expect(metrics.filter({ hasText: '最近数据' })).not.toContainText('Invalid')
+
+      const sevenDays = window.getByRole('button', { name: '7 天', exact: true })
+      await sevenDays.click()
+      await expect(sevenDays).toHaveAttribute('aria-pressed', 'true')
+      await expect(window.getByRole('button', { name: '30 天', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      )
+
+      const filterBar = window.locator('[data-usage-filter-bar]')
+      await expect(filterBar).toBeVisible()
+      await window.getByLabel('全局模型筛选').fill('gpt-5.2')
+      await window.getByLabel('全局项目筛选').fill('tokenlub')
+      await filterBar.getByRole('button', { name: 'CLI 会话', exact: true }).click()
+      await filterBar.getByRole('button', { name: '应用', exact: true }).click()
+      await expect(metrics.filter({ hasText: '总请求数' })).toContainText('1')
+
+      await navigateTo(
+        window,
+        ROUTES.find((item) => item.path === '/logs')!
+      )
+      await expect(window.getByLabel('模型筛选')).toHaveValue('gpt-5.2')
+      await expect(window.getByLabel('项目筛选')).toHaveValue('tokenlub')
+      await expect(window.getByRole('row', { name: /openai\/gpt-5\.2/ })).toContainText('tokenlub')
+      await window.screenshot({
+        path: testInfo.outputPath('request-logs-filtered.png'),
+        animations: 'disabled'
+      })
+
+      await navigateTo(
+        window,
+        ROUTES.find((item) => item.path === '/')!
+      )
+      const refresh = window.getByRole('button', { name: '刷新', exact: true })
+      await refresh.click()
+      await expect(refresh).toBeEnabled()
+      await expect(metrics).toHaveCount(8)
+
+      for (const viewport of [
+        { width: 1280, height: 900, name: 'desktop' },
+        { width: 900, height: 760, name: 'compact' }
+      ]) {
+        await window.setViewportSize(viewport)
+        await window.locator('.page-content').evaluate((element) => {
+          element.scrollTop = 0
+        })
+        await expect(metrics.first()).toBeVisible()
+        expect(
+          await window.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+        ).toBe(true)
+        await window.screenshot({
+          path: testInfo.outputPath(`dashboard-${viewport.name}.png`),
+          animations: 'disabled'
+        })
+      }
+
+      await window.setViewportSize({ width: 1280, height: 900 })
+      await window.getByRole('button', { name: '深色' }).first().click()
+      await expect(window.locator('html')).toHaveAttribute('data-theme', 'dark')
+      await window.locator('.page-content').evaluate((element) => {
+        element.scrollTop = 0
+      })
+      await window.screenshot({
+        path: testInfo.outputPath('dashboard-dark.png'),
+        animations: 'disabled'
+      })
+      await window.locator('[data-usage-filter-bar]').getByRole('button', { name: '清除' }).click()
+      expect(runtimeErrors).toEqual([])
+    } finally {
+      window.off('console', onConsole)
+      window.off('pageerror', onPageError)
     }
   })
 

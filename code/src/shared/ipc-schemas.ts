@@ -35,8 +35,14 @@ export const usageFilterSchema = z.object({
   source: z.enum(['vendor-api', 'session-log']).optional(),
   limit: z.number().int().positive().max(10000).optional(),
   offset: z.number().int().nonnegative().optional(),
-  modelContains: z.string().optional()
+  modelContains: z.string().max(200).optional(),
+  projectContains: z.string().max(200).optional()
 })
+
+/** 仪表盘聚合查询过滤条件校验。 */
+export const usageAnalysisFilterSchema = usageFilterSchema
+  .omit({ limit: true, offset: true })
+  .extend({ days: z.number().int().min(0).max(3650).optional() })
 
 // Pricing
 /** 设置定价条目入参校验。 */

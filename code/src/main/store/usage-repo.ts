@@ -11,7 +11,9 @@ import type {
   UsageLogPage,
   TotalSpendSummary,
   KeySpendSummary,
-  ModelSpendAggregate
+  ModelSpendAggregate,
+  UsageAnalysisFilter,
+  UsageLogFilter
 } from '@shared/types/usage'
 import { normalizeBillingScope, resolveBillingScope } from '@shared/pricing-scope'
 
@@ -73,6 +75,55 @@ interface PricedUsageGroup {
   storedCost?: number | null | undefined
   preferredCurrency?: string | null | undefined
   billingScope?: string | null | undefined
+}
+
+type UsageWhereFilter = Pick<
+  UsageAnalysisFilter,
+  'days' | 'providerId' | 'fromISO' | 'toISO' | 'source' | 'modelContains' | 'projectContains'
+>
+
+/** 统一构建用量查询条件，避免日志、分页与聚合口径发生漂移。 */
+function buildUsageWhere(filter: UsageWhereFilter): { where: string; args: unknown[] } {
+  const clauses: string[] = []
+  const args: unknown[] = []
+  if (filter.providerId) {
+    clauses.push('provider_id = ?')
+    args.push(filter.providerId)
+  }
+  if (filter.fromISO) {
+    clauses.push('captured_at >= ?')
+    args.push(filter.fromISO)
+  } else if ((filter.days ?? 0) > 0) {
+    clauses.push('captured_at >= ?')
+    args.push(new Date(Date.now() - (filter.days ?? 0) * 24 * 3600 * 1000).toISOString())
+  }
+  if (filter.toISO) {
+    clauses.push('captured_at <= ?')
+    args.push(filter.toISO)
+  }
+  if (filter.source) {
+    clauses.push('source = ?')
+    args.push(filter.source)
+  }
+  if (filter.modelContains?.trim()) {
+    clauses.push('LOWER(model) LIKE LOWER(?)')
+    args.push(`%${filter.modelContains.trim()}%`)
+  }
+  if (filter.projectContains?.trim()) {
+    clauses.push("LOWER(COALESCE(agent_label, '')) LIKE LOWER(?)")
+    args.push(`%${filter.projectContains.trim()}%`)
+  }
+  return {
+    where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '',
+    args
+  }
+}
+
+/** 聚合接口兼容旧版 days 数值入参，并对对象入参补齐默认 30 天。 */
+function normalizeAnalysisFilter(filter: number | UsageAnalysisFilter = 30): UsageAnalysisFilter {
+  if (typeof filter === 'number') return { days: filter }
+  if (filter.days !== undefined || filter.fromISO) return filter
+  return { ...filter, days: 30 }
 }
 
 /** 查找用量分组的定价:先按供应商+模型,再仅按模型回退。(内部辅助函数) */
@@ -274,7 +325,7 @@ export function insertUsage(records: UsageRecord[]): {
 }
 
 /**
- * 按条件查询用量记录(支持供应商/时间/来源/模型模糊匹配),结果按时间降序,读取时按定价配置重算成本。
+ * 按条件查询用量记录(支持供应商/时间/来源/模型/项目模糊匹配),结果按时间降序,读取时按定价配置重算成本。
  * @param filter 过滤条件(均为可选)
  * @param filter.providerId 供应商 ID
  * @param filter.fromISO 起始时间(ISO)
@@ -282,40 +333,12 @@ export function insertUsage(records: UsageRecord[]): {
  * @param filter.source 来源
  * @param filter.limit 返回上限(默认 500)
  * @param filter.modelContains 模型名模糊匹配(不区分大小写)
+ * @param filter.projectContains 项目/Agent 名模糊匹配(不区分大小写)
  * @returns 用量记录数组
  */
-export function queryUsage(filter: {
-  providerId?: string
-  fromISO?: string
-  toISO?: string
-  source?: string
-  limit?: number
-  modelContains?: string
-}): UsageRecord[] {
+export function queryUsage(filter: UsageLogFilter): UsageRecord[] {
   const db = getDb()
-  const clauses: string[] = []
-  const args: unknown[] = []
-  if (filter.providerId) {
-    clauses.push('provider_id = ?')
-    args.push(filter.providerId)
-  }
-  if (filter.fromISO) {
-    clauses.push('captured_at >= ?')
-    args.push(filter.fromISO)
-  }
-  if (filter.toISO) {
-    clauses.push('captured_at <= ?')
-    args.push(filter.toISO)
-  }
-  if (filter.source) {
-    clauses.push('source = ?')
-    args.push(filter.source)
-  }
-  if (filter.modelContains?.trim()) {
-    clauses.push('LOWER(model) LIKE LOWER(?)')
-    args.push(`%${filter.modelContains.trim()}%`)
-  }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const { where, args } = buildUsageWhere(filter)
   const limit = filter.limit ?? 500
   const rows = db
     .prepare(`SELECT * FROM usage_records ${where} ORDER BY captured_at DESC LIMIT ?`)
@@ -328,39 +351,9 @@ export function queryUsage(filter: {
  * @param filter 过滤条件(同 queryUsage,额外支持 offset)
  * @returns 分页结果对象(rows + total + limit + offset)
  */
-export function queryUsagePage(filter: {
-  providerId?: string
-  fromISO?: string
-  toISO?: string
-  source?: string
-  limit?: number
-  offset?: number
-  modelContains?: string
-}): UsageLogPage {
+export function queryUsagePage(filter: UsageLogFilter): UsageLogPage {
   const db = getDb()
-  const clauses: string[] = []
-  const args: unknown[] = []
-  if (filter.providerId) {
-    clauses.push('provider_id = ?')
-    args.push(filter.providerId)
-  }
-  if (filter.fromISO) {
-    clauses.push('captured_at >= ?')
-    args.push(filter.fromISO)
-  }
-  if (filter.toISO) {
-    clauses.push('captured_at <= ?')
-    args.push(filter.toISO)
-  }
-  if (filter.source) {
-    clauses.push('source = ?')
-    args.push(filter.source)
-  }
-  if (filter.modelContains?.trim()) {
-    clauses.push('LOWER(model) LIKE LOWER(?)')
-    args.push(`%${filter.modelContains.trim()}%`)
-  }
-  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+  const { where, args } = buildUsageWhere(filter)
   const limit = filter.limit ?? 100
   const offset = filter.offset ?? 0
   const totalRow = db
@@ -378,11 +371,11 @@ export function queryUsagePage(filter: {
 }
 
 /**
- * 仪表盘汇总:计算指定天数内的总成本、token 总量、按供应商占比与每日趋势。
- * @param days 统计天数(<=0 表示全部历史),默认 30
+ * 仪表盘汇总:按共享筛选条件计算总成本、token 总量、按供应商占比与每日趋势。
+ * @param filter 统计天数或来源/模型/项目等筛选条件
  * @returns 含总成本/token/供应商占比/每日趋势的汇总对象
  */
-export function getDashboardSummary(days = 30): {
+export function getDashboardSummary(filter: number | UsageAnalysisFilter = 30): {
   totalCost: number
   totalInputTokens: number
   totalOutputTokens: number
@@ -392,10 +385,7 @@ export function getDashboardSummary(days = 30): {
   daily: Array<{ date: string; cost: number; tokens: number }>
 } {
   const db = getDb()
-  const allTime = days <= 0
-  const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString()
-  const where = allTime ? '' : 'WHERE captured_at >= ?'
-  const args = allTime ? [] : [since]
+  const { where, args } = buildUsageWhere(normalizeAnalysisFilter(filter))
 
   const totals = db
     .prepare(
@@ -518,12 +508,9 @@ export function getDashboardSummary(days = 30): {
  * whichever accumulates the largest amount (default 'CNY' when nothing priced).
  * 按原始用量×当前定价实时计算总消费(而非入库时存储的 cost 列),按币种汇总;主币种为金额最大者。(glm-5.2)
  */
-export function computeTotalSpend(days = 30): TotalSpendSummary {
+export function computeTotalSpend(filter: number | UsageAnalysisFilter = 30): TotalSpendSummary {
   const db = getDb()
-  const allTime = days <= 0
-  const since = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString()
-  const where = allTime ? '' : 'WHERE captured_at >= ?'
-  const args = allTime ? [] : [since]
+  const { where, args } = buildUsageWhere(normalizeAnalysisFilter(filter))
 
   const groups = db
     .prepare(

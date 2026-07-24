@@ -5,7 +5,7 @@
   <p>A local-first LLM usage, balance, and cost workspace for multi-model developers.</p>
 
   <p>
-    <img alt="Version" src="https://img.shields.io/badge/version-1.2.3-151515?style=flat-square" />
+    <img alt="Version" src="https://img.shields.io/badge/version-1.2.4-151515?style=flat-square" />
     <img alt="React" src="https://img.shields.io/badge/React-19.2-151515?style=flat-square&logo=react" />
     <img alt="Electron" src="https://img.shields.io/badge/Electron-31-151515?style=flat-square&logo=electron" />
     <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS-B59A58?style=flat-square" />
@@ -100,13 +100,13 @@ npm run build
 ### Package for Windows
 
 ```powershell
-npm run dist:win -- --change "MoonMeter-1.2.3" --model "release"
+npm run dist:win -- --change "MoonMeter-1.2.4" --model "release"
 ```
 
 Output:
 
 ```text
-demo/moonmeter-1.2.3-MoonMeter-1.2.3-release/
+demo/moonmeter-1.2.4-MoonMeter-1.2.4-release/
 ```
 
 For macOS, use `npm run dist:mac:x64`, `npm run dist:mac:arm64`, or `npm run dist:mac`. Formal builds and historical versions are available from [GitHub Releases](https://github.com/2488652el/MoonMeter/releases).
@@ -171,4 +171,4 @@ Run at least `typecheck`, `test`, `lint`, and `format:check` before submitting a
 
 ## Version
 
-Current source version: **MoonMeter 1.2.3**. This release removes unused internal surfaces and duplicate styles, stabilizes cross-platform source line endings, and corrects repository and packaging guidance. See [CHANGELOG.md](./CHANGELOG.md).
+Current source version: **MoonMeter 1.2.4**. This release upgrades the dashboard metric layout and adds shared source, model, and project/agent filters across the dashboard and request logs. See [CHANGELOG.md](./CHANGELOG.md).
