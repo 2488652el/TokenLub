@@ -10,6 +10,7 @@ import { IPC } from '@shared/ipc-channels'
 import {
   apiKeyCreateInputSchema,
   apiKeyUpdateInputSchema,
+  usageAnalysisFilterSchema,
   usageFilterSchema,
   pricingSetInputSchema,
   pricingCatalogApplyInputSchema,
@@ -105,6 +106,14 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
   return out as T
 }
 
+/** 仪表盘 IPC 兼容旧版数字天数，同时统一走对象 schema 校验。 */
+function parseUsageAnalysisFilter(input: unknown): Parameters<typeof getDashboardSummary>[0] {
+  const candidate = typeof input === 'number' ? { days: input } : (input ?? { days: 30 })
+  return stripUndefined(usageAnalysisFilterSchema.parse(candidate)) as Parameters<
+    typeof getDashboardSummary
+  >[0]
+}
+
 /**
  * 注册全部 IPC 处理器:覆盖密钥、用量、价格、设置、告警、余额、Provider、
  * 本地日志同步与 CLI 密钥探测等模块。每个处理器使用 zod schema 校验入参。
@@ -186,9 +195,11 @@ export function registerIpcHandlers(): void {
   })
 
   // usage
-  ipcMain.handle(IPC.usageGetDashboard, (_e, days?: number) => getDashboardSummary(days ?? 30))
-  ipcMain.handle(IPC.usageGetTotalSpend, async (_e, days?: number) =>
-    withCnySpendConversion(computeTotalSpend(days ?? 30))
+  ipcMain.handle(IPC.usageGetDashboard, (_e, filter) =>
+    getDashboardSummary(parseUsageAnalysisFilter(filter))
+  )
+  ipcMain.handle(IPC.usageGetTotalSpend, async (_e, filter) =>
+    withCnySpendConversion(computeTotalSpend(parseUsageAnalysisFilter(filter)))
   )
   ipcMain.handle(IPC.usageGetModelSpend, (_e, filter) => {
     const parsed = stripUndefined(usageFilterSchema.parse(filter ?? {})) as unknown as {

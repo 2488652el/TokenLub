@@ -17,6 +17,11 @@ import {
 } from '../../shared/utils/request-log-filter'
 import type { UsageRecord, UsageSource } from '../../shared/types/usage'
 import type { ProviderManifest } from '../../shared/types/provider'
+import {
+  readUsageAnalysisFilter,
+  usageRangeToLocalDates,
+  writeUsageAnalysisFilter
+} from '../../shared/utils/usage-analysis-filter'
 
 /** 排序字段类型:按时间或按费用 */
 type SortKey = 'time' | 'cost'
@@ -26,31 +31,12 @@ const PAGE_SIZE = 100
 /** 搜索防抖时长(毫秒) */
 const SEARCH_DEBOUNCE_MS = 400
 
-/** ponytail: YYYY-MM-DD for <input type="date">. Avoids timezone drift by
- *  using local-date arithmetic in `toLocalISO`/`fromLocalISO` below.
- *
- *  将 Date 转为本地 YYYY-MM-DD 字符串,避免时区漂移。 (glm-5.2) */
-function toLocalISO(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-/** 返回默认日期范围:近 30 天 */
-function defaultDates(): { from: string; to: string } {
-  const now = new Date()
-  const from = new Date(now)
-  from.setDate(from.getDate() - 30)
-  return { from: toLocalISO(from), to: toLocalISO(now) }
-}
-
-/** ponytail: hand-rolled CSV — escape quotes/commas/newlines, prepend BOM so
+/** hand-rolled CSV — escape quotes/commas/newlines, prepend BOM so
  *  Excel on Windows opens UTF-8 cleanly. No csv lib needed. */
 // 手写 CSV 构建:转义引号/逗号/换行,并在开头加 BOM 以便 Windows Excel 正确识别 UTF-8。 (glm-5.2)
 function buildCsv(rows: UsageRecord[]): string {
   const header =
-    'time,provider,model,source,prompt_tokens,completion_tokens,cache_read_tokens,cache_creation_tokens,cost,currency,session_id'
+    'time,provider,model,project,source,prompt_tokens,completion_tokens,cache_read_tokens,cache_creation_tokens,cost,currency,session_id'
   const esc = (v: unknown): string => {
     if (v === null || v === undefined) return ''
     const s = String(v)
@@ -64,6 +50,7 @@ function buildCsv(rows: UsageRecord[]): string {
         esc(r.capturedAt),
         esc(r.providerId),
         esc(r.model),
+        esc(r.agentLabel ?? ''),
         esc(r.source),
         esc(r.promptTokens ?? ''),
         esc(r.completionTokens ?? ''),
@@ -97,6 +84,7 @@ function downloadCsv(rows: UsageRecord[]) {
  * 拉取供应商与分页日志,提供筛选、排序、分页、导出与详情查看。
  */
 export default function RequestLogs() {
+  const persistedFilter = useMemo(() => readUsageAnalysisFilter(window.localStorage), [])
   const [providers, setProviders] = useState<ProviderManifest[]>([])
   const [logs, setLogs] = useState<UsageRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,16 +93,20 @@ export default function RequestLogs() {
   const [detail, setDetail] = useState<UsageRecord | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const init = useMemo(defaultDates, [])
+  const init = useMemo(() => usageRangeToLocalDates(persistedFilter.range), [persistedFilter.range])
   const [providerFilter, setProviderFilter] = useState<string>('all')
-  const [sourceFilter, setSourceFilter] = useState<UsageSource | 'all'>('all')
+  const [sourceFilter, setSourceFilter] = useState<UsageSource | 'all'>(persistedFilter.source)
   const [fromDate, setFromDate] = useState<string>(init.from)
   const [toDate, setToDate] = useState<string>(init.to)
-  const [search, setSearch] = useState<string>('')
-  // ponytail: server-side model filter is debounced so we don't hammer the
+  const [search, setSearch] = useState<string>(persistedFilter.modelContains)
+  const [projectSearch, setProjectSearch] = useState<string>(persistedFilter.projectContains)
+  // server-side model filter is debounced so we don't hammer the
   // main process on every keystroke. The local `search` still drives the
   // instant client-side highlight.
-  const [committedSearch, setCommittedSearch] = useState<string>('')
+  const [committedSearch, setCommittedSearch] = useState<string>(persistedFilter.modelContains)
+  const [committedProjectSearch, setCommittedProjectSearch] = useState<string>(
+    persistedFilter.projectContains
+  )
   const [sortKey, setSortKey] = useState<SortKey>('time')
   const [sortDesc, setSortDesc] = useState(true)
   const [page, setPage] = useState(1)
@@ -130,6 +122,7 @@ export default function RequestLogs() {
         fromDate,
         toDate,
         search: committedSearch,
+        projectSearch: committedProjectSearch,
         limit: PAGE_SIZE,
         offset: (targetPage - 1) * PAGE_SIZE
       })
@@ -162,7 +155,15 @@ export default function RequestLogs() {
   useEffect(() => {
     void load(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerFilter, sourceFilter, fromDate, toDate, committedSearch, page])
+  }, [
+    providerFilter,
+    sourceFilter,
+    fromDate,
+    toDate,
+    committedSearch,
+    committedProjectSearch,
+    page
+  ])
 
   // ponytail: debounce the server-side model search so typing stays snappy.
   // Blur/Enter commits immediately for users who want a fast round-trip.
@@ -170,15 +171,26 @@ export default function RequestLogs() {
     const t = window.setTimeout(() => {
       setPage(1)
       setCommittedSearch(search)
+      setCommittedProjectSearch(projectSearch)
     }, SEARCH_DEBOUNCE_MS)
     return () => window.clearTimeout(t)
-  }, [search])
+  }, [projectSearch, search])
 
   /** 提交搜索词(失焦或回车时立即生效) */
   function commitSearch() {
     setPage(1)
     setCommittedSearch(search)
+    setCommittedProjectSearch(projectSearch)
   }
+
+  useEffect(() => {
+    writeUsageAnalysisFilter(window.localStorage, {
+      ...readUsageAnalysisFilter(window.localStorage),
+      source: sourceFilter,
+      modelContains: committedSearch.trim(),
+      projectContains: committedProjectSearch.trim()
+    })
+  }, [committedProjectSearch, committedSearch, sourceFilter])
 
   /** 刷新已入库的用量后重新加载 */
   async function handleRefresh() {
@@ -202,6 +214,7 @@ export default function RequestLogs() {
           fromDate,
           toDate,
           search: search.trim() ? search : committedSearch,
+          projectSearch: projectSearch.trim() ? projectSearch : committedProjectSearch,
           limit: REQUEST_LOGS_EXPORT_LIMIT
         })
       )
@@ -217,11 +230,13 @@ export default function RequestLogs() {
   function handleReset() {
     setProviderFilter('all')
     setSourceFilter('all')
-    const d = defaultDates()
+    const d = usageRangeToLocalDates('30d')
     setFromDate(d.from)
     setToDate(d.to)
     setSearch('')
     setCommittedSearch('')
+    setProjectSearch('')
+    setCommittedProjectSearch('')
     setPage(1)
   }
 
@@ -242,7 +257,12 @@ export default function RequestLogs() {
   // date-range, so this stays well under the 10k limit even on big installs.
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const filtered = q ? logs.filter((r) => r.model.toLowerCase().includes(q)) : logs
+    const project = projectSearch.trim().toLowerCase()
+    const filtered = logs.filter(
+      (record) =>
+        (!q || record.model.toLowerCase().includes(q)) &&
+        (!project || (record.agentLabel ?? '').toLowerCase().includes(project))
+    )
     const sorted = [...filtered].sort((a, b) => {
       if (sortKey === 'cost') {
         const av = a.cost ?? 0
@@ -255,7 +275,7 @@ export default function RequestLogs() {
       return sortDesc ? bt.localeCompare(at) : at.localeCompare(bt)
     })
     return sorted
-  }, [logs, search, sortKey, sortDesc])
+  }, [logs, projectSearch, search, sortKey, sortDesc])
 
   const providerOptions = useMemo(() => {
     const map = new Map<string, string>()
@@ -324,11 +344,11 @@ export default function RequestLogs() {
       <Card
         className="mb-4"
         title="筛选条件"
-        subtitle="按供应商、来源、日期或模型快速定位日志"
+        subtitle="与首页共享来源、模型和项目条件"
         action={
           <div className="flex items-center gap-3">
             <span
-              key={`${providerFilter}-${sourceFilter}-${fromDate}-${toDate}-${committedSearch}-${totalCount}`}
+              key={`${providerFilter}-${sourceFilter}-${fromDate}-${toDate}-${committedSearch}-${committedProjectSearch}-${totalCount}`}
               className="motion-data-flash text-[11.5px] text-text-muted"
               aria-live="polite"
             >
@@ -348,7 +368,7 @@ export default function RequestLogs() {
         bodyClassName="pt-1"
       >
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <FilterField label="供应商" className="lg:col-span-4">
+          <FilterField label="供应商" className="lg:col-span-3">
             <select
               value={providerFilter}
               onChange={(event) => {
@@ -366,7 +386,7 @@ export default function RequestLogs() {
             </select>
           </FilterField>
 
-          <FilterField label="日志来源" className="lg:col-span-4">
+          <FilterField label="日志来源" className="lg:col-span-3">
             <div className="flex h-9 rounded-md border border-border-light bg-bg-base p-1">
               <SourceFilterButton
                 label="全部"
@@ -395,7 +415,7 @@ export default function RequestLogs() {
             </div>
           </FilterField>
 
-          <FilterField label="模型名称" className="lg:col-span-4">
+          <FilterField label="模型名称" className="lg:col-span-3">
             <div className="relative">
               <Icon
                 name="fa-magnifying-glass"
@@ -403,6 +423,7 @@ export default function RequestLogs() {
               />
               <input
                 type="search"
+                aria-label="模型筛选"
                 placeholder="搜索模型名称"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -415,7 +436,28 @@ export default function RequestLogs() {
             </div>
           </FilterField>
 
-          <FilterField label="日期范围" className="lg:col-span-8">
+          <FilterField label="项目 / Agent" className="lg:col-span-3">
+            <div className="relative">
+              <Icon
+                name="fa-folder-open"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-text-muted"
+              />
+              <input
+                type="search"
+                aria-label="项目筛选"
+                placeholder="搜索项目或 Agent"
+                value={projectSearch}
+                onChange={(event) => setProjectSearch(event.target.value)}
+                onBlur={commitSearch}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commitSearch()
+                }}
+                className="h-9 w-full rounded-md border border-border-light bg-bg-input py-1.5 pl-9 pr-3 text-[12.5px] text-text-primary focus:border-border-focus focus:outline-none focus:ring-2 focus:ring-accent-dim"
+              />
+            </div>
+          </FilterField>
+
+          <FilterField label="日期范围" className="lg:col-span-12">
             <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
               <input
                 type="date"
@@ -467,15 +509,16 @@ export default function RequestLogs() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] table-fixed text-[12.5px]">
               <colgroup>
-                <col className="w-[164px]" />
-                <col className="w-[92px]" />
-                <col className="w-[132px]" />
-                <col className="w-[92px]" />
-                <col className="w-[76px]" />
-                <col className="w-[76px]" />
-                <col className="w-[86px]" />
-                <col className="w-[86px]" />
-                <col className="w-[96px]" />
+                <col className="w-[145px]" />
+                <col className="w-[80px]" />
+                <col className="w-[120px]" />
+                <col className="w-[105px]" />
+                <col className="w-[80px]" />
+                <col className="w-[65px]" />
+                <col className="w-[65px]" />
+                <col className="w-[73px]" />
+                <col className="w-[73px]" />
+                <col className="w-[85px]" />
               </colgroup>
               <thead className="bg-bg-base text-left text-text-secondary">
                 <tr>
@@ -487,6 +530,7 @@ export default function RequestLogs() {
                   </th>
                   <th className="px-3 py-3 font-medium">供应商</th>
                   <th className="px-3 py-3 font-medium">模型</th>
+                  <th className="px-3 py-3 font-medium">项目 / Agent</th>
                   <th className="px-3 py-3 font-medium">来源</th>
                   <th className="px-3 py-3 text-right font-medium">输入量</th>
                   <th className="px-3 py-3 text-right font-medium">输出量</th>
@@ -501,7 +545,7 @@ export default function RequestLogs() {
                 </tr>
               </thead>
               <tbody
-                key={`${page}-${providerFilter}-${sourceFilter}-${fromDate}-${toDate}-${committedSearch}-${sortKey}-${sortDesc}`}
+                key={`${page}-${providerFilter}-${sourceFilter}-${fromDate}-${toDate}-${committedSearch}-${committedProjectSearch}-${sortKey}-${sortDesc}`}
                 className="motion-table-rows text-text-primary"
               >
                 {visible.map((r, i) => (
@@ -519,6 +563,9 @@ export default function RequestLogs() {
                     <td className="truncate px-3 py-3 font-mono" title={r.model}>
                       {r.model || '—'}
                     </td>
+                    <td className="truncate px-3 py-3" title={r.agentLabel}>
+                      {r.agentLabel || '—'}
+                    </td>
                     <td className="px-3 py-3">
                       <span
                         className={
@@ -530,16 +577,16 @@ export default function RequestLogs() {
                         {sourceLabel(r.source)}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-right font-mono tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums">
                       {r.promptTokens !== undefined ? fmtCount(r.promptTokens) : '—'}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums">
                       {r.completionTokens !== undefined ? fmtCount(r.completionTokens) : '—'}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums">
                       {r.cacheReadTokens !== undefined ? fmtCount(r.cacheReadTokens) : '—'}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono tabular-nums">
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono tabular-nums">
                       {r.cacheCreationTokens !== undefined ? fmtCount(r.cacheCreationTokens) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-mono font-medium tabular-nums">
@@ -602,6 +649,7 @@ export default function RequestLogs() {
             <DetailRow k="Captured" v={detail.capturedAt || '—'} mono />
             <DetailRow k="Provider" v={detail.providerId} />
             <DetailRow k="Model" v={detail.model || '—'} mono />
+            <DetailRow k="Project" v={detail.agentLabel ?? '—'} />
             <DetailRow k="Source" v={detail.source} />
             <DetailRow k="API Key" v={detail.apiKeyId ?? '—'} mono />
             <DetailRow k="Session" v={detail.sessionId ?? '—'} mono />

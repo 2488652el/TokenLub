@@ -23,13 +23,13 @@ interface UsageRow {
 }
 
 const usageRows: UsageRow[] = [
-  row(1, '2026-07-06T12:00:00.000Z', 'glm-5.2'),
-  row(2, '2026-07-06T11:00:00.000Z', 'glm-5.2'),
-  row(3, '2026-07-06T10:00:00.000Z', 'glm-5.2'),
-  row(4, '2026-07-05T09:00:00.000Z', 'gpt-4o')
+  row(1, '2026-07-06T12:00:00.000Z', 'glm-5.2', 'tokenlub'),
+  row(2, '2026-07-06T11:00:00.000Z', 'glm-5.2', 'website'),
+  row(3, '2026-07-06T10:00:00.000Z', 'glm-5.2', 'tokenlub'),
+  row(4, '2026-07-05T09:00:00.000Z', 'gpt-4o', null)
 ]
 
-function row(id: number, capturedAt: string, model: string): UsageRow {
+function row(id: number, capturedAt: string, model: string, agentLabel: string | null): UsageRow {
   return {
     id,
     api_key_id: null,
@@ -47,7 +47,7 @@ function row(id: number, capturedAt: string, model: string): UsageRow {
     source: 'session-log',
     session_id: null,
     message_id: `m-${id}`,
-    agent_label: null,
+    agent_label: agentLabel,
     captured_at: capturedAt
   }
 }
@@ -61,6 +61,10 @@ function matches(sql: string, args: unknown[], item: UsageRow) {
   if (sql.includes('LOWER(model) LIKE LOWER(?)')) {
     const needle = String(args[i++]).replaceAll('%', '').toLowerCase()
     if (!item.model.toLowerCase().includes(needle)) return false
+  }
+  if (sql.includes("LOWER(COALESCE(agent_label, '')) LIKE LOWER(?)")) {
+    const needle = String(args[i++]).replaceAll('%', '').toLowerCase()
+    if (!(item.agent_label ?? '').toLowerCase().includes(needle)) return false
   }
   return true
 }
@@ -105,5 +109,18 @@ describe('queryUsagePage', () => {
     expect(page.limit).toBe(2)
     expect(page.offset).toBe(1)
     expect(page.rows.map((r) => r.id)).toEqual([2, 3])
+  })
+
+  it('filters null-safe project labels before pagination', async () => {
+    const { queryUsagePage } = await import('../../../../code/src/main/store/usage-repo')
+
+    const page = queryUsagePage({
+      projectContains: 'TOKEN',
+      limit: 100,
+      offset: 0
+    })
+
+    expect(page.total).toBe(2)
+    expect(page.rows.map((record) => record.agentLabel)).toEqual(['tokenlub', 'tokenlub'])
   })
 })

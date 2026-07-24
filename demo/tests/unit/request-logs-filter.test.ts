@@ -14,6 +14,7 @@ describe('RequestLogs filter builder', () => {
       fromDate: '2026-07-01',
       toDate: '2026-07-02',
       search: 'gpt-4o',
+      projectSearch: 'tokenlub',
       limit: 100,
       offset: 200
     })
@@ -24,6 +25,7 @@ describe('RequestLogs filter builder', () => {
       fromISO: new Date('2026-07-01T00:00:00').toISOString(),
       toISO: new Date('2026-07-02T23:59:59.999').toISOString(),
       modelContains: 'gpt-4o',
+      projectContains: 'tokenlub',
       limit: 100,
       offset: 200
     })

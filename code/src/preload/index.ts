@@ -13,7 +13,9 @@ import type {
   RefreshAllResult,
   TotalSpendSummary,
   KeySpendSummary,
-  ModelSpendAggregate
+  ModelSpendAggregate,
+  UsageAnalysisFilter,
+  UsageLogFilter
 } from '../shared/types/usage'
 import type {
   CnyRateQuote,
@@ -46,7 +48,7 @@ window.addEventListener('online', () => {
  * the same zod schema before dispatching. Validating twice is YAGNI.
  */
 const api = {
-  version: '1.2.3',
+  version: '1.2.4',
 
   keys: {
     list: (): Promise<ApiKeyRecord[]> => ipcRenderer.invoke(IPC.keysList),
@@ -68,31 +70,18 @@ const api = {
   },
 
   usage: {
-    getDashboard: (days?: number): Promise<DashboardSummary> =>
-      ipcRenderer.invoke(IPC.usageGetDashboard, days ?? 30),
-    getTotalSpend: (days?: number): Promise<TotalSpendSummary> =>
-      ipcRenderer.invoke(IPC.usageGetTotalSpend, days ?? 30),
+    getDashboard: (filter?: number | UsageAnalysisFilter): Promise<DashboardSummary> =>
+      ipcRenderer.invoke(IPC.usageGetDashboard, filter ?? 30),
+    getTotalSpend: (filter?: number | UsageAnalysisFilter): Promise<TotalSpendSummary> =>
+      ipcRenderer.invoke(IPC.usageGetTotalSpend, filter ?? 30),
     getModelSpend: (filter?: {
       fromISO?: string | undefined
       toISO?: string | undefined
     }): Promise<ModelSpendAggregate[]> => ipcRenderer.invoke(IPC.usageGetModelSpend, filter ?? {}),
-    getLogs: (filter?: {
-      providerId?: string | undefined
-      fromISO?: string | undefined
-      toISO?: string | undefined
-      source?: 'vendor-api' | 'session-log' | undefined
-      limit?: number | undefined
-      modelContains?: string | undefined
-    }): Promise<UsageRecord[]> => ipcRenderer.invoke(IPC.usageGetLogs, filter ?? {}),
-    getLogsPage: (filter?: {
-      providerId?: string | undefined
-      fromISO?: string | undefined
-      toISO?: string | undefined
-      source?: 'vendor-api' | 'session-log' | undefined
-      limit?: number | undefined
-      offset?: number | undefined
-      modelContains?: string | undefined
-    }): Promise<UsageLogPage> => ipcRenderer.invoke(IPC.usageGetLogsPage, filter ?? {}),
+    getLogs: (filter?: UsageLogFilter): Promise<UsageRecord[]> =>
+      ipcRenderer.invoke(IPC.usageGetLogs, filter ?? {}),
+    getLogsPage: (filter?: UsageLogFilter): Promise<UsageLogPage> =>
+      ipcRenderer.invoke(IPC.usageGetLogsPage, filter ?? {}),
     refreshAll: (): Promise<RefreshAllResult> => ipcRenderer.invoke(IPC.usageRefreshAll),
     /**
      * Per-key spend estimate. Backed by `computeSpendByKey` in
